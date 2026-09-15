@@ -1,5 +1,10 @@
 # Plan
 
+## Status
+
+Bootstrap documents committed. Next session starts with T00 (storage
+decision, owner) and then T01. Nothing else is in progress.
+
 Milestones are sequential. Tasks inside a milestone marked `[P]` can run
 in parallel with the other `[P]` tasks of the same milestone. Sizes:
 S (< 2 h agent time), M (half a day), L (a day or more). Model tag: `S`
@@ -19,27 +24,44 @@ acceptance criteria are shown in a merged PR.
 - **T02 (done in bootstrap commit)** Docs and agent config: this plan,
   `docs/ARCHITECTURE.md`, `docs/WORKFLOW.md`, `CLAUDE.md`, skill stubs,
   PR template.
+- **T00 [owner]** Decide the data storage backend from `docs/STORAGE.md`
+  and record it in `docs/DECISIONS.md`. Blocks T12, T13, T42, T51.
 - **T03 [owner]** Branch protection on `main` (PR required, CI required,
-  one approval). Enable GitHub Pages from the `gh-pages` branch.
+  one approval). Enable GitHub Pages from the `gh-pages` branch. If
+  storage option B is chosen, create `newscollection2027-data`.
 - **T04 (S, size S)** Create one GitHub issue per task below with labels
   `milestone:Mx`, `size:x`, `model:S|O`.
 
 ## M1 Ingest
 
-- **T10 (S, size S) [P]** `config/outlets.yaml` with the starting outlets
-  (The Verge, Ars Technica, TechCrunch, Engadget, ZDNet, VentureBeat,
-  TechRepublic, The Next Web) and `nc feeds check`, which fetches every feed
-  and prints item counts and the newest date.
-  AC: report shows every configured feed returning items; dead feeds are
-  removed or replaced.
+- **T09 (O, size M)** Outlet research and evaluation. The outlet list is
+  open. Candidates: the 25 sites the old project scraped, plus any
+  English-language tech outlet with a public feed. For each candidate,
+  find the feed URLs and score: feed exists and is discoverable; entries
+  carry a real summary or lede rather than the title alone; number of
+  entries per fetch; posting frequency; canonical links without tracking
+  parameters; one feed per outlet or clear section feeds; feed terms of
+  use permit aggregation with attribution. Deliverable: `docs/OUTLETS.md`
+  with a scoring table and a recommended starting set of 8 to 12 outlets,
+  plus the same data as `config/outlets.candidates.yaml`.
+  AC: every candidate has a score and a reason; the recommended set has
+  no outlet whose feed is title-only.
+- **T10 (S, size S) [P]** `config/outlets.yaml` generated from the
+  recommended set in `docs/OUTLETS.md`, and `nc feeds check`, which
+  fetches every feed and prints item counts, newest date and whether ledes
+  are present.
+  AC: report shows every configured feed returning items with ledes; dead
+  feeds are removed or replaced.
 - **T11 (S, size M) [P]** Fetch and normalize: `feedparser`, canonical URL
   (tracking parameters stripped, scheme and host lowercased), item id,
   lede extraction (HTML stripped, first 60 words of summary or content),
   published time in UTC, outlet, author, tags.
   AC: unit tests with one fixture feed per outlet under `tests/fixtures/feeds/`.
-- **T12 (S, size S)** Store: idempotent append to
-  `data/items/YYYY/MM/DD.jsonl` keyed by item id; `nc db rebuild` builds
-  `.cache/nc.sqlite` from the JSONL files.
+- **T12 (S, size S)** Store: `DataRoot` abstraction (a local directory
+  backed by the storage chosen in T00), idempotent append to
+  `items/YYYY/MM/DD.jsonl` keyed by item id; `nc db rebuild` builds
+  `.cache/nc.sqlite` from the JSONL files; `nc sync pull|push` for the
+  chosen backend.
   AC: running `nc ingest` twice in a row produces no git diff on the
   second run.
 - **T13 (S, size S)** Ingest workflow: `.github/workflows/ingest.yml`,

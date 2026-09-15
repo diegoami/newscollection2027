@@ -44,7 +44,9 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
      comment. Findings are fixed on the same branch or explicitly declined
      with a reason in the thread.
   3. Owner reads the PR, asks for changes or approves and merges (squash).
-- The nightly Routine and the ingest workflow commit directly to `main`
+- Where data lives is an open decision (`docs/STORAGE.md`). Under the
+  bootstrap assumption the nightly Routine and the ingest workflow commit
+  directly to `main`
   under `data/**` and `data/runs/**` only, with messages prefixed
   `data:`. CI skips tests for commits that touch only `data/**` and runs
   the deploy instead. These are the only exceptions to the PR rule.

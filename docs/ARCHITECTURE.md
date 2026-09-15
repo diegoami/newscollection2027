@@ -17,9 +17,10 @@ subscription rather than through metered API calls.
    files; an agent (Claude Code in a Routine, or the SDK backend) writes
    analysis files; Python validates them against a schema and a verbatim
    quote check. The rest of the system never knows which backend ran.
-3. **Data lives in git as text.** Daily JSONL and per-cluster JSON files.
-   SQLite is a rebuildable cache, never committed. Git history is the
-   archive and the audit trail.
+3. **Data is text files under one data root.** Daily JSONL and
+   per-cluster JSON files. SQLite is a rebuildable cache, never stored.
+   Where the data root lives (a data repository or object storage) is an
+   open decision, see `docs/STORAGE.md`; the code only sees a directory.
 4. **Nothing unattributed reaches the page.** Every claim and every
    discrepancy carries the outlet, the item id and the verbatim sentence it
    came from. The validator rejects anything else.
