@@ -19,8 +19,9 @@ subscription rather than through metered API calls.
    quote check. The rest of the system never knows which backend ran.
 3. **Data is text files under one data root.** Daily JSONL and
    per-cluster JSON files. SQLite is a rebuildable cache, never stored.
-   Where the data root lives (a data repository or object storage) is an
-   open decision, see `docs/STORAGE.md`; the code only sees a directory.
+   The data root is a checkout of the separate repository
+   `newscollection2027-data`; object storage replaces it later (see
+   `docs/STORAGE.md`). The code only sees a directory.
 4. **Nothing unattributed reaches the page.** Every claim and every
    discrepancy carries the outlet, the item id and the verbatim sentence it
    came from. The validator rejects anything else.
@@ -31,17 +32,18 @@ subscription rather than through metered API calls.
  every 3h                          04:00 Europe/Berlin
  GitHub Actions (free)             Claude Code Routine (subscription, Sonnet 5)
  ┌───────────────────────┐         ┌──────────────────────────────────────┐
- │ nc ingest             │         │ git pull                             │
- │ nc cluster            │ commit  │ nc pending      -> list cluster files │
- │ -> data/items/…       │──main──>│ agent writes data/analyses/…         │
- │ -> data/clusters/…    │         │ nc validate     -> accept / reject    │
- │ -> data/pending/…     │         │ nc build        -> smoke check        │
- └───────────────────────┘         │ commit + push main                    │
-                                   └──────────────────────────────────────┘
-                                                     │ push to main
-                                                     ▼
-                                   GitHub Actions deploy: nc build -> gh-pages
-                                   (later: Netlify build from the same command)
+ │ nc sync pull          │         │ nc sync pull                         │
+ │ nc ingest             │  push   │ nc pending      -> list cluster files │
+ │ nc cluster            │──data──>│ agent writes analyses/…              │
+ │ -> items/…            │  repo   │ nc validate     -> accept / reject    │
+ │ -> clusters/…         │         │ nc build        -> smoke check        │
+ │ -> pending/…          │         │ nc sync push    -> data repo          │
+ └───────────────────────┘         └──────────────────────────────────────┘
+              │                                      │
+              └────────── repository_dispatch ───────┘
+                                   ▼
+                   GitHub Actions deploy (code repo): checkout both repos,
+                   nc build -> gh-pages   (later: Netlify, same command)
 ```
 
 Why split ingest from analysis: feeds only expose the last 10 to 30 items,

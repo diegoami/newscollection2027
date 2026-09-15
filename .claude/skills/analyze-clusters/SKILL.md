@@ -1,6 +1,6 @@
 ---
 name: analyze-clusters
-description: Turn pending story clusters (data/pending/*.json) into validated analysis files (data/analyses/<date>/<id>.json) that compare what each outlet claims. Use when asked to analyze clusters, fill pending analyses, or run the nightly analysis step.
+description: Turn pending story clusters (pending/*.json in the data root) into validated analysis files (analyses/<date>/<id>.json in the data root) that compare what each outlet claims. Use when asked to analyze clusters, fill pending analyses, or run the nightly analysis step.
 ---
 
 # Analyze clusters
@@ -15,14 +15,14 @@ fact you know from elsewhere.
 1. Run `nc pending` to list cluster files. Process them in the order given.
 2. For each cluster file, read it. It contains `id`, `version` and `items`,
    each item with `item_id`, `outlet`, `title`, `lede`, `published`.
-3. Write `data/analyses/<YYYY-MM-DD>/<cluster id>.json` where the date is
+3. Write `<data root>/analyses/<YYYY-MM-DD>/<cluster id>.json` where the date is
    the cluster's date prefix. Follow `contract/analysis.schema.json`
    exactly. Set `backend` to `claude_code` and `model` to the model you are
    running as if you know it, otherwise `unknown`.
 4. After every ten files, run `nc validate --new`. For each reject, read
-   the reason in `data/rejected/<id>.json`, fix the analysis and validate
+   the reason in `<data root>/rejected/<id>.json`, fix the analysis and validate
    again. Give up on a cluster after two retries and move on.
-5. Do not edit cluster files, items, or anything outside `data/analyses/`.
+5. Do not edit cluster files, items, or anything outside `<data root>/analyses/`.
 
 ## Content rules
 

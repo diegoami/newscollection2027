@@ -32,8 +32,11 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
 
 ### Branching and pull requests
 
-- `main` is protected: PRs only, CI must pass, one approval by the owner.
-  No agent merges. No force pushes.
+- `main` is protected by a ruleset: PRs only, CI must pass, no force
+  pushes, no deletions, required approvals set to zero. Zero, because
+  agent sessions open PRs under the owner's GitHub identity and GitHub
+  does not let an author approve their own PR. The owner merges after
+  reading the PR and the reviewer agent's findings. No agent merges.
 - Feature branches: `feat/T<nn>-<slug>` (one task per branch), fixes:
   `fix/<slug>`. Branches are short-lived and deleted after merge.
 - One PR per task. The PR body states the task id, what changed, how it
@@ -43,7 +46,7 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
   2. Orchestrator runs the reviewer agent and posts its findings as one PR
      comment. Findings are fixed on the same branch or explicitly declined
      with a reason in the thread.
-  3. Owner reads the PR, asks for changes or approves and merges (squash).
+  3. Owner reads the PR, asks for changes or merges (squash).
 - Where data lives is an open decision (`docs/STORAGE.md`). Under the
   bootstrap assumption the nightly Routine and the ingest workflow commit
   directly to `main`
@@ -63,20 +66,24 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
 ### Every three hours: ingest (GitHub Actions)
 
 ```
-nc ingest         fetch feeds, append new items to data/items/
+nc sync pull      clone or fast-forward the data repo into the data root
+nc ingest         fetch feeds, append new items to items/
 nc cluster        embed new items, link, emit clusters and pending files
-git commit -m "data: ingest <timestamp>"   only if something changed
-git push
+nc sync push      commit "data: ingest <timestamp>" and push, only if changed
+                  then repository_dispatch data-updated -> deploy workflow
 ```
 
 Concurrency group `data` so runs never overlap. The embedding model is
-cached between runs with `actions/cache`.
+cached between runs with `actions/cache`. The workflow authenticates to
+the data repo with a fine-grained personal access token scoped to that
+one repository, stored as the secret `DATA_REPO_TOKEN`.
 
 ### 04:00 Europe/Berlin: analyze and publish (Claude Code Routine)
 
 Routine settings: fresh session per firing, model Claude Sonnet 5,
-environment Default, repo `diegoami/newscollection2027` with push access,
-push and email notifications on. Cron is evaluated in UTC: `0 2 * * *`
+environment Default, repos `diegoami/newscollection2027` (read) and
+`diegoami/newscollection2027-data` (push) attached, push and email
+notifications on. Cron is evaluated in UTC: `0 2 * * *`
 is 04:00 in summer and 03:00 in winter; the schedule is changed twice a
 year or left to drift, owner's choice.
 
@@ -86,7 +93,7 @@ Routine prompt (kept to one line, the detail lives in the repo skill):
 
 The skill procedure:
 
-1. `git pull --ff-only origin main`
+1. `nc sync pull` brings the data repo to the data root.
 2. `nc pending` lists cluster files awaiting analysis.
 3. For each pending cluster, the agent reads the cluster file and writes
    `data/analyses/<date>/<cluster_id>.json` following
@@ -96,10 +103,10 @@ The skill procedure:
    leaves it in `data/rejected/`.
 5. `nc build` as a smoke test that the site still builds.
 6. `nc runlog` writes `data/runs/<date>.json`.
-7. `git add data && git commit -m "data: analyses <date>" && git push origin main`.
-
-The push triggers the deploy workflow, which builds the site and publishes
-it to GitHub Pages (later Netlify).
+7. `nc sync push` commits `data: analyses <date>` to the data repo and
+   pushes; the data repo's push triggers the deploy workflow in the code
+   repo through `repository_dispatch`, which builds the site and publishes
+   it to GitHub Pages (later Netlify).
 
 Agent structure at runtime: one agent, no subagents in v1. Fifty clusters
 at about a thousand tokens each fit comfortably in one context. If nightly
