@@ -2,8 +2,9 @@
 
 ## Status
 
-Bootstrap documents committed. Next session starts with T00 (storage
-decision, owner) and then T01. Nothing else is in progress.
+Bootstrap documents committed. Storage decided (separate data repo, see
+`docs/DECISIONS.md`). Next session starts with T01; T03 is the owner's
+prerequisite for merging it. Nothing else is in progress.
 
 Milestones are sequential. Tasks inside a milestone marked `[P]` can run
 in parallel with the other `[P]` tasks of the same milestone. Sizes:
@@ -24,11 +25,11 @@ acceptance criteria are shown in a merged PR.
 - **T02 (done in bootstrap commit)** Docs and agent config: this plan,
   `docs/ARCHITECTURE.md`, `docs/WORKFLOW.md`, `CLAUDE.md`, skill stubs,
   PR template.
-- **T00 [owner]** Decide the data storage backend from `docs/STORAGE.md`
-  and record it in `docs/DECISIONS.md`. Blocks T12, T13, T42, T51.
+- **T00 [owner, done]** Storage backend decided: separate data repository.
 - **T03 [owner]** Branch protection on `main` (PR required, CI required,
-  one approval). Enable GitHub Pages from the `gh-pages` branch. If
-  storage option B is chosen, create `newscollection2027-data`.
+  one approval). Enable GitHub Pages from the `gh-pages` branch. Create
+  the public repository `newscollection2027-data` with an empty `main`
+  and no branch protection; only automation writes to it.
 - **T04 (S, size S)** Create one GitHub issue per task below with labels
   `milestone:Mx`, `size:x`, `model:S|O`.
 
@@ -57,16 +58,20 @@ acceptance criteria are shown in a merged PR.
   lede extraction (HTML stripped, first 60 words of summary or content),
   published time in UTC, outlet, author, tags.
   AC: unit tests with one fixture feed per outlet under `tests/fixtures/feeds/`.
-- **T12 (S, size S)** Store: `DataRoot` abstraction (a local directory
-  backed by the storage chosen in T00), idempotent append to
-  `items/YYYY/MM/DD.jsonl` keyed by item id; `nc db rebuild` builds
-  `.cache/nc.sqlite` from the JSONL files; `nc sync pull|push` for the
-  chosen backend.
+- **T12 (S, size S)** Store: `DataRoot` abstraction (a local directory,
+  by default a checkout of `newscollection2027-data` at `NC_DATA_ROOT`),
+  idempotent append to `items/YYYY/MM/DD.jsonl` keyed by item id;
+  `nc db rebuild` builds `.cache/nc.sqlite` from the JSONL files;
+  `nc sync pull|push` wraps clone or pull and commit or push of the data
+  repo with `data:` commit messages.
   AC: running `nc ingest` twice in a row produces no git diff on the
   second run.
-- **T13 (S, size S)** Ingest workflow: `.github/workflows/ingest.yml`,
-  cron every three hours, concurrency group `data`, commits with the
-  `data:` prefix only when files changed.
+- **T13 (S, size S)** Ingest workflow: `.github/workflows/ingest.yml` in
+  the code repo, cron every three hours, concurrency group `data`, checks
+  out the data repo with a fine-grained token stored as a secret, runs
+  `nc ingest` and `nc cluster`, pushes to the data repo only when files
+  changed, then sends a `repository_dispatch` event `data-updated` to the
+  code repo.
   AC: two consecutive scheduled runs; the second produces a commit only if
   new items exist.
 
@@ -136,8 +141,9 @@ acceptance criteria are shown in a merged PR.
   first-to-report rate, story count, computed by one function from the
   analyses and used by the outlet pages and the front page.
   AC: unit test with fixture analyses reproduces hand-computed numbers.
-- **T42 (S, size S)** Deploy workflow: on push to `main`, `nc build`, then
-  publish `site/` to the `gh-pages` branch.
+- **T42 (S, size S)** Deploy workflow: on push to `main`, on
+  `repository_dispatch` `data-updated`, and manually; checks out both
+  repos, `nc build`, publishes `site/` to the `gh-pages` branch.
   AC: site reachable at `https://diegoami.github.io/newscollection2027/`.
 - **T43 (S, size S)** Status page from `data/runs/`.
   AC: last run's counts, rejects and durations visible on `/status/`.
@@ -149,7 +155,8 @@ acceptance criteria are shown in a merged PR.
   --dry-run`, which executes every step except the agent step and the push.
   AC: dry run succeeds in a Claude Code session on real pending data.
 - **T51 [owner + orchestrator]** Create the Routine: cron `0 2 * * *`
-  (UTC), fresh session, Claude Sonnet 5, notifications on, prompt as in
+  (UTC), fresh session, Claude Sonnet 5, notifications on, both
+  repositories attached with push access to the data repo, prompt as in
   `docs/WORKFLOW.md`.
   AC: first unattended run commits analyses and the site updates.
 - **T52 (S, size S)** Failure surfacing: the ingest workflow opens or

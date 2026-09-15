@@ -10,15 +10,16 @@ Read first: `docs/ARCHITECTURE.md` (what and why), `docs/WORKFLOW.md`
 ## Rules
 
 - Deterministic code (ingest, cluster, validate, build) never calls an LLM.
-- The LLM step is a file contract: `data/pending/*.json` in,
-  `data/analyses/<date>/*.json` out, `nc validate` decides. Never bypass
+- The LLM step is a file contract: `pending/*.json` in the data root in,
+  `analyses/<date>/*.json` out, `nc validate` decides. Never bypass
   the validator.
 - Every claim and discrepancy on the site carries outlet, item id and a
   verbatim quote from that item's title or lede. No exceptions.
-- `data/**` is text only (JSONL and JSON). SQLite lives in `.cache/` and is
-  never committed.
-- `main` is PR-only except `data:` commits from automation touching
-  `data/**`. Agents never merge.
+- Pipeline data is text only (JSONL and JSON) and lives in the data root,
+  a checkout of `newscollection2027-data` at `NC_DATA_ROOT`. It is never
+  committed to this repository. SQLite lives in `.cache/`.
+- `main` is PR-only, no exceptions. Agents never merge. Automation pushes
+  only to the data repository.
 - Run `make check` before reporting any task as done.
 - Model ids and thresholds live in `config/`, never inline in code.
 
@@ -26,7 +27,8 @@ Read first: `docs/ARCHITECTURE.md` (what and why), `docs/WORKFLOW.md`
 
 ```
 make check          ruff + mypy + pytest
-nc ingest           fetch feeds into data/items/
+nc sync pull|push   fast-forward or commit and push the data repo
+nc ingest           fetch feeds into the data root
 nc cluster          embed, link, emit clusters and pending files
 nc pending          list clusters awaiting analysis
 nc validate --new   validate analyses written since the last run
