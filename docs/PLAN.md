@@ -26,8 +26,9 @@ acceptance criteria are shown in a merged PR.
   `docs/ARCHITECTURE.md`, `docs/WORKFLOW.md`, `CLAUDE.md`, skill stubs,
   PR template.
 - **T00 [owner, done]** Storage backend decided: separate data repository.
-- **T03 [owner]** Branch protection on `main` (PR required, CI required,
-  one approval). Enable GitHub Pages from the `gh-pages` branch. Create
+- **T03 [owner]** Ruleset on `main`: PR required, required approvals
+  zero, block force pushes, restrict deletions; add the required status
+  check `check` once T01's CI workflow exists. Enable GitHub Pages from the `gh-pages` branch. Create
   the public repository `newscollection2027-data` with an empty `main`
   and no branch protection; only automation writes to it.
 - **T04 (S, size S)** Create one GitHub issue per task below with labels

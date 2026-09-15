@@ -32,8 +32,11 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
 
 ### Branching and pull requests
 
-- `main` is protected: PRs only, CI must pass, one approval by the owner.
-  No agent merges. No force pushes.
+- `main` is protected by a ruleset: PRs only, CI must pass, no force
+  pushes, no deletions, required approvals set to zero. Zero, because
+  agent sessions open PRs under the owner's GitHub identity and GitHub
+  does not let an author approve their own PR. The owner merges after
+  reading the PR and the reviewer agent's findings. No agent merges.
 - Feature branches: `feat/T<nn>-<slug>` (one task per branch), fixes:
   `fix/<slug>`. Branches are short-lived and deleted after merge.
 - One PR per task. The PR body states the task id, what changed, how it
@@ -43,7 +46,7 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
   2. Orchestrator runs the reviewer agent and posts its findings as one PR
      comment. Findings are fixed on the same branch or explicitly declined
      with a reason in the thread.
-  3. Owner reads the PR, asks for changes or approves and merges (squash).
+  3. Owner reads the PR, asks for changes or merges (squash).
 - Where data lives is an open decision (`docs/STORAGE.md`). Under the
   bootstrap assumption the nightly Routine and the ingest workflow commit
   directly to `main`
