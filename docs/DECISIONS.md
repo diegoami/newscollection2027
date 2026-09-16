@@ -8,6 +8,19 @@ without reading a single robots.txt or terms page, so whether these feeds
 may be aggregated with attribution is unanswered. It also decides whether
 NYT Technology, which measured well, joins the set.
 
+- 2026-09-16 Promotional items and same-outlet pairs, raised by the
+  owner during the first labelling session. Coupon pages, deals posts
+  and conference marketing are dropped from the clustering window by
+  `config/promo.yaml`; they are not stories, they are near duplicates
+  of each other, and they had already corrupted 3 of the first 10
+  positive labels. Same-outlet pairs stay out of the labelling sample
+  but remain in `pending-pairs/`: a cluster needs two distinct outlets,
+  so they are not the judgment a human should spend an hour on, but
+  they can still bridge a component. Filtering happens at cluster time,
+  never at ingest: the item store is the record and these rules will be
+  retuned. Consequence for T23: the pool is 121 pairs, not 223, so the
+  "at least 200" acceptance criterion needs the owner's call — relax it,
+  or wait for the corpus to refill with cross-outlet pairs.
 - 2026-09-16 Clustering, ratified on #38. Cluster ids derive from an
   anchor item fixed when the cluster is born, not from a hash of the
   membership: the documented model asked for both and they contradict

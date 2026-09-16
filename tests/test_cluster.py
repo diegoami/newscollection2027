@@ -58,6 +58,7 @@ from nc.cluster import (
 )
 from nc.embed import HashBackend, embed_items, load_vectors
 from nc.feeds import Item
+from nc.promo import PromoRules, load_promo_rules, partition
 from nc.store import DataRoot, append_items
 
 CONFIG = ClusterConfig(tau_low=0.65, tau_high=0.80, window_days=4, min_outlets=2)
@@ -1032,8 +1033,15 @@ def test_run_clustering_writes_a_labelling_sample_with_clear_pos_and_neg(
 
     report = run_clustering(data_root, CONFIG, db_path, now=NOW)
 
-    assert report.label_sample_written == 6 + 3 + 1 + 3 + 1 + 1
+    # Groups a, b, c, e, f contribute 6 + 3 + 1 + 1 + 1. Group d is
+    # three items from one outlet, so its 3 pairs are same-outlet and
+    # `select_label_sample` skips them: a cluster needs two distinct
+    # outlets, so they are not the judgment the thresholds govern. They
+    # stay in the borderline band for T24, where a same-outlet link can
+    # still bridge a component.
+    assert report.label_sample_written == 6 + 3 + 1 + 1 + 1
     sample = load_label_sample(data_root)
+    assert all(pair.a.outlet != pair.b.outlet for pair in sample)
     assert len(sample) == report.label_sample_written
     scores = sorted({round(pair.score, 2) for pair in sample})
     assert scores == [0.50, 0.72, 0.85, 0.88, 0.95]
@@ -1241,3 +1249,132 @@ def test_cluster_item_from_item_keeps_the_fields_the_agent_quotes() -> None:
         "lede": item.lede,
         "published": item.published,
     }
+
+
+# --- promotional items and same-outlet pairs --------------------------
+#
+# Both come from the same finding on the first real corpus: a coupon
+# page is not a story, but it is a near duplicate of every other coupon
+# page, so it outscores two outlets covering the same event. See
+# nc/promo.py's module docstring for the measurements.
+
+
+def _tagged(seed: str, outlet: str, title: str, tags: tuple[str, ...]) -> Item:
+    return replace(_item(seed, outlet, title=title), tags=tags)
+
+
+def test_promo_rules_match_outlet_tags_case_and_space_insensitively() -> None:
+    rules = PromoRules(frozenset({"gear / deals"}), ())
+    assert rules.matches(_tagged("a", "wired", "Anything", ("Gear  /  Deals",)))
+    assert not rules.matches(_tagged("b", "wired", "Anything", ("Security",)))
+
+
+def test_promo_rules_match_shopping_copy_in_the_title() -> None:
+    rules = load_promo_rules(Path("config/promo.yaml"))
+    for title in (
+        "Casetify Promo Codes | 15% Off September 2026",
+        "Chirp Discount Codes: 67% Off",
+        "HostGator Coupon Codes: 76% Off Hosting in September 2026",
+        "Save $270 on this solid 1080p gaming PC with an RTX 5060 from MSI",
+        "Grab a $560 saving on this 1440p-ready gaming PC",
+    ):
+        assert rules.matches(_tagged("x", "wired", title, ())), title
+
+
+def test_promo_rules_leave_business_news_that_says_deal_alone() -> None:
+    """The word "deal" is ordinary business-news vocabulary. An earlier
+    rule matching the bare word dropped these real stories, which is why
+    config/promo.yaml lists shopping-copy constructions instead."""
+    rules = load_promo_rules(Path("config/promo.yaml"))
+    for title in (
+        "May Mobility is going public in a $1.4B SPAC deal",
+        "Automattic's interim CEO and legal chief signed severance deals",
+        "Maryland data center developers offer residents biggest-ever US deal",
+        "AMD Radeon RX 9070 GRE returns to its lowest-ever price of $499",
+    ):
+        assert not rules.matches(_tagged("x", "tomshardware", title, ())), title
+
+
+def test_missing_promo_config_filters_nothing() -> None:
+    """A data root or a fixture without the file gets no filtering,
+    rather than an exception or an empty window."""
+    rules = load_promo_rules(Path("config/no-such-file.yaml"))
+    assert not rules.matches(_tagged("a", "wired", "Promo Codes: 15% Off", ()))
+
+
+def test_partition_keeps_input_order_on_both_sides() -> None:
+    rules = PromoRules(frozenset({"coupons"}), ())
+    items = [
+        _tagged("n1", "wired", "Real story one", ("Security",)),
+        _tagged("p1", "wired", "Coupon page", ("Coupons",)),
+        _tagged("n2", "wired", "Real story two", ("AI",)),
+    ]
+    news, promotional = partition(items, rules)
+    assert [item.id for item in news] == [_item_id("n1"), _item_id("n2")]
+    assert [item.id for item in promotional] == [_item_id("p1")]
+
+
+def test_run_clustering_drops_promotional_items_from_the_window(
+    tmp_path: Path,
+) -> None:
+    """The filter runs before anything is compared, so a coupon page
+    cannot link, cannot reach a cluster, and cannot enter the labelling
+    sample."""
+    data_root = DataRoot(tmp_path / "data")
+    coupon_a = _tagged("c0", "wired", "Casetify Promo Codes | 15% Off", ())
+    coupon_b = _tagged("c1", "wired", "Visible Promo Codes and Coupons", ())
+    story_a = _item("s0", "theverge", title="Meta launches smart glasses")
+    story_b = _item("s1", "engadget", title="Meta launches smart glasses")
+    append_items(data_root, [coupon_a, coupon_b, story_a, story_b])
+
+    rules = load_promo_rules(Path("config/promo.yaml"))
+    db_path = tmp_path / "vectors.sqlite"
+    embed_items(data_root, HashBackend(), "hash", db_path, 16)
+    report = run_clustering(
+        data_root,
+        ClusterConfig(0.65, 0.8, 4, 2),
+        db_path,
+        now=datetime(2026, 9, 16, 12, 0, tzinfo=UTC),
+        promo_rules=rules,
+    )
+
+    assert report.promotional_dropped == 2
+    assert report.run.stats.window_items == 2
+    sampled = {
+        item.item_id
+        for pair in load_label_sample(data_root)
+        for item in (pair.a, pair.b)
+    }
+    assert coupon_a.id not in sampled
+    assert coupon_b.id not in sampled
+
+
+def test_format_report_names_the_promotional_drop(tmp_path: Path) -> None:
+    """A filter whose effect is invisible in the run log is one nobody
+    notices misfiring."""
+    data_root = DataRoot(tmp_path / "data")
+    append_items(data_root, [_tagged("c0", "wired", "Shark Promo Codes", ())])
+    db_path = tmp_path / "vectors.sqlite"
+    embed_items(data_root, HashBackend(), "hash", db_path, 16)
+    config = ClusterConfig(0.65, 0.8, 4, 2)
+    report = run_clustering(
+        data_root,
+        config,
+        db_path,
+        now=datetime(2026, 9, 16, 12, 0, tzinfo=UTC),
+        promo_rules=load_promo_rules(Path("config/promo.yaml")),
+    )
+    assert "dropping 1 promotional (config/promo.yaml)" in format_report(report, config)
+
+
+def test_label_sample_skips_same_outlet_pairs() -> None:
+    """A cluster is emitted only with two distinct outlets, so a
+    same-outlet pair is not the judgment the thresholds govern. It stays
+    in pending-pairs/, where it can still bridge a component."""
+    a = ClusterItem.from_item(_item("e0", "wired"))
+    b = ClusterItem.from_item(_item("e1", "wired"))
+    c = ClusterItem.from_item(_item("e2", "theverge"))
+    same = PendingPair(a=a, b=b, score=0.90)
+    cross = PendingPair(a=a, b=c, score=0.90)
+    chosen = select_label_sample([same, cross], [], 0.30, 0.05, 20)
+    assert [pair.pair_id for pair in chosen] == [cross.pair_id]

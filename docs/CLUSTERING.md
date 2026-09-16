@@ -282,3 +282,53 @@ embedding model whose absolute cosine scale is not the same as a
 transformer's. The likely fix is that `tau_high` needs to come down,
 but "likely" is exactly what T23's labelling and this page's `nc tune`
 report are for -- do not retune from this paragraph alone.
+
+## What never reaches the labelling pool
+
+Two filters run before a human ever sees a pair. Both come from the
+first real labelling session, where the pool of 223 pairs turned out to
+be 46% unusable.
+
+**Promotional items are dropped from the window** (`config/promo.yaml`,
+`nc.promo`). The outlets do not publish only news: 27 of Wired's 55
+items in one four-day window were coupon pages, and Tom's Hardware
+posts build-a-PC discounts. These are not stories, and they are near
+duplicates *of each other*, so they outscore genuine cross-outlet
+matches: "Casetify Promo Codes | 15% Off" against "Visible Promo Codes
+and Coupons" scored 0.7323, above The Register and BleepingComputer on
+the same Iranian malware campaign at 0.7330 — and above most real
+pairs. Three things follow, worst first: a coupon page can reach a
+story cluster (two shopping desks linking, plus one link out to a real
+article, satisfies `min_outlets`), it crowds the top score buckets out
+of the labelling sample, and it corrupts the labels — 3 of the first 10
+"same story" answers were two unrelated coupon pages.
+
+The rules are of two kinds because one is not enough. An outlet's own
+feed categories are the reliable signal, since a human at the outlet
+chose them; that catches The Verge completely. Tom's Hardware files
+discounts under `Gaming PCs` like any other hardware piece, so titles
+are matched too, on shopping-copy constructions only. Two rules were
+tried and rejected against the real corpus: a bare `deal` (it is
+ordinary business vocabulary — "a $1.4B SPAC deal", "reciprocal
+severance deals") and Wired's `Shopping` tag (it also carries product
+launches and reviews). Both are documented in `config/promo.yaml` so
+they are not re-added.
+
+The filter runs at cluster time, not ingest time. The item store is
+append-only and is the record, so nothing is deleted; widening or
+narrowing the rules changes the next run's window with no migration.
+
+**Same-outlet pairs are dropped from the labelling sample**
+(`select_label_sample`), but kept in `pending-pairs/`. A cluster is
+emitted only with two or more distinct outlets, so the judgment the
+thresholds govern is whether two *outlets* are on the same story. In
+the first corpus, same-outlet pairs were 97 of 223 and 7 of the 10
+above 0.80 — one masthead's own follow-ups crowding exactly the part of
+the range the thresholds are set from. They stay in the band for T24's
+judge because a same-outlet link still matters to clustering: it can
+bridge two items of one outlet into a component that reaches a second
+outlet, and that component is a legitimate cluster holding two items
+from the same masthead. It is the human's hour that should not go on
+them.
+
+Net effect on the first corpus: 223 pairs to 121, and 318 items to 290.

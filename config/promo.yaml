@@ -1,0 +1,48 @@
+# Promotional items: coupon pages, deals posts, conference marketing.
+# `nc cluster` drops these from the window before anything is compared
+# (nc/promo.py, docs/CLUSTERING.md). They are never deleted from the
+# item store, so widening or narrowing these rules only changes what
+# the next run reads.
+#
+# Why they have to go: a coupon page is not a story, but it is a near
+# duplicate of every other coupon page, so two of them score higher
+# against each other than two outlets covering the same event. Left in,
+# they crowd out the real pairs in the labelling sample and can
+# eventually reach a story cluster, where the site would be checking
+# one outlet's affiliate copy against another's.
+
+# Feed categories the outlets file shopping content under. Matched
+# against the item's own tags, case-insensitively, with surrounding
+# whitespace collapsed. This is the reliable signal: the outlet
+# curated it.
+#
+# `shopping` is deliberately NOT here. Wired files coupon pages, buyer's
+# guides, reviews AND product launches under it, so matching it dropped
+# "Boox Launches the Palma 3 E-Reader" and a laptop review along with
+# the coupons. Every coupon page it would have caught is caught by the
+# title patterns below anyway. What survives instead is a handful of
+# "Best X of 2026" buyer's guides, which cost one easy "different"
+# answer each in a labelling session -- a cheaper mistake than losing a
+# launch story two outlets both covered.
+tags:
+  - coupon
+  - coupons
+  - deal
+  - deals
+  - gear / deals
+  - verge shopping
+
+# Title patterns, for outlets whose deals posts carry ordinary
+# categories instead -- Tom's Hardware files them under "Gaming PCs".
+# Shopping-copy constructions only. A bare "deal" is deliberately NOT
+# here: it is ordinary business-news vocabulary ("a $1.4B SPAC deal",
+# "reciprocal severance deals", "biggest-ever community benefits
+# deal"), and listing it dropped three real stories when measured.
+title_patterns:
+  - "promo code"
+  - "coupon"
+  - "discount code"
+  - "[0-9]+% off"
+  - "save \\$[0-9]"
+  - "grab a \\$[0-9]"
+  - "\\$[0-9][0-9,]* off"
