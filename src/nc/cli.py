@@ -3,7 +3,7 @@
 Subcommands (`pending`, `validate`, `analyze`, `build`, `nightly`) are
 added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
-T12; `embed` by T20; `cluster` by T21.
+T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import feedparser
 
-from nc import __version__, cluster, embed, feeds, store, sync
+from nc import __version__, cluster, embed, feeds, labelling, store, sync
 from nc.store import DataRoot
 
 
@@ -99,6 +99,27 @@ def _cluster(args: argparse.Namespace) -> int:
     config = cluster.load_cluster_config(args.config)
     report = cluster.run_clustering(data_root, config, args.db)
     print(cluster.format_report(report, config))
+    return 0
+
+
+def _label(args: argparse.Namespace) -> int:
+    """T22: show unlabeled borderline pairs, record yes/no to
+    `labels/pairs.jsonl`. Reads `pending-pairs/` written by `nc cluster`
+    -- no embedding model, see nc/labelling.py's module docstring.
+    """
+    data_root = _data_root(args)
+    config = cluster.load_cluster_config(args.config)
+    labelling.run_label_session(data_root, config, limit=args.limit)
+    return 0
+
+
+def _tune(args: argparse.Namespace) -> int:
+    """T22: precision/recall per candidate threshold, from
+    `labels/pairs.jsonl`."""
+    data_root = _data_root(args)
+    config = cluster.load_cluster_config(args.config)
+    report = labelling.run_tune(data_root)
+    print(labelling.format_tune_report(report, config))
     return 0
 
 
@@ -232,6 +253,42 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"vectors SQLite file (default: {embed.DEFAULT_VECTORS_DB_PATH})",
     )
     cluster_parser.set_defaults(func=_cluster)
+
+    label_parser = subparsers.add_parser(
+        "label",
+        help="show unlabeled near-threshold pairs, record yes/no (T22)",
+    )
+    label_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    label_parser.add_argument(
+        "--config",
+        type=Path,
+        default=cluster.DEFAULT_CLUSTER_CONFIG_PATH,
+        help=f"clustering config (default: {cluster.DEFAULT_CLUSTER_CONFIG_PATH})",
+    )
+    label_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="stop after this many pairs (default: the whole unlabeled pool)",
+    )
+    label_parser.set_defaults(func=_label)
+
+    tune_parser = subparsers.add_parser(
+        "tune",
+        help="print precision and recall per threshold from the labels (T22)",
+    )
+    tune_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    tune_parser.add_argument(
+        "--config",
+        type=Path,
+        default=cluster.DEFAULT_CLUSTER_CONFIG_PATH,
+        help=f"clustering config (default: {cluster.DEFAULT_CLUSTER_CONFIG_PATH})",
+    )
+    tune_parser.set_defaults(func=_tune)
 
     db_parser = subparsers.add_parser(
         "db", help="the SQLite cache built from the data root"

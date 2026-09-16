@@ -156,6 +156,29 @@ skill reads `id`, `version` and `items` straight out of it). To take a
 cluster off the queue, a later step (T30's `nc validate`) sets `status`
 in the cluster file; the next `nc cluster` run removes the pending file.
 
+**Borderline pairs (T22).** `ClusterRun.borderline` is recomputed from
+scratch on every run and was, until T22, thrown away: nothing persisted
+it, so T22's `nc label` would have needed the embedding model loaded
+just to show a human two headlines. `write_pending_pairs` fixes that by
+writing one file per pair to `pending-pairs/<pair_id>.json`, denormalized
+(both items' outlet, title, lede, published, plus the score) so `nc
+label` is a pure file read. This does not reopen the churn question T12
+exists to close: `_write_if_changed` means a pair already on disk with
+the same score is untouched, and because item vectors are deterministic
+(T20's AC) the same pair recomputed in a later run renders to the same
+bytes. The window can only ever *shrink* what a no-op run recomputes
+(cutoff moves forward, no new items), never grow it, so a run with
+nothing new writes zero pending-pair bytes for the same reason it writes
+zero cluster bytes. Pair files are never deleted, including when a pair
+ages out of the window or gets superseded by a later run: unlike the
+pending/ mirror, there is no downstream status that means "stop showing
+this," short of a human judging it (`nc.labelling` filters those out by
+reading `labels/pairs.jsonl`, not by anything this module tracks). The
+cost is a `pending-pairs/` directory that only grows -- acceptable at
+this project's volume for the same reason `clusters/` growing forever is
+(section 4, "Cost"), and a T24 concern to prune once judged pairs are
+merged back in, not this task's.
+
 ===========================================================================
 4. Cost
 ===========================================================================
@@ -349,19 +372,20 @@ class Cluster:
         return payload
 
 
+def _cluster_item_from_dict(raw: Mapping[str, object]) -> ClusterItem:
+    return ClusterItem(
+        item_id=str(raw["item_id"]),
+        outlet=str(raw["outlet"]),
+        title=str(raw["title"]),
+        lede=str(raw["lede"]),
+        published=str(raw["published"]),
+    )
+
+
 def cluster_from_dict(raw: Mapping[str, object]) -> Cluster:
     items_raw = raw["items"]
     assert isinstance(items_raw, list)
-    items = tuple(
-        ClusterItem(
-            item_id=str(entry["item_id"]),
-            outlet=str(entry["outlet"]),
-            title=str(entry["title"]),
-            lede=str(entry["lede"]),
-            published=str(entry["published"]),
-        )
-        for entry in items_raw
-    )
+    items = tuple(_cluster_item_from_dict(entry) for entry in items_raw)
     superseded_by = raw.get("superseded_by")
     return Cluster(
         id=str(raw["id"]),
@@ -447,6 +471,69 @@ class PairScan:
     borderline: tuple[Pair, ...]
     compared: int
     skipped_dim_mismatch: int
+
+
+@dataclass(frozen=True)
+class PendingPair:
+    """One borderline pair, persisted for T22's `nc label` (and T24's
+    judge) to read without the embedding model: both members are fully
+    denormalized -- outlet, title, lede, published, exactly as
+    `ClusterItem` already denormalizes them into a cluster file -- plus
+    the score that put the pair in the band. `nc label` needs nothing
+    else to show a human the two headlines; `nc tune` needs nothing but
+    `score` and the human's later yes/no.
+
+    Not a `Pair` with items bolted on: `Pair.a`/`Pair.b` are item ids
+    used as `extra_links` keys (T24's seam into `cluster_items`), and
+    keeping that type minimal is what makes `scan_pairs` cheap (module
+    docstring, "Cost"). Denormalizing happens once, at the write
+    boundary in `run_clustering`, where the window's items are already
+    in hand.
+    """
+
+    a: ClusterItem
+    b: ClusterItem
+    score: float
+
+    @property
+    def pair_id(self) -> str:
+        """`<lower item id>-<higher item id>`. Item ids are never
+        reallocated (`nc.store` is append-only), so this id is never
+        reallocated either -- unlike a cluster id, a pair never needs
+        `_allocate_id`'s collision probing."""
+        return f"{self.a.item_id}-{self.b.item_id}"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "a": self.a.to_dict(),
+            "b": self.b.to_dict(),
+            # Rounded for the same reason cluster files have no
+            # timestamps (module docstring, "Idempotence"): two runs
+            # over the same vectors should render identical bytes, and
+            # rounding away sub-ULP matmul jitter makes that robust
+            # rather than merely usually true.
+            "score": round(self.score, 6),
+        }
+
+
+def pending_pair_from_dict(raw: Mapping[str, object]) -> PendingPair:
+    a_raw, b_raw = raw["a"], raw["b"]
+    assert isinstance(a_raw, Mapping)
+    assert isinstance(b_raw, Mapping)
+    return PendingPair(
+        a=_cluster_item_from_dict(a_raw),
+        b=_cluster_item_from_dict(b_raw),
+        score=float(str(raw["score"])),
+    )
+
+
+def render_pending_pair(pair: PendingPair) -> str:
+    """The exact bytes of a `pending-pairs/<pair_id>.json` file. Same
+    rendering rules as `render` (indent, sorted keys, ascii-only) for
+    the same reason: committed to the data repo, must be byte-stable."""
+    return (
+        json.dumps(pair.to_dict(), indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    )
 
 
 def scan_pairs(
@@ -744,6 +831,30 @@ def pending_path(data_root: DataRoot, cluster_id: str) -> Path:
     return data_root.resolve("pending", f"{cluster_id}.json")
 
 
+def pending_pairs_dir(data_root: DataRoot) -> Path:
+    """T24's spec input directory (docs/PLAN.md T24): `nc label` reads
+    it too, straight off disk, no embedding model involved."""
+    return data_root.resolve("pending-pairs")
+
+
+def pending_pair_path(data_root: DataRoot, pair: PendingPair) -> Path:
+    return pending_pairs_dir(data_root) / f"{pair.pair_id}.json"
+
+
+def load_pending_pairs(data_root: DataRoot) -> list[PendingPair]:
+    """Every persisted borderline pair, in pair-id order. `nc label`'s
+    only way of reading the borderline band -- no vectors, no model."""
+    directory = pending_pairs_dir(data_root)
+    if not directory.exists():
+        return []
+    pairs = [
+        pending_pair_from_dict(json.loads(path.read_text(encoding="utf-8")))
+        for path in sorted(directory.glob("*.json"))
+    ]
+    pairs.sort(key=lambda pair: pair.pair_id)
+    return pairs
+
+
 def _write_if_changed(path: Path, text: str) -> bool:
     """Write only when the bytes would differ. The whole idempotence
     story (module docstring, section 3) comes down to this."""
@@ -783,11 +894,38 @@ def write_run(data_root: DataRoot, run: ClusterRun) -> WriteResult:
     return WriteResult(clusters_written, pending_written, pending_removed)
 
 
+def write_pending_pairs(data_root: DataRoot, pairs: Iterable[PendingPair]) -> int:
+    """Write `pending-pairs/<pair_id>.json` for every borderline pair,
+    `_write_if_changed` throughout.
+
+    Never deletes: a pair that drops out of `ClusterRun.borderline`
+    because one of its items aged out of the window (module docstring,
+    "Ageing out") is not wrong, just no longer freshly computed, and
+    `nc label` still wants it in the pool until a human judges it. This
+    is also why idempotence holds with no new items: the window can
+    only shrink, so the borderline set on a re-run is a subset of what
+    is already on disk, byte-identical (same vectors, same score,
+    rounded the same way) -- nothing to write.
+
+    A pair a human already judged is left alone too: `nc.labelling`
+    filters those out by `pair_id` against `labels/pairs.jsonl`, so
+    this module does not need to know labels exist.
+    """
+    written = 0
+    for pair in pairs:
+        if _write_if_changed(
+            pending_pair_path(data_root, pair), render_pending_pair(pair)
+        ):
+            written += 1
+    return written
+
+
 @dataclass(frozen=True)
 class RunReport:
     cutoff: str
     run: ClusterRun
     written: WriteResult
+    pending_pairs_written: int
 
 
 def run_clustering(
@@ -814,7 +952,29 @@ def run_clustering(
     vectors = load_vectors([item.id for item in items], db_path)
     run = cluster_items(items, vectors, existing, config, extra_links)
     written = write_run(data_root, run)
-    return RunReport(cutoff=cutoff, run=run, written=written)
+
+    # Denormalize here, not in `cluster_items`: this is the one place
+    # that already has both the window's full `Item`s and the
+    # borderline `Pair`s that came out of them. Every borderline pair's
+    # members are drawn from `items` by construction (`scan_pairs` only
+    # ever compares ids from `window_ids`), so both lookups always hit.
+    by_id = {item.id: item for item in items}
+    pending_pairs = [
+        PendingPair(
+            a=ClusterItem.from_item(by_id[pair.a]),
+            b=ClusterItem.from_item(by_id[pair.b]),
+            score=pair.score,
+        )
+        for pair in run.borderline
+    ]
+    pending_pairs_written = write_pending_pairs(data_root, pending_pairs)
+
+    return RunReport(
+        cutoff=cutoff,
+        run=run,
+        written=written,
+        pending_pairs_written=pending_pairs_written,
+    )
 
 
 def format_report(report: RunReport, config: ClusterConfig) -> str:
@@ -840,5 +1000,7 @@ def format_report(report: RunReport, config: ClusterConfig) -> str:
             f"cluster: wrote {report.written.clusters_written} cluster file(s), "
             f"{report.written.pending_written} pending file(s), removed "
             f"{report.written.pending_removed} pending file(s)",
+            f"cluster: wrote {report.pending_pairs_written} pending-pair file(s) "
+            f"for nc label (docs/CLUSTERING.md)",
         )
     )

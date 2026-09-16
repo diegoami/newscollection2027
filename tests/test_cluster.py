@@ -33,6 +33,7 @@ from nc.cluster import (
     Cluster,
     ClusterConfig,
     ClusterItem,
+    PendingPair,
     UnionFind,
     WriteResult,
     _allocate_id,
@@ -40,9 +41,14 @@ from nc.cluster import (
     format_report,
     load_cluster_config,
     load_clusters,
+    load_pending_pairs,
+    pending_pair_from_dict,
+    pending_pair_path,
     render,
+    render_pending_pair,
     run_clustering,
     scan_pairs,
+    write_pending_pairs,
 )
 from nc.embed import HashBackend, embed_items, load_vectors
 from nc.feeds import Item
@@ -722,6 +728,114 @@ def test_format_report_mentions_the_dropped_singletons(tmp_path: Path) -> None:
     assert "dropped 19 singleton component(s)" in text
     assert "1 single-outlet" in text
     assert "borderline pair(s)" in text
+
+
+# --- pending pairs (T22) ----------------------------------------------
+
+
+def test_pending_pair_renders_both_members_and_score() -> None:
+    a = ClusterItem.from_item(_item("e0", "theverge"))
+    b = ClusterItem.from_item(_item("e1", "tomshardware"))
+    pair = PendingPair(a=a, b=b, score=0.7231234567)
+    rendered = render_pending_pair(pair)
+    payload = json.loads(rendered)
+    assert payload["a"] == a.to_dict()
+    assert payload["b"] == b.to_dict()
+    # Rounded, not truncated to whatever repr a float happens to have --
+    # see PendingPair.to_dict.
+    assert payload["score"] == 0.723123
+
+
+def test_pending_pair_round_trips_through_json() -> None:
+    a = ClusterItem.from_item(_item("e0", "theverge"))
+    b = ClusterItem.from_item(_item("e1", "tomshardware"))
+    pair = PendingPair(a=a, b=b, score=0.723123)
+    assert pending_pair_from_dict(json.loads(render_pending_pair(pair))) == pair
+
+
+def test_pending_pair_id_is_a_and_b_joined() -> None:
+    a = ClusterItem.from_item(_item("e0", "theverge"))
+    b = ClusterItem.from_item(_item("e1", "tomshardware"))
+    pair = PendingPair(a=a, b=b, score=0.72)
+    assert pair.pair_id == f"{a.item_id}-{b.item_id}"
+
+
+def test_run_clustering_orders_pending_pair_members_by_id(tmp_path: Path) -> None:
+    """`scan_pairs` always orders `a < b`; `run_clustering` must not
+    scramble that when it denormalizes the pair for persistence."""
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    pair = load_pending_pairs(data_root)[0]
+    assert pair.a.item_id < pair.b.item_id
+
+
+def test_run_clustering_writes_the_borderline_pair(tmp_path: Path) -> None:
+    """T22's seam: the borderline pair `nc cluster` reports is also
+    persisted, denormalized, for `nc label` to read with no model."""
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+
+    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+
+    assert report.pending_pairs_written == 1
+    pairs = load_pending_pairs(data_root)
+    assert len(pairs) == 1
+    pair = pairs[0]
+    assert {pair.a.item_id, pair.b.item_id} == _ids("e0", "e1")
+    assert pair.a.item_id < pair.b.item_id
+    assert pytest.approx(pair.score, abs=1e-6) == 0.72
+    # Denormalized: nc label needs nothing else to show a human this pair.
+    outlets = {pair.a.outlet, pair.b.outlet}
+    assert outlets == {"theverge", "tomshardware"}
+    titles = {pair.a.title, pair.b.title}
+    assert titles == {"e0 headline", "e1 headline"}
+    path = pending_pair_path(data_root, pair)
+    assert path.parent == data_root.resolve("pending-pairs")
+    assert path.exists()
+
+
+def test_pending_pairs_are_stable_across_a_no_op_rerun(tmp_path: Path) -> None:
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    before = _snapshot(data_root.path)
+
+    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+
+    assert second.pending_pairs_written == 0
+    assert _snapshot(data_root.path) == before
+
+
+def test_pending_pairs_are_not_deleted_when_the_window_moves_on(
+    tmp_path: Path,
+) -> None:
+    """Ageing out drops a pair from `ClusterRun.borderline` (its items
+    are no longer in the window), but the persisted file stays -- see
+    `write_pending_pairs`'s docstring."""
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    before = load_pending_pairs(data_root)
+    assert len(before) == 1
+
+    later = run_clustering(
+        data_root, CONFIG, db_path, now=datetime(2026, 9, 30, tzinfo=UTC)
+    )
+
+    assert later.run.stats.window_items == 0
+    assert later.pending_pairs_written == 0
+    assert load_pending_pairs(data_root) == before
+
+
+def test_write_pending_pairs_only_rewrites_changed_files(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    a = ClusterItem.from_item(_item("e0", "theverge"))
+    b = ClusterItem.from_item(_item("e1", "tomshardware"))
+    pair = PendingPair(a=a, b=b, score=0.72)
+
+    assert write_pending_pairs(data_root, [pair]) == 1
+    assert write_pending_pairs(data_root, [pair]) == 0  # unchanged, not rewritten
 
 
 # --- timing ---------------------------------------------------------------
