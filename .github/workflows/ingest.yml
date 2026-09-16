@@ -1,0 +1,161 @@
+name: ingest
+
+# T13. Every three hours: pull the data repo, fetch feeds, (later) cluster
+# them, and push back only if something changed. See docs/WORKFLOW.md,
+# "Every three hours: ingest", and docs/ARCHITECTURE.md's runtime
+# topology diagram.
+#
+# The cron only becomes active once this file is on the default branch
+# (main) -- GitHub does not schedule workflows that live only on a
+# feature branch. `workflow_dispatch` lets it be run on demand before
+# and after that, e.g. to demonstrate the AC.
+
+on:
+  schedule:
+    - cron: "0 */3 * * *" # every three hours, on the hour, UTC
+  workflow_dispatch:
+
+# `contents: write` is for the `repository_dispatch` call at the end
+# (POST /repos/{owner}/{repo}/dispatches requires the Contents: write
+# permission on the token that calls it -- see the step below). It is
+# not used, and must never be used, to push anything to *this*
+# repository: per CLAUDE.md, automation pushes only to the data repo,
+# and that push is authenticated separately with `secrets.DATA_REPO_TOKEN`,
+# not with this job's GITHUB_TOKEN.
+permissions:
+  contents: write
+
+# Runs must never overlap: two ingests racing on the same data-repo
+# checkout could interleave `git add`/`commit`/`push` and corrupt the
+# clone or the item files. `cancel-in-progress: false` (not true, unlike
+# check.yml) because the risk here is different from a test job: a
+# cancelled test run just gets redone, but cancelling this job mid-push
+# could leave the data repo's working tree committed-but-unpushed, or
+# GitHub Actions could tear the runner down between `git commit` and
+# `git push`. Queuing the next scheduled/dispatched run behind the
+# current one is cheap (ingest is idempotent, per T12's AC) and never
+# corrupts anything; cancelling a push might.
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  # Not `check`: T03 registers the bare `check` as the required status
+  # check on main, and GitHub matches check runs by name. A feed outage
+  # or an ingest bug must never be able to post a red `check` and block
+  # an unrelated PR from merging -- feeds-check.yml names its job
+  # `feeds` for the identical reason.
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      # Authenticate git to the data repo before touching it, so both
+      # `nc sync pull` and `nc sync push` go through without either
+      # command needing to know about tokens (nc.sync deliberately only
+      # knows plain git, per its module docstring). The rewrite is
+      # scoped to this one repo URL -- it must match config/sync.yaml's
+      # `repo_url` exactly -- so it cannot affect the checkout of this
+      # repo (a separate URL) or leak the token to any other host.
+      # `git config --global` writes to the runner's own $HOME/.gitconfig,
+      # which is never part of any checkout and is discarded with the
+      # runner; the token is never written into a committed file, and is
+      # not echoed, so it never reaches the logs. A bad or missing token
+      # surfaces here as an ordinary git auth failure the first time
+      # `nc sync push` actually pushes (see below), not as a silent
+      # no-op: `git push` exits non-zero, `nc.sync.push`'s `_run(...,
+      # check=True)` raises, and `nc sync push` crashes with a visible
+      # traceback and a failed step.
+      - name: Authenticate to the data repo
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          git config --global \
+            url."https://x-access-token:${DATA_REPO_TOKEN}@github.com/diegoami/newscollection2027-data.git".insteadOf \
+            "https://github.com/diegoami/newscollection2027-data.git"
+
+      # NC_DATA_ROOT is left unset here, so it defaults to `data/`
+      # under the checkout (nc.store.DEFAULT_DATA_ROOT) -- already in
+      # this repo's .gitignore and thrown away with the runner, exactly
+      # like every other environment that doesn't set it explicitly.
+      #
+      # `nc sync pull` rather than a second `actions/checkout` step:
+      # the data repo is *currently* an empty, unborn-`main` repository
+      # (T03), and `nc.sync.pull` was already written (T12) to handle
+      # exactly that case -- an empty clone with no branch checked out
+      # falls through to `git checkout -B <branch>` -- whereas
+      # `actions/checkout` expects a ref that already exists and is not
+      # built for an unborn default branch. Using `nc sync pull` also
+      # keeps every bit of git knowledge about the data repo inside
+      # `nc.sync`, per its module docstring and CLAUDE.md, instead of
+      # splitting it between the module and the workflow YAML.
+      - run: uv run nc sync pull
+
+      - run: uv run nc ingest
+
+      # T21 (M2) implements `nc cluster`; nothing does yet. This step is
+      # deliberately kept in the workflow, disabled, rather than left
+      # out, so the pending wiring is visible instead of silently
+      # forgotten. Flip `if: false` to `if: true` (or delete the guard)
+      # once T21 lands.
+      - name: nc cluster (pending T21 -- not implemented yet)
+        if: false
+        run: uv run nc cluster
+
+      # `nc sync push` (T12) already does exactly step 5 of the task:
+      # it commits and pushes only when `git status --porcelain` on the
+      # data root is non-empty, so a no-op ingest (T12's idempotent
+      # append) produces no commit. Its stdout is one of two fixed
+      # strings; that's parsed here, rather than duplicating the
+      # git-diff check in YAML, to decide whether to fire the dispatch
+      # below.
+      - name: nc sync push
+        id: sync_push
+        run: |
+          output="$(uv run nc sync push)"
+          echo "$output"
+          if [ "$output" = "sync push: pushed" ]; then
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Tell the code repo a push actually happened, only then, so the
+      # deploy workflow (T42) never rebuilds and republishes the site
+      # for a no-op ingest run.
+      #
+      # Token: the default `GITHUB_TOKEN` is enough here, and is used
+      # instead of `DATA_REPO_TOKEN`. Two things that might look like
+      # they'd block it, don't: (1) `GITHUB_TOKEN` is scoped to this
+      # repository only, which is fine because we are dispatching *to*
+      # this same repository, not a foreign one; (2) GitHub's docs on
+      # triggering a workflow from a workflow note that events made
+      # with `GITHUB_TOKEN` do not normally start further workflow
+      # runs (the anti-recursion rule that bit push-based approaches),
+      # but call out `repository_dispatch` (and `workflow_dispatch`) as
+      # explicit exceptions to that rule. What it does need is the
+      # `contents: write` permission granted above -- the REST endpoint
+      # `POST /repos/{owner}/{repo}/dispatches` requires write access to
+      # repository contents on the calling token.
+      - name: Notify code repo (repository_dispatch data-updated)
+        if: steps.sync_push.outputs.pushed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+            -d '{"event_type":"data-updated"}'

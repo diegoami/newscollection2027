@@ -233,3 +233,36 @@ def test_sync_pull_then_push_against_a_local_bare_repo(
         text=True,
     )
     assert log.stdout.strip() == "data: test push"
+
+
+def test_sync_push_output_strings_are_exact(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`.github/workflows/ingest.yml` compares this output for equality.
+
+    It fires the `data-updated` repository_dispatch only when stdout is
+    exactly "sync push: pushed". Rewording the line would not fail
+    anything at runtime -- the dispatch would simply stop firing and the
+    site would quietly stop republishing -- so the contract is pinned
+    here. Change these strings and the workflow must change with them.
+    """
+    remote = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(remote)],
+        check=True,
+        capture_output=True,
+    )
+    config_path = tmp_path / "sync.yaml"
+    config_path.write_text(f"repo_url: {remote}\nbranch: main\n")
+    data_root = tmp_path / "data-root"
+    argv = ["--data-root", str(data_root), "--config", str(config_path)]
+
+    assert main(["sync", "pull", *argv]) == 0
+    capsys.readouterr()
+
+    (data_root / "hello.txt").write_text("hi\n")
+    assert main(["sync", "push", *argv, "--message", "data: test"]) == 0
+    assert capsys.readouterr().out.strip() == "sync push: pushed"
+
+    assert main(["sync", "push", *argv, "--message", "data: test"]) == 0
+    assert capsys.readouterr().out.strip() == "sync push: nothing changed"

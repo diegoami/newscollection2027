@@ -84,6 +84,9 @@ def _sync_push(args: argparse.Namespace) -> int:
     config = sync.load_sync_config(args.config)
     message = args.message or f"data: sync {feeds.utc_now_iso()}"
     pushed = sync.push(data_root, config, message)
+    # .github/workflows/ingest.yml compares this line for equality to
+    # decide whether to fire the data-updated dispatch. Reword it and
+    # the workflow stops firing silently; tests/test_cli.py pins it.
     print("sync push: pushed" if pushed else "sync push: nothing changed")
     return 0
 
