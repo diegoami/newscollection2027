@@ -179,6 +179,28 @@ this project's volume for the same reason `clusters/` growing forever is
 (section 4, "Cost"), and a T24 concern to prune once judged pairs are
 merged back in, not this task's.
 
+**The labelling corpus (T22, gap closed after #39).** `pending-pairs/`
+only ever holds `[tau_low, tau_high)`, so a human doing `nc label` could
+only ever see contested middle pairs: no clear negatives to anchor the
+bottom of the curve, no clear positives to measure precision above
+`tau_high` with. The fix is not a wider `tau_low` -- that knob also
+gates T24's paid judge queue, and this project's owner has done this
+before and does not want to pay to judge thousands of obviously
+unrelated pairs every three hours just to get a better labelling sample.
+So it is a second, independent knob set (`sample_floor`,
+`sample_bucket_width`, `sample_bucket_cap` in `config/cluster.yaml`) and
+a second directory, `label-sample/`, holding a *stratified, capped*
+sample across `[sample_floor, 1.0]` instead of an exhaustive dump of one
+band. `select_label_sample` is deterministic (a pair's bucket is a pure
+function of its own score) and stable (an already-sampled pair is never
+reconsidered, so new pairs can only fill remaining room, never displace
+one already written), which is what keeps a no-op `nc cluster` run
+writing zero label-sample bytes the same way it writes zero cluster and
+zero pending-pair bytes. See `select_label_sample`'s docstring for the
+detailed argument and docs/CLUSTERING.md for the corpus-size math and
+why `nc label` reads both directories rather than treating one as a
+superset of the other.
+
 ===========================================================================
 4. Cost
 ===========================================================================
@@ -208,6 +230,15 @@ the same 5,000 items -- 2.8M borderline pairs -- it is 9.9s, still
 inside the minute. `tau_low` is what bounds this, which is one more
 reason T23 should not set it near zero.
 
+`sample_floor` (the labelling corpus, above) adds a third mask to the
+same block loop and is subject to the same cost: it is a floor, not a
+band, so a `sample_floor` set near zero has the same "absurd `tau_low`"
+effect on this loop that the paragraph above describes, independent of
+`sample_bucket_cap` (the cap only bounds how many of those hits get
+written to disk, not how many the matmul has to turn into `Pair`
+objects first). 0.30, well above the "absurd" 0.10 measured above and
+comfortably below `tau_low`, is the default for this reason.
+
 Existing clusters are read in full on every run (`load_clusters` globs
 `clusters/*/*.json`). At the project's volume -- roughly fifty clusters
 a night, a couple of kilobytes each -- that is tens of megabytes a year
@@ -219,6 +250,7 @@ cluster-id index in `.cache/` rebuilt from those files, like
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -264,6 +296,15 @@ class ClusterConfig:
     tau_high: float
     window_days: int
     min_outlets: int
+    # T22's labelling corpus (see config/cluster.yaml and this module's
+    # docstring, "Borderline pairs (T22)"). Defaulted so that every
+    # existing construction of this dataclass -- tests, fixture yaml
+    # files without these keys -- keeps working; `load_cluster_config`
+    # also falls back to these when the keys are absent, since they are
+    # new and optional, not a contract every config file must state.
+    sample_floor: float = 0.30
+    sample_bucket_width: float = 0.05
+    sample_bucket_cap: int = 20
 
 
 def load_cluster_config(path: Path = DEFAULT_CLUSTER_CONFIG_PATH) -> ClusterConfig:
@@ -275,6 +316,9 @@ def load_cluster_config(path: Path = DEFAULT_CLUSTER_CONFIG_PATH) -> ClusterConf
         tau_high=float(raw["tau_high"]),
         window_days=int(raw["window_days"]),
         min_outlets=int(raw["min_outlets"]),
+        sample_floor=float(raw.get("sample_floor", 0.30)),
+        sample_bucket_width=float(raw.get("sample_bucket_width", 0.05)),
+        sample_bucket_cap=int(raw.get("sample_bucket_cap", 20)),
     )
     if not 0.0 <= config.tau_low <= config.tau_high <= 1.0:
         raise ValueError(
@@ -285,6 +329,18 @@ def load_cluster_config(path: Path = DEFAULT_CLUSTER_CONFIG_PATH) -> ClusterConf
         raise ValueError(f"{path}: window_days must be >= 1, got {config.window_days}")
     if config.min_outlets < 1:
         raise ValueError(f"{path}: min_outlets must be >= 1, got {config.min_outlets}")
+    if not 0.0 <= config.sample_floor <= 1.0:
+        raise ValueError(
+            f"{path}: sample_floor must be in [0, 1], got {config.sample_floor}"
+        )
+    if config.sample_bucket_width <= 0.0:
+        raise ValueError(
+            f"{path}: sample_bucket_width must be > 0, got {config.sample_bucket_width}"
+        )
+    if config.sample_bucket_cap < 1:
+        raise ValueError(
+            f"{path}: sample_bucket_cap must be >= 1, got {config.sample_bucket_cap}"
+        )
     return config
 
 
@@ -469,6 +525,14 @@ class Pair:
 class PairScan:
     linked: tuple[Pair, ...]
     borderline: tuple[Pair, ...]
+    # Every pair at or above `sample_floor` (T22's labelling corpus,
+    # see the module docstring and `select_label_sample`), regardless
+    # of `tau_low`/`tau_high` -- deliberately overlapping `linked` and
+    # `borderline` rather than excluding them, because "the whole
+    # usable score range" includes the clear positives above tau_high
+    # and the band itself, not only what lies below it. Empty unless a
+    # `sample_floor` was passed to `scan_pairs`.
+    sample: tuple[Pair, ...]
     compared: int
     skipped_dim_mismatch: int
 
@@ -541,12 +605,18 @@ def scan_pairs(
     vectors: Mapping[str, Sequence[float]],
     tau_low: float,
     tau_high: float,
+    sample_floor: float | None = None,
 ) -> PairScan:
-    """Every pair at or above `tau_low`, split at `tau_high`.
+    """Every pair at or above `tau_low`, split at `tau_high`, plus
+    (when `sample_floor` is given) every pair at or above `sample_floor`
+    for T22's labelling corpus -- see `PairScan.sample`.
 
     Exhaustive: no blocking key, no approximate index, so nothing is
     missed by construction. The cost is one chunked matmul -- see the
-    module docstring, "Cost".
+    module docstring, "Cost". `sample_floor` is optional and defaults
+    to `None` (no third mask computed) so every existing caller of this
+    function is unaffected; `cluster_items` is the only caller that
+    passes it, and it always passes `config.sample_floor`.
 
     Items without a stored vector are skipped (T20's `nc embed` has not
     seen them yet); so are vectors of a dimensionality other than the
@@ -560,7 +630,7 @@ def scan_pairs(
         dim = len(vectors[item_id])
         dims[dim] = dims.get(dim, 0) + 1
     if not dims:
-        return PairScan((), (), 0, 0)
+        return PairScan((), (), (), 0, 0)
     # Ties broken by the larger dimensionality so the choice does not
     # depend on dict order.
     majority_dim = max(dims, key=lambda dim: (dims[dim], dim))
@@ -569,7 +639,7 @@ def scan_pairs(
 
     count = len(usable)
     if count < 2:
-        return PairScan((), (), count, skipped)
+        return PairScan((), (), (), count, skipped)
 
     matrix: npt.NDArray[np.float32] = np.asarray(
         [vectors[item_id] for item_id in usable], dtype=np.float32
@@ -585,16 +655,20 @@ def scan_pairs(
     columns = np.arange(count)
     linked: list[Pair] = []
     borderline: list[Pair] = []
+    sample: list[Pair] = []
+    targets: list[tuple[list[Pair], float, float | None]] = [
+        (linked, tau_high, None),
+        (borderline, tau_low, tau_high),
+    ]
+    if sample_floor is not None:
+        targets.append((sample, sample_floor, None))
     for start in range(0, count, _BLOCK):
         stop = min(start + _BLOCK, count)
         sims = matrix[start:stop] @ matrix.T
         # Upper triangle only: each pair once, and never an item with
         # itself.
         upper = columns[None, :] > np.arange(start, stop)[:, None]
-        for target, low, high in (
-            (linked, tau_high, None),
-            (borderline, tau_low, tau_high),
-        ):
+        for target, low, high in targets:
             mask = upper & (sims >= low)
             if high is not None:
                 mask &= sims < high
@@ -607,7 +681,12 @@ def scan_pairs(
 
     linked.sort(key=lambda pair: (-pair.score, pair.a, pair.b))
     borderline.sort(key=lambda pair: (-pair.score, pair.a, pair.b))
-    return PairScan(tuple(linked), tuple(borderline), count, skipped)
+    # Sorted by id, not score: `select_label_sample` picks deterministically
+    # by pair id within a bucket, not by "highest score seen", so this
+    # order is what makes that selection reproducible regardless of the
+    # order `np.nonzero` happens to emit hits in.
+    sample.sort(key=lambda pair: (pair.a, pair.b))
+    return PairScan(tuple(linked), tuple(borderline), tuple(sample), count, skipped)
 
 
 # --- ids ------------------------------------------------------------------
@@ -663,6 +742,12 @@ class ClusterRun:
     clusters: tuple[Cluster, ...]
     superseded: tuple[Cluster, ...]
     borderline: tuple[Pair, ...]
+    # T22's labelling corpus candidates: every pair at or above
+    # `config.sample_floor`, from the same `scan_pairs` call that
+    # produced `borderline` -- see `PairScan.sample`. `run_clustering`
+    # is what turns this into files, deterministically and boundedly
+    # (`select_label_sample`); this module only reports the candidates.
+    sample_candidates: tuple[Pair, ...]
     stats: ClusterStats
 
 
@@ -706,7 +791,9 @@ def cluster_items(
         for member_id in members[1:]:
             union.union(members[0], member_id)
 
-    scan = scan_pairs(window_ids, vectors, config.tau_low, config.tau_high)
+    scan = scan_pairs(
+        window_ids, vectors, config.tau_low, config.tau_high, config.sample_floor
+    )
     for pair in scan.linked:
         union.union(pair.a, pair.b)
     extra = 0
@@ -804,7 +891,9 @@ def cluster_items(
         dropped_single_item=dropped_single_item,
         dropped_single_outlet=dropped_single_outlet,
     )
-    return ClusterRun(tuple(emitted), tuple(superseded), scan.borderline, stats)
+    return ClusterRun(
+        tuple(emitted), tuple(superseded), scan.borderline, scan.sample, stats
+    )
 
 
 # --- the data root --------------------------------------------------------
@@ -832,8 +921,10 @@ def pending_path(data_root: DataRoot, cluster_id: str) -> Path:
 
 
 def pending_pairs_dir(data_root: DataRoot) -> Path:
-    """T24's spec input directory (docs/PLAN.md T24): `nc label` reads
-    it too, straight off disk, no embedding model involved."""
+    """T24's spec input directory (docs/PLAN.md T24): every borderline
+    pair, exhaustively, uncapped. `nc label` reads it too (alongside
+    `label_sample_dir`, see that function's docstring), straight off
+    disk, no embedding model involved."""
     return data_root.resolve("pending-pairs")
 
 
@@ -843,8 +934,46 @@ def pending_pair_path(data_root: DataRoot, pair: PendingPair) -> Path:
 
 def load_pending_pairs(data_root: DataRoot) -> list[PendingPair]:
     """Every persisted borderline pair, in pair-id order. `nc label`'s
-    only way of reading the borderline band -- no vectors, no model."""
-    directory = pending_pairs_dir(data_root)
+    exhaustive view of the borderline band -- no vectors, no model."""
+    return _load_pairs(pending_pairs_dir(data_root))
+
+
+def label_sample_dir(data_root: DataRoot) -> Path:
+    """T22's labelling corpus (docs/CLUSTERING.md, "The labelling
+    corpus"): a bounded, stratified sample spanning
+    `[config.sample_floor, 1.0]`, written by `select_label_sample` /
+    `write_label_sample`. A directory of its own, not a subset of
+    `pending-pairs/`, because the two are defined by different things
+    and serve different readers: `pending-pairs/` is every pair in
+    `[tau_low, tau_high)`, uncapped, and is T24's judge queue;
+    `label-sample/` is a capped, deterministic sample across the whole
+    usable range, and exists only so `nc label` (T22) shows a human
+    more than the contested middle. Conflating them would make
+    `sample_bucket_cap` either starve T24's queue or stop bounding
+    anything -- exactly the coupling this directory exists to avoid.
+
+    `nc label` reads both directories (`run_label_session` in
+    `nc.labelling`), deduplicated by `pair_id`, rather than treating
+    this sample as a superset of the band: `sample_bucket_cap` means a
+    band with more pairs in a given 0.05 slice than the cap can hold is
+    *not* fully represented here, so dropping `pending-pairs/` from `nc
+    label`'s input would silently shrink the exhaustive band coverage
+    the existing labelling flow (and T23's >=200-pairs target) already
+    relies on. Reading both keeps that guarantee and adds this
+    directory's clear positives and negatives on top."""
+    return data_root.resolve("label-sample")
+
+
+def label_sample_path(data_root: DataRoot, pair: PendingPair) -> Path:
+    return label_sample_dir(data_root) / f"{pair.pair_id}.json"
+
+
+def load_label_sample(data_root: DataRoot) -> list[PendingPair]:
+    """Every persisted labelling-sample pair, in pair-id order."""
+    return _load_pairs(label_sample_dir(data_root))
+
+
+def _load_pairs(directory: Path) -> list[PendingPair]:
     if not directory.exists():
         return []
     pairs = [
@@ -920,12 +1049,143 @@ def write_pending_pairs(data_root: DataRoot, pairs: Iterable[PendingPair]) -> in
     return written
 
 
+def _sample_bucket(score: float, floor: float, width: float, num_buckets: int) -> int:
+    """Which `[floor + i*width, floor + (i+1)*width)` slice `score`
+    falls in, clamped into `[0, num_buckets)`. A pure function of the
+    pair's own score -- see `select_label_sample`'s docstring for why
+    that, plus never re-evaluating an already-sampled pair, is what
+    makes the whole selection stable.
+
+    Callers must pass the same 6-decimal-rounded score that
+    `PendingPair.to_dict` persists, not the raw matmul float --
+    `select_label_sample` does this. Two matmuls of different shape can
+    legitimately produce a different float32 value for what is
+    mathematically the same cosine (BLAS is not required to sum in the
+    same order for every matrix shape), by far less than a labelling
+    bucket is ever supposed to care about; rounding first is what makes
+    a score that lands within a few ULP of a bucket edge -- e.g.
+    exactly 0.95 with a 0.05-wide bucket -- classify the same way
+    whether it was just computed or reloaded from a file written by an
+    earlier run.
+    """
+    index = int((score - floor) / width)
+    return min(max(index, 0), num_buckets - 1)
+
+
+def select_label_sample(
+    candidates: Sequence[PendingPair],
+    already_sampled: Sequence[PendingPair],
+    floor: float,
+    width: float,
+    cap: int,
+) -> list[PendingPair]:
+    """Which of `candidates` (this run's pairs at or above `floor`,
+    from `ClusterRun.sample_candidates`, denormalized) to add to the
+    labelling corpus, given what `already_sampled` (`load_label_sample`)
+    already holds on disk.
+
+    **Determinism.** A pair's bucket is `_sample_bucket` of its score,
+    rounded to 6 decimals first (the same rounding `PendingPair.to_dict`
+    applies before writing) -- a pure function of the pair's own
+    (rounded) score and the config, nothing else. Item ids are never
+    reallocated (`nc.store` is append-only) and vectors are
+    deterministic (T20's AC), so a pair's rounded score, once computed,
+    is the same value on every future run. The rounding step matters
+    here specifically: BLAS does not guarantee bit-identical float32
+    output for the same two vectors across differently-shaped matmuls
+    (a later run's window has more or fewer rows), so an unrounded score
+    within a few ULP of a bucket edge could in principle land on either
+    side depending on which run computed it. Rounding to the same
+    precision the file format already uses collapses that jitter before
+    it can matter: a pair can never reclassify into a different bucket
+    between runs, and two runs over the same pairs always agree on
+    where every pair belongs, independent of scan order, dict iteration
+    order, or matrix shape. Within a bucket, candidates are considered
+    in ascending `pair_id` order -- a fixed, content-derived key -- so
+    "the first `cap` candidates" means the same set every time the same
+    candidate pool is scanned, not "whichever `cap` the matmul happened
+    to emit first".
+
+    **Stability as pairs accumulate.** A pair already in
+    `already_sampled` is never reconsidered: it does not count against
+    `cap` a second time and it cannot be displaced by a later pair,
+    however that later pair sorts. Concretely, this function only ever
+    *adds* to a bucket's existing count, up to `cap`, and it is the
+    caller's job (`write_label_sample`, `_write_if_changed`) to never
+    rewrite a file whose content has not changed. So once a pair is
+    written, no future run -- with more items, more candidates, a wider
+    window -- can remove it or replace it with a "better" one. New
+    pairs can only fill a bucket that still has room.
+
+    **Idempotence.** Two runs over an unchanged candidate pool select
+    nothing new: every candidate is either already in `already_sampled`
+    (skipped) or its bucket has no remaining room (every slot already
+    taken by a pair that -- by the ascending-`pair_id` rule -- would be
+    chosen again first). There is nothing for a second identical run to
+    add.
+
+    **Bounded growth.** At most `cap` pairs are chosen per bucket per
+    run, and the number of buckets is fixed by `floor`/`width`/1.0, not
+    by how many candidates or items exist -- see this module's
+    docstring and docs/CLUSTERING.md for the corpus-size math. This is
+    what keeps the labelling corpus from growing the way an all-pairs
+    dump would.
+    """
+    if width <= 0:
+        return []
+    num_buckets = max(1, math.ceil((1.0 - floor) / width))
+
+    already_ids = {pair.pair_id for pair in already_sampled}
+    existing_counts: dict[int, int] = {}
+    for pair in already_sampled:
+        bucket = _sample_bucket(round(pair.score, 6), floor, width, num_buckets)
+        existing_counts[bucket] = existing_counts.get(bucket, 0) + 1
+
+    by_bucket: dict[int, list[PendingPair]] = {}
+    for pair in candidates:
+        # Round before comparing against `floor` and before bucketing,
+        # for the same reason: the value that matters is the one that
+        # will be persisted (`PendingPair.to_dict` rounds it too), not
+        # whatever extra float32 jitter this run's matmul added.
+        rounded_score = round(pair.score, 6)
+        if rounded_score < floor or pair.pair_id in already_ids:
+            continue
+        bucket = _sample_bucket(rounded_score, floor, width, num_buckets)
+        by_bucket.setdefault(bucket, []).append(pair)
+
+    chosen: list[PendingPair] = []
+    for bucket, bucket_candidates in by_bucket.items():
+        remaining = cap - existing_counts.get(bucket, 0)
+        if remaining <= 0:
+            continue
+        ordered = sorted(bucket_candidates, key=lambda pair: pair.pair_id)
+        chosen.extend(ordered[:remaining])
+
+    chosen.sort(key=lambda pair: pair.pair_id)
+    return chosen
+
+
+def write_label_sample(data_root: DataRoot, pairs: Iterable[PendingPair]) -> int:
+    """Write `label-sample/<pair_id>.json` for every pair
+    `select_label_sample` chose, `_write_if_changed` throughout -- the
+    same never-delete, never-rewrite-unchanged-bytes shape as
+    `write_pending_pairs`, for the same idempotence reason."""
+    written = 0
+    for pair in pairs:
+        if _write_if_changed(
+            label_sample_path(data_root, pair), render_pending_pair(pair)
+        ):
+            written += 1
+    return written
+
+
 @dataclass(frozen=True)
 class RunReport:
     cutoff: str
     run: ClusterRun
     written: WriteResult
     pending_pairs_written: int
+    label_sample_written: int
 
 
 def run_clustering(
@@ -969,11 +1229,33 @@ def run_clustering(
     ]
     pending_pairs_written = write_pending_pairs(data_root, pending_pairs)
 
+    # T22's labelling corpus: same denormalization, over
+    # `run.sample_candidates` instead of `run.borderline` -- see
+    # `select_label_sample`'s docstring for why this stays deterministic
+    # and bounded as pairs accumulate across runs.
+    sample_candidates = [
+        PendingPair(
+            a=ClusterItem.from_item(by_id[pair.a]),
+            b=ClusterItem.from_item(by_id[pair.b]),
+            score=pair.score,
+        )
+        for pair in run.sample_candidates
+    ]
+    chosen_sample = select_label_sample(
+        sample_candidates,
+        load_label_sample(data_root),
+        config.sample_floor,
+        config.sample_bucket_width,
+        config.sample_bucket_cap,
+    )
+    label_sample_written = write_label_sample(data_root, chosen_sample)
+
     return RunReport(
         cutoff=cutoff,
         run=run,
         written=written,
         pending_pairs_written=pending_pairs_written,
+        label_sample_written=label_sample_written,
     )
 
 
@@ -1001,6 +1283,9 @@ def format_report(report: RunReport, config: ClusterConfig) -> str:
             f"{report.written.pending_written} pending file(s), removed "
             f"{report.written.pending_removed} pending file(s)",
             f"cluster: wrote {report.pending_pairs_written} pending-pair file(s) "
-            f"for nc label (docs/CLUSTERING.md)",
+            f"for T24's judge (docs/CLUSTERING.md)",
+            f"cluster: wrote {report.label_sample_written} label-sample file(s) "
+            f"for nc label, sampled from [{config.sample_floor}, 1.0] "
+            f"(docs/CLUSTERING.md)",
         )
     )

@@ -62,3 +62,41 @@ window_days: 4
 # numbers in config/, not because lowering it to 1 is a supported thing
 # to do.
 min_outlets: 2
+
+# ===========================================================================
+# T22's labelling corpus (nc.labelling / `nc label`). NOT the judge queue.
+# ===========================================================================
+#
+# These three knobs do not affect clustering (union-find never reads
+# them) and they do not affect T24's judge (`pending-pairs/`, gated by
+# tau_low/tau_high above). They control a *separate*, stratified sample
+# of pairs `nc cluster` writes to `data/label-sample/` so a human doing
+# `nc label` also sees pairs well below tau_low (clear negatives, to
+# anchor the bottom of the curve) and pairs above tau_high (clear
+# positives, so `nc tune` can measure precision above the current link
+# threshold, not just inside the band). See docs/CLUSTERING.md, "The
+# labelling corpus", for why this is a second directory rather than a
+# change to tau_low: tau_low also gates T24's paid LLM judge queue, and
+# widening it to get better labels would queue thousands of pairs for
+# judging every three hours. Do not repurpose these three knobs for
+# anything that touches clustering or the judge.
+
+# The lowest score a pair is considered for the labelling sample.
+# Below it, a pair is assumed obviously unrelated and not worth a
+# human's time. Buckets run from here up to a cosine of 1.0.
+sample_floor: 0.30
+
+# Width of one labelling bucket. `nc cluster` samples up to
+# sample_bucket_cap pairs from each [sample_floor, sample_floor+width),
+# ..., [1.0-width, 1.0] slice of the score range, so a labelling session
+# gets even coverage of the whole range instead of only the pairs
+# nearest tau_high.
+sample_bucket_width: 0.05
+
+# Cap per bucket. Bounds the labelling-sample files `nc cluster` can
+# write in one run to roughly
+# ceil((1.0 - sample_floor) / sample_bucket_width) * sample_bucket_cap,
+# regardless of how large the window or the corpus gets -- see
+# `nc.cluster.select_label_sample`'s docstring for why the bound holds
+# and stays stable as new pairs accumulate.
+sample_bucket_cap: 20

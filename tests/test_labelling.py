@@ -16,7 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from nc.cluster import ClusterConfig, ClusterItem, PendingPair, write_pending_pairs
+from nc.cluster import (
+    ClusterConfig,
+    ClusterItem,
+    PendingPair,
+    write_label_sample,
+    write_pending_pairs,
+)
 from nc.feeds import Item
 from nc.labelling import (
     Label,
@@ -26,6 +32,7 @@ from nc.labelling import (
     build_tune_report,
     format_tune_report,
     label_from_pair,
+    labelling_pool,
     labels_path,
     load_labels,
     order_for_labelling,
@@ -136,6 +143,42 @@ def test_append_label_never_rewrites_an_earlier_line(tmp_path: Path) -> None:
     assert after.startswith(before)
 
 
+# --- labelling_pool (T22, gap closed after #39) ------------------------
+
+
+def test_labelling_pool_is_the_union_of_both_directories(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    band_pair = _pair("e0", "theverge", "e1", "tomshardware", 0.72)
+    negative = _pair("f0", "engadget", "f1", "zdnet", 0.20)
+    write_pending_pairs(data_root, [band_pair])
+    write_label_sample(data_root, [negative])
+
+    pool = labelling_pool(data_root)
+
+    assert {pair.pair_id for pair in pool} == {band_pair.pair_id, negative.pair_id}
+
+
+def test_labelling_pool_dedupes_a_pair_present_in_both_directories(
+    tmp_path: Path,
+) -> None:
+    """A pair in the band can also be picked by the stratified sample
+    (the ranges overlap by design); `nc label` must show it once."""
+    data_root = DataRoot(tmp_path / "data")
+    overlap = _pair("g0", "bbc", "g1", "wired", 0.75)
+    write_pending_pairs(data_root, [overlap])
+    write_label_sample(data_root, [overlap])
+
+    pool = labelling_pool(data_root)
+
+    assert len(pool) == 1
+    assert pool[0].pair_id == overlap.pair_id
+
+
+def test_labelling_pool_is_empty_when_nothing_written(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    assert labelling_pool(data_root) == []
+
+
 # --- unlabeled_pairs / order_for_labelling -----------------------------
 
 
@@ -194,6 +237,27 @@ def test_order_for_labelling_clamps_out_of_band_scores() -> None:
 
 def _write_pairs(data_root: DataRoot, pairs: Iterable[PendingPair]) -> None:
     write_pending_pairs(data_root, pairs)
+
+
+def test_run_label_session_also_shows_label_sample_only_pairs(
+    tmp_path: Path,
+) -> None:
+    """T22's gap, closed: a pair that never entered the borderline band
+    (here, a clear negative at 0.20 -- `pending-pairs/` never held
+    scores like this) is still shown, because `run_label_session` draws
+    from `labelling_pool`, not from `load_pending_pairs` alone."""
+    data_root = DataRoot(tmp_path / "data")
+    negative = _pair("z0", "engadget", "z1", "zdnet", 0.20)
+    write_label_sample(data_root, [negative])
+
+    result = run_label_session(
+        data_root, CONFIG, input_fn=_scripted("n"), print_fn=_silent
+    )
+
+    assert result.labeled == 1
+    labels = load_labels(data_root)
+    assert labels[0].pair_id == negative.pair_id
+    assert labels[0].same_story is False
 
 
 def test_run_label_session_records_yes_and_no(tmp_path: Path) -> None:

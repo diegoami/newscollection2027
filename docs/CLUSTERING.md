@@ -24,12 +24,97 @@ prevent, or silently shrink the pool a labelling session draws from.
 Pruning judged or resolved pairs out of `pending-pairs/` is T24's job,
 once its judge starts consuming them.
 
+## The labelling corpus: `label-sample/`
+
+Found on PR #39, before it merged: `pending-pairs/` only ever holds
+`[tau_low, tau_high)`, so a labelling session built only from it can
+only ever contain contested middle pairs. That leaves `nc tune` with no
+clear negatives to anchor the bottom of the curve, no clear positives to
+measure precision *above* `tau_high` with, and a recall number that is
+conditional on a pair having been in the band in the first place --
+the "recall's blind spot" bullet below, which used to be about
+`tau_low` alone.
+
+**The fix is not a wider `tau_low`.** `tau_low` also gates T24's judge
+queue (it is the same band that becomes `pending-pairs/`): lowering it
+to get a better labelling sample would queue thousands of obviously
+unrelated pairs for T24's paid LLM judge every three hours, for no
+labelling benefit that couldn't be had more cheaply. Labelling and the
+judge queue are two different purposes and must not share a threshold.
+
+Instead, `nc cluster` also writes a **bounded, stratified sample**,
+independent of the band, to `label-sample/<pair_id>.json` in the data
+root -- same file shape as `pending-pairs/` (both items denormalized,
+plus the score), different selection rule and a different directory,
+deliberately:
+
+- `pending-pairs/` is defined by the band (`[tau_low, tau_high)`),
+  uncapped, and is T24's judge input.
+- `label-sample/` is defined by a stratification of the *whole* usable
+  score range into `config/cluster.yaml`'s `sample_floor` up to 1.0, in
+  `sample_bucket_width`-wide slices, each capped at
+  `sample_bucket_cap` pairs (defaults: 0.30, 0.05, 20). It exists only
+  so a labelling session also sees clear negatives and clear positives,
+  and it is never read by T24's judge.
+
+Conflating the two -- for example, capping `pending-pairs/` itself, or
+widening `tau_low` to feed both purposes from one band -- would re-couple
+exactly what keeping them apart is for: the judge queue's size would
+start depending on a labelling knob, or the labelling sample's coverage
+would start depending on how many pairs happen to be paid to judge.
+
+**Why the selection is stable.** `nc cluster` runs every three hours and
+commits its output, so `label-sample/` must not churn the way a
+"keep the best N seen so far" sample would. `nc.cluster.select_label_sample`
+is deterministic (a pair's bucket is a fixed function of its own score,
+rounded to the same precision the file format stores -- see that
+function's docstring for why the rounding step itself matters, not just
+the bucketing) and *additive only*: a pair already written to
+`label-sample/` is never reconsidered, never evicted and never replaces
+another pair, however a later run's new candidates would sort. New
+pairs can only fill a bucket that still has room under its cap. Combined
+with `_write_if_changed`, a `nc cluster` run with no new items writes
+zero `label-sample/` bytes for the same reason it writes zero cluster
+and zero pending-pair bytes --
+`tests/test_cluster.py::test_labelling_sample_is_stable_across_a_no_op_rerun`
+pins this, and
+`tests/test_cluster.py::test_labelling_sample_selection_is_stable_when_a_bucket_is_full`
+pins the sharper case: new items that add candidates to an *already
+full* bucket leave the file already written for that bucket completely
+untouched -- same bytes, same mtime.
+
+**Expected size.** The number of buckets is fixed by the config
+(`ceil((1.0 - sample_floor) / sample_bucket_width)`, 14 with the
+defaults), not by how many items or pairs exist, so the corpus is
+bounded at `14 * sample_bucket_cap` = 280 files with the shipped
+defaults, regardless of window or corpus size -- the opposite of an
+all-pairs dump. For the real corpus this project has seen so far (303
+items in the four-day window, ~45,700 pairs, see "starting evidence"
+below), that means at most 280 `label-sample/` files ever accumulate
+from a single run's candidates, and in practice fewer: most 0.05-wide
+slices near 1.0 are sparse for real news headlines, so they rarely fill
+to the cap.
+
 ## `nc label`: labelling a session
 
 ```
-nc label                  # every unlabeled pending pair
+nc label                  # every unlabeled pair, band and sample alike
 nc label --limit 50       # stop after 50 (still saved, still resumable)
 ```
+
+`nc label` draws from `nc.labelling.labelling_pool`: the union of
+`pending-pairs/` and `label-sample/`, deduplicated by pair id. Not just
+`label-sample/` alone -- `sample_bucket_cap` means the sample is not
+guaranteed to hold every pair in the band, so reading only the sample
+would silently shrink the exhaustive band coverage `nc label` has
+always given, which T23's "label at least 200 near-threshold pairs"
+leans on. Not just `pending-pairs/` alone either -- that directory only
+ever held the band, which is the gap the labelling corpus closes.
+Reading the union keeps both: every borderline pair stays reachable,
+and a session also sees the clear positives and negatives it never saw
+before. A pair picked by both (the stratified sample also lands some
+pairs inside the band) is shown once, since `pair_id` is the same key
+in both directories.
 
 For each unlabeled pair it shows both outlets, both titles, both ledes
 and the score, then asks:
@@ -60,7 +145,13 @@ session that stops after 30 answers still has roughly 4 labels from
 every part of the band, not 30 answers clustered around whatever score
 happens to be most common. This matters because `nc tune`'s table is
 only as good as its coverage: 200 labels bunched at 0.66 tell you
-nothing about 0.75.
+nothing about 0.75. A pair from `label-sample/` outside `[tau_low,
+tau_high)` -- a clear negative or a clear positive -- clamps into the
+nearest end bucket rather than being dropped, so it is still shown, just
+not spread across its own sub-range the way the band is; ordering
+between the labelling corpus's own buckets was not worth the added
+complexity for T22's brief and is left as a possible follow-up if a
+labelling session ends up front-loaded with clear cases.
 
 **Record format**, one JSON object per line in `labels/pairs.jsonl`:
 
@@ -119,13 +210,20 @@ Read it like this:
   same-story rate only nearing 1.0 at the very bottom of the labeled
   range, that is a sign `tau_low` may be sitting above where real
   matches start, not just `tau_high`.
-- **Recall's blind spot.** These labels only ever came from pairs `nc
-  cluster` judged borderline at the time, i.e. pairs that scored in
-  `[tau_low, tau_high)` under whatever thresholds were live when they
-  were written. A true match that scored below the old `tau_low` was
-  never persisted, never labeled, and never counted here. `nc tune`
-  cannot tell you how much recall you are losing below the band; only a
-  wider band (a lower `tau_low`, labeled for a while) can answer that.
+- **Recall's blind spot, narrowed but not closed.** Before the
+  labelling corpus, every label came from a pair `nc cluster` judged
+  borderline at the time -- scored in `[tau_low, tau_high)` under
+  whatever thresholds were live when it was written -- so a true match
+  scoring below the old `tau_low`, or a false match scoring above the
+  old `tau_high`, was never persisted or labeled at all. `label-sample/`
+  now persists both, down to `sample_floor`, so this table can measure
+  precision above `tau_high` for the first time and recall down to
+  `sample_floor` rather than only down to `tau_low`. What is still
+  invisible: a true match scoring below `sample_floor`. That pair was
+  never persisted, never labeled, and never counted here -- `nc tune`
+  cannot tell you how much recall you are losing below the floor; only
+  lowering `sample_floor` itself (a labelling knob, not `tau_low`) and
+  labelling for a while can answer that.
 
 **Choosing a value.** Given the asymmetry above, prefer the highest
 threshold with zero false links over one with marginally better recall
@@ -139,13 +237,20 @@ trust.
 
 1. Run a labelling session (T23: at least 200 pairs, ideally spread
    over several sittings since `nc label` never repeats a judged pair).
+   With the labelling corpus in place, that session already draws clear
+   positives and negatives alongside the band -- no separate step
+   needed to get them.
 2. Run `nc tune` and pick `tau_high` from the highest-precision row you
    trust, and `tau_low` from where recall stops improving or the labels
-   run out (see "recall's blind spot" above -- widening the band and
-   labelling again is the only way to check below it).
+   run out (see "recall's blind spot" above -- lowering `sample_floor`
+   and labelling again is the only way to check below it; `tau_low`
+   itself is not the knob for that, see "The labelling corpus" above).
 3. Edit `tau_low` and `tau_high` in `config/cluster.yaml` directly
    (both are plain numbers with comments explaining what they do; no
-   other file needs to change).
+   other file needs to change). `sample_floor`, `sample_bucket_width`
+   and `sample_bucket_cap` are separate knobs in the same file and are
+   not part of this step -- they shape the labelling corpus, not
+   clustering or the judge queue.
 4. Retuning does **not** retroactively re-cluster: `nc cluster` seeds
    every run from the memberships already on disk (module docstring,
    "Membership is monotonic"), so a new `tau_high` only affects links

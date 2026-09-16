@@ -3,10 +3,15 @@
 docs/PLAN.md T22: "`nc label` shows near-threshold pairs and records yes
 or no to `data/labels/pairs.jsonl`; `nc tune` prints precision and
 recall per threshold from the labels." Both are here because they share
-one file format (`Label`) and one purpose: turning `nc.cluster`'s
-persisted borderline pairs (`pending-pairs/*.json`, see
-`nc.cluster.write_pending_pairs`) into evidence for T23's threshold
-choice.
+one file format (`Label`) and one purpose: turning what `nc.cluster`
+persisted -- the exhaustive borderline band (`pending-pairs/*.json`,
+`nc.cluster.write_pending_pairs`) *and*, since the gap found on #39, a
+bounded, stratified sample across the whole usable score range
+(`label-sample/*.json`, `nc.cluster.select_label_sample`) -- into
+evidence for T23's threshold choice. `labelling_pool` in this module is
+what a labelling session actually draws from: the union of both
+directories, deduplicated by pair id. See that function's docstring for
+why neither directory alone is enough on its own.
 
 **Why this module never touches the embedding model.** The design
 question T22's brief poses is where the borderline pairs a human judges
@@ -41,11 +46,16 @@ obligation of its own.
 can change which labeled pairs would auto-link is exactly one of the
 observed scores (nothing changes between two consecutive ones), so the
 table is exhaustive and every row is backed by real, nameable evidence
-rather than an interpolated guess. What the table cannot show: recall
-against a true match that scored below the historic `tau_low` -- that
-pair was never persisted, never shown to a human, and is invisible to
-this arithmetic. `docs/CLUSTERING.md` says this again, for the owner
-sitting down with the report.
+rather than an interpolated guess. What the table still cannot show,
+even with the labelling corpus: recall against a true match that scored
+below `config.sample_floor` -- that pair was never persisted, never
+shown to a human, and is invisible to this arithmetic. Before #39 that
+blind spot was the historic `tau_low`, and precision *above* `tau_high`
+was invisible too (no clear positives were ever persisted at all); the
+labelling corpus narrows the blind spot to below `sample_floor` and
+makes precision above `tau_high` measurable for the first time.
+`docs/CLUSTERING.md` says this again, for the owner sitting down with
+the report.
 """
 
 from __future__ import annotations
@@ -57,7 +67,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from nc.cluster import ClusterConfig, PendingPair, load_pending_pairs
+from nc.cluster import ClusterConfig, PendingPair, load_label_sample, load_pending_pairs
 from nc.store import DataRoot
 
 # nc.cluster._TIME_FORMAT is private to that module; labels are a
@@ -173,6 +183,37 @@ def append_label(data_root: DataRoot, label: Label) -> None:
 # --- ordering -----------------------------------------------------------
 
 
+def labelling_pool(data_root: DataRoot) -> list[PendingPair]:
+    """Every pair `nc label` can show: `pending-pairs/` (T24's judge
+    queue, exhaustive over `[tau_low, tau_high)`) union `label-sample/`
+    (T22's bounded, stratified sample over the wider
+    `[sample_floor, 1.0]`), deduplicated by `pair_id`.
+
+    Not just `label-sample/` alone: `sample_bucket_cap` means the
+    labelling corpus is *not* guaranteed to hold every pair in the band
+    -- a 0.05-wide slice with more borderline pairs than the cap allows
+    still has the rest sitting only in `pending-pairs/`. Reading only
+    the sample would silently shrink the exhaustive band coverage `nc
+    label` has always given, which T23's "label at least 200
+    near-threshold pairs" leans on. Not just `pending-pairs/` alone
+    either: that directory only ever held the band, which is the whole
+    gap this function closes. Reading the union keeps both guarantees:
+    every borderline pair remains reachable, and the labelling session
+    also sees clear positives and clear negatives it never saw before.
+
+    A pair present in both directories (its score put it in the band,
+    and the stratified sample also picked it) is shown once: `pair_id`
+    is the same key in both, `nc.cluster.PendingPair`'s definition,
+    so a plain dict keyed on it dedupes for free.
+    """
+    merged: dict[str, PendingPair] = {}
+    for pair in load_pending_pairs(data_root):
+        merged[pair.pair_id] = pair
+    for pair in load_label_sample(data_root):
+        merged.setdefault(pair.pair_id, pair)
+    return [merged[pair_id] for pair_id in sorted(merged)]
+
+
 def unlabeled_pairs(
     pairs: Sequence[PendingPair], labels: Sequence[Label]
 ) -> list[PendingPair]:
@@ -262,14 +303,14 @@ def run_label_session(
     print_fn: Callable[[str], None] = print,
     now_fn: Callable[[], str] = lambda: datetime.now(UTC).strftime(_ISO_FORMAT),
 ) -> LabelSessionResult:
-    """Show unlabeled borderline pairs one at a time; y/n appends to
+    """Show unlabeled pairs from `labelling_pool` one at a time; y/n appends to
     `labels/pairs.jsonl` immediately (not buffered -- see
     `append_label`), s skips without recording, q stops. `input_fn` and
     `print_fn` are the whole interactive surface, injected so a scripted
     session can drive this without a real terminal (see
     tests/test_labelling.py).
     """
-    pairs = load_pending_pairs(data_root)
+    pairs = labelling_pool(data_root)
     labels = load_labels(data_root)
     pool = order_for_labelling(
         unlabeled_pairs(pairs, labels), config.tau_low, config.tau_high
@@ -281,8 +322,8 @@ def run_label_session(
     if total == 0:
         print_fn(
             f"label: nothing to label ({len(labels)} pair(s) already "
-            "judged, or `nc cluster` has not written any pending pairs "
-            "yet)"
+            "judged, or `nc cluster` has not written any pending-pair or "
+            "label-sample files yet)"
         )
         return LabelSessionResult(0, 0, 0, False, 0)
 

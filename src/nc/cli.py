@@ -103,9 +103,11 @@ def _cluster(args: argparse.Namespace) -> int:
 
 
 def _label(args: argparse.Namespace) -> int:
-    """T22: show unlabeled borderline pairs, record yes/no to
-    `labels/pairs.jsonl`. Reads `pending-pairs/` written by `nc cluster`
-    -- no embedding model, see nc/labelling.py's module docstring.
+    """T22: show unlabeled pairs, record yes/no to `labels/pairs.jsonl`.
+    Reads `pending-pairs/` (T24's exhaustive judge queue) and
+    `label-sample/` (T22's bounded, stratified sample) written by `nc
+    cluster` -- no embedding model, see nc/labelling.py's module
+    docstring and `labelling_pool`.
     """
     data_root = _data_root(args)
     config = cluster.load_cluster_config(args.config)

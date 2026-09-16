@@ -22,6 +22,7 @@ import math
 import os
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from hashlib import sha1
 from pathlib import Path
@@ -39,8 +40,11 @@ from nc.cluster import (
     _allocate_id,
     cluster_items,
     format_report,
+    label_sample_dir,
+    label_sample_path,
     load_cluster_config,
     load_clusters,
+    load_label_sample,
     load_pending_pairs,
     pending_pair_from_dict,
     pending_pair_path,
@@ -48,6 +52,8 @@ from nc.cluster import (
     render_pending_pair,
     run_clustering,
     scan_pairs,
+    select_label_sample,
+    write_label_sample,
     write_pending_pairs,
 )
 from nc.embed import HashBackend, embed_items, load_vectors
@@ -196,6 +202,12 @@ def test_load_cluster_config_reads_the_shipped_config() -> None:
     assert config.window_days == 4  # docs/ARCHITECTURE.md, Clustering
     assert config.min_outlets == 2
     assert 0.0 <= config.tau_low < config.tau_high <= 1.0
+    # T22's labelling corpus: independent of tau_low/tau_high, see
+    # config/cluster.yaml.
+    assert config.sample_floor == pytest.approx(0.30)
+    assert config.sample_bucket_width == pytest.approx(0.05)
+    assert config.sample_bucket_cap == 20
+    assert config.sample_floor <= config.tau_low  # spans below the band
 
 
 def test_load_cluster_config_rejects_inverted_thresholds(tmp_path: Path) -> None:
@@ -209,6 +221,51 @@ def test_load_cluster_config_rejects_a_zero_window(tmp_path: Path) -> None:
     path = tmp_path / "cluster.yaml"
     path.write_text("tau_low: 0.6\ntau_high: 0.8\nwindow_days: 0\nmin_outlets: 2\n")
     with pytest.raises(ValueError, match="window_days"):
+        load_cluster_config(path)
+
+
+def test_load_cluster_config_defaults_the_sample_knobs_when_absent(
+    tmp_path: Path,
+) -> None:
+    """The three labelling-corpus knobs are new: a config file written
+    before this change, or a minimal test fixture, still loads."""
+    path = tmp_path / "cluster.yaml"
+    path.write_text("tau_low: 0.6\ntau_high: 0.8\nwindow_days: 4\nmin_outlets: 2\n")
+    config = load_cluster_config(path)
+    assert config.sample_floor == pytest.approx(0.30)
+    assert config.sample_bucket_width == pytest.approx(0.05)
+    assert config.sample_bucket_cap == 20
+
+
+def test_load_cluster_config_rejects_a_sample_floor_outside_zero_one(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "cluster.yaml"
+    path.write_text(
+        "tau_low: 0.6\ntau_high: 0.8\nwindow_days: 4\nmin_outlets: 2\n"
+        "sample_floor: 1.5\n"
+    )
+    with pytest.raises(ValueError, match="sample_floor"):
+        load_cluster_config(path)
+
+
+def test_load_cluster_config_rejects_a_zero_bucket_width(tmp_path: Path) -> None:
+    path = tmp_path / "cluster.yaml"
+    path.write_text(
+        "tau_low: 0.6\ntau_high: 0.8\nwindow_days: 4\nmin_outlets: 2\n"
+        "sample_bucket_width: 0\n"
+    )
+    with pytest.raises(ValueError, match="sample_bucket_width"):
+        load_cluster_config(path)
+
+
+def test_load_cluster_config_rejects_a_zero_bucket_cap(tmp_path: Path) -> None:
+    path = tmp_path / "cluster.yaml"
+    path.write_text(
+        "tau_low: 0.6\ntau_high: 0.8\nwindow_days: 4\nmin_outlets: 2\n"
+        "sample_bucket_cap: 0\n"
+    )
+    with pytest.raises(ValueError, match="sample_bucket_cap"):
         load_cluster_config(path)
 
 
@@ -286,6 +343,57 @@ def test_scan_pairs_survives_a_zero_vector() -> None:
 def test_scan_pairs_handles_a_window_too_small_to_have_pairs() -> None:
     assert scan_pairs([], {}, 0.65, 0.80).linked == ()
     assert scan_pairs(["x"], {"x": [1.0, 0.0]}, 0.65, 0.80).linked == ()
+
+
+# --- scan_pairs's sample mask (T22's labelling corpus) ---------------------
+
+
+def test_scan_pairs_sample_is_empty_without_a_floor() -> None:
+    """`sample_floor` defaults to `None`: every existing caller of
+    `scan_pairs` (all four positional args) is unaffected by T22's
+    labelling-corpus change."""
+    items, vectors = _synthetic_set()
+    scan = scan_pairs([item.id for item in items], vectors, 0.65, 0.80)
+    assert scan.sample == ()
+
+
+def test_scan_pairs_sample_spans_below_tau_low_and_above_tau_high() -> None:
+    """The whole point of the gap this closes: clear negatives (group F,
+    0.50, well below tau_low) and clear positives (group A, 0.95, well
+    above tau_high) both show up, not just the borderline band."""
+    items, vectors = _synthetic_set()
+    scan = scan_pairs(
+        [item.id for item in items], vectors, 0.65, 0.80, sample_floor=0.30
+    )
+    scores = sorted({round(pair.score, 2) for pair in scan.sample})
+    # A=0.95, B=0.88, C and D=0.85, E=0.72, F=0.50 -- every synthetic
+    # group at or above the 0.30 floor, singles (score 0) excluded.
+    assert scores == [0.50, 0.72, 0.85, 0.88, 0.95]
+    assert len(scan.sample) == 6 + 3 + 1 + 3 + 1 + 1  # A + B + C + D + E + F pairs
+    assert any(pair.score >= 0.80 for pair in scan.sample)  # a clear positive
+    assert any(0.65 <= pair.score < 0.80 for pair in scan.sample)  # the band
+    assert any(pair.score < 0.65 for pair in scan.sample)  # a clear negative
+
+
+def test_scan_pairs_sample_ignores_pairs_below_the_floor() -> None:
+    items, vectors = _synthetic_set()
+    scan = scan_pairs(
+        [item.id for item in items], vectors, 0.65, 0.80, sample_floor=0.30
+    )
+    assert all(pair.score >= 0.30 for pair in scan.sample)
+    # The near-orthogonal singles never clear even a low floor.
+    assert not any(_item_id("single0") in (pair.a, pair.b) for pair in scan.sample)
+
+
+def test_scan_pairs_sample_is_sorted_by_pair_id_not_score() -> None:
+    """`select_label_sample` relies on this order to pick deterministically
+    within a bucket -- see that function's docstring."""
+    items, vectors = _synthetic_set()
+    scan = scan_pairs(
+        [item.id for item in items], vectors, 0.65, 0.80, sample_floor=0.30
+    )
+    ids = [(pair.a, pair.b) for pair in scan.sample]
+    assert ids == sorted(ids)
 
 
 # --- the acceptance criterion: 30 items, known groups ---------------------
@@ -836,6 +944,208 @@ def test_write_pending_pairs_only_rewrites_changed_files(tmp_path: Path) -> None
 
     assert write_pending_pairs(data_root, [pair]) == 1
     assert write_pending_pairs(data_root, [pair]) == 0  # unchanged, not rewritten
+
+
+# --- T22's labelling corpus: select_label_sample, write_label_sample ------
+
+
+def _sample_pair(seed_a: str, seed_b: str, score: float) -> PendingPair:
+    a = ClusterItem.from_item(_item(seed_a, "outlet-a"))
+    b = ClusterItem.from_item(_item(seed_b, "outlet-b"))
+    return PendingPair(a=a, b=b, score=score)
+
+
+def test_select_label_sample_is_deterministic_regardless_of_input_order() -> None:
+    pairs = [
+        _sample_pair("x1", "x2", 0.31),
+        _sample_pair("x3", "x4", 0.32),
+        _sample_pair("x5", "x6", 0.33),
+    ]
+    first = select_label_sample(pairs, [], 0.30, 0.05, cap=2)
+    second = select_label_sample(list(reversed(pairs)), [], 0.30, 0.05, cap=2)
+    assert [p.pair_id for p in first] == [p.pair_id for p in second]
+
+
+def test_select_label_sample_caps_a_bucket_by_lowest_pair_id() -> None:
+    """Not "first N seen": the cap picks a fixed, content-derived
+    ordering (pair id) so the choice does not depend on scan order."""
+    pairs = [_sample_pair(f"c{i}", f"d{i}", 0.31) for i in range(5)]
+    chosen = select_label_sample(pairs, [], 0.30, 0.05, cap=2)
+    assert len(chosen) == 2
+    assert [p.pair_id for p in chosen] == sorted(p.pair_id for p in pairs)[:2]
+
+
+def test_select_label_sample_never_evicts_an_already_sampled_pair() -> None:
+    """Stability: a pair already on disk stays chosen even when a new
+    candidate would sort earlier by pair id -- the bucket is full, and
+    fullness is judged from `already_sampled`, not from this call's
+    candidate list."""
+    already = [_sample_pair("m1", "m2", 0.31)]
+    new_candidate = _sample_pair("a0", "a1", 0.32)  # sorts before "m1-m2"
+    chosen = select_label_sample([*already, new_candidate], already, 0.30, 0.05, cap=1)
+    assert chosen == []
+
+
+def test_select_label_sample_fills_only_the_remaining_room() -> None:
+    already = [_sample_pair("m1", "m2", 0.31)]
+    new_candidate = _sample_pair("a0", "a1", 0.32)
+    chosen = select_label_sample([*already, new_candidate], already, 0.30, 0.05, cap=2)
+    assert [p.pair_id for p in chosen] == [new_candidate.pair_id]
+
+
+def test_select_label_sample_ignores_scores_below_the_floor() -> None:
+    below = _sample_pair("z1", "z2", 0.10)
+    assert select_label_sample([below], [], 0.30, 0.05, cap=5) == []
+
+
+def test_select_label_sample_caps_each_bucket_independently() -> None:
+    low = _sample_pair("a1", "a2", 0.31)
+    high = _sample_pair("b1", "b2", 0.91)
+    chosen = select_label_sample([low, high], [], 0.30, 0.05, cap=1)
+    assert {p.pair_id for p in chosen} == {low.pair_id, high.pair_id}
+
+
+def test_write_label_sample_only_rewrites_changed_files(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    pair = _sample_pair("e0", "e1", 0.5)
+
+    assert write_label_sample(data_root, [pair]) == 1
+    assert write_label_sample(data_root, [pair]) == 0  # unchanged, not rewritten
+    path = label_sample_path(data_root, pair)
+    assert path.parent == label_sample_dir(data_root)
+    assert path.parent == data_root.resolve("label-sample")
+    assert load_label_sample(data_root) == [pair]
+
+
+# --- T22's labelling corpus, end to end through run_clustering ------------
+
+
+def test_run_clustering_writes_a_labelling_sample_with_clear_pos_and_neg(
+    tmp_path: Path,
+) -> None:
+    """T22's gap, closed: group F (0.50) is well below tau_low and never
+    reaches `pending-pairs/`; group A (0.95) is well above tau_high and
+    links outright, never reaching `pending-pairs/` either. Both are now
+    in the labelling corpus."""
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+
+    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+
+    assert report.label_sample_written == 6 + 3 + 1 + 3 + 1 + 1
+    sample = load_label_sample(data_root)
+    assert len(sample) == report.label_sample_written
+    scores = sorted({round(pair.score, 2) for pair in sample})
+    assert scores == [0.50, 0.72, 0.85, 0.88, 0.95]
+
+    pending_scores = {round(pair.score, 2) for pair in load_pending_pairs(data_root)}
+    assert pending_scores == {0.72}  # only the borderline band, as before
+    assert 0.50 not in pending_scores  # the clear negative T22's gap missed
+    assert 0.95 not in pending_scores  # the clear positive T22's gap missed
+
+
+def test_labelling_sample_is_stable_across_a_no_op_rerun(tmp_path: Path) -> None:
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    before = _snapshot(data_root.path)
+
+    time.sleep(0.01)
+    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+
+    assert second.label_sample_written == 0
+    assert _snapshot(data_root.path) == before
+
+
+def test_labelling_sample_selection_is_stable_when_a_bucket_is_full(
+    tmp_path: Path,
+) -> None:
+    """The idempotence constraint made concrete: a tight cap already
+    saturates every bucket the synthetic set touches; a new item that
+    adds more candidates to a saturated bucket must not disturb the
+    file already chosen for it."""
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+    tight_config = replace(CONFIG, sample_bucket_cap=1)
+    run_clustering(data_root, tight_config, db_path, now=NOW)
+    before_sample = {p.pair_id: p for p in load_label_sample(data_root)}
+    # Four distinct 0.05-wide buckets are touched: F (0.50), E (0.72),
+    # {C, D, B} (0.85 and 0.88 both fall in [0.85, 0.90)), and A (0.95).
+    # Capped to 1 file per bucket.
+    assert len(before_sample) == 4
+    before_files = {
+        path: value
+        for path, value in _snapshot(data_root.path).items()
+        if path.startswith("label-sample/")
+    }
+
+    # A new member joins group A's topic at 0.90 (not 0.95 exactly): its
+    # cross-similarity to the original members is sqrt(0.95 * 0.90) =~
+    # 0.9247, comfortably inside the same 0.05-wide bucket as the
+    # original pairs' 0.95 (Python's `0.95` is not exactly representable
+    # in binary floating point and rounds down, so that bucket is
+    # actually [0.90, 0.95) here -- see `_sample_bucket`'s docstring).
+    # Four new candidate pairs land in the already-full bucket.
+    latecomer = _item("a4", "engadget", published="2026-09-16T09:00:00Z")
+    vectors[latecomer.id] = _vector(0, 40, 0.90)
+    append_items(data_root, [latecomer])
+    _embed(data_root, db_path, [latecomer], vectors)
+    time.sleep(0.01)
+
+    run_clustering(data_root, tight_config, db_path, now=NOW)
+    after_sample = {p.pair_id: p for p in load_label_sample(data_root)}
+    after_files = {
+        path: value
+        for path, value in _snapshot(data_root.path).items()
+        if path.startswith("label-sample/")
+    }
+
+    assert after_files == before_files  # not one byte, not one mtime, moved
+    assert after_sample == before_sample  # the bucket stayed full, unchanged
+    assert len([p for p in after_sample.values() if p.score == 0.95]) == 1
+
+
+def test_labelling_sample_grows_into_a_new_bucket_without_disturbing_others(
+    tmp_path: Path,
+) -> None:
+    """The positive case: a genuinely new score range gets its own file,
+    and nothing already written is touched in the process."""
+    items, vectors = _synthetic_set()
+    data_root, db_path = _prepare(tmp_path, items, vectors)
+    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    before_files = {
+        path: value
+        for path, value in _snapshot(data_root.path).items()
+        if path.startswith("label-sample/")
+    }
+
+    # A brand new topic, at a similarity (0.40) none of the synthetic
+    # groups occupy -- its own, previously-empty bucket.
+    g0 = _item("g0", "cnet", published="2026-09-16T09:00:00Z")
+    g1 = _item("g1", "polygon", published="2026-09-16T09:05:00Z")
+    vectors[g0.id] = _vector(6, 50, 0.40)
+    vectors[g1.id] = _vector(6, 51, 0.40)
+    append_items(data_root, [g0, g1])
+    _embed(data_root, db_path, [g0, g1], vectors)
+    time.sleep(0.01)
+
+    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    after_files = {
+        path: value
+        for path, value in _snapshot(data_root.path).items()
+        if path.startswith("label-sample/")
+    }
+
+    for path, value in before_files.items():
+        assert after_files[path] == value  # every earlier file, untouched
+    new_paths = set(after_files) - set(before_files)
+    assert len(new_paths) == 1
+    added = next(
+        pair
+        for pair in load_label_sample(data_root)
+        if {pair.a.item_id, pair.b.item_id} == {g0.id, g1.id}
+    )
+    assert pytest.approx(added.score, abs=1e-6) == 0.40
 
 
 # --- timing ---------------------------------------------------------------
