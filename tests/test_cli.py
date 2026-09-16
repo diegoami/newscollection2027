@@ -358,3 +358,83 @@ def test_embed_reports_embedded_and_already_stored_counts(
     out_2 = capsys.readouterr().out
     assert "0 item(s) embedded" in out_2
     assert "5 already had a vector" in out_2
+
+
+def test_cluster_emits_a_cluster_and_is_a_no_op_the_second_time(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """T21 end to end through the CLI, with no model anywhere.
+
+    `HashBackend` gives identical text an identical vector, so two
+    outlets running the same headline and lede land at cosine 1.0 and
+    link; the third item is unrelated text and stays a dropped
+    singleton.
+    """
+    from nc.embed import HashBackend, embed_items
+    from nc.feeds import Item, utc_now_iso
+    from nc.store import DataRoot, append_items
+
+    now = utc_now_iso()
+    shared_title = "Chipmaker announces a new accelerator"
+    shared_lede = "The company said the part ships in the first quarter."
+    items = [
+        Item(
+            id=f"{index:040x}",
+            outlet=outlet,
+            url=f"https://{outlet}.example/{index}",
+            title=title,
+            lede=lede,
+            author=None,
+            published=now,
+            fetched=now,
+            tags=(),
+        )
+        for index, (outlet, title, lede) in enumerate(
+            (
+                ("theverge", shared_title, shared_lede),
+                ("arstechnica", shared_title, shared_lede),
+                ("wired", "Something else entirely", "An unrelated lede."),
+            )
+        )
+    ]
+    data_root = tmp_path / "data-root"
+    append_items(DataRoot(data_root), items)
+    db_path = tmp_path / "vectors.sqlite"
+    embed_items(DataRoot(data_root), HashBackend(dim=16), "hash", db_path)
+
+    config_path = tmp_path / "cluster.yaml"
+    config_path.write_text(
+        "tau_low: 0.65\ntau_high: 0.80\nwindow_days: 4\nmin_outlets: 2\n"
+    )
+    argv = [
+        "cluster",
+        "--data-root",
+        str(data_root),
+        "--config",
+        str(config_path),
+        "--db",
+        str(db_path),
+    ]
+
+    assert main(argv) == 0
+    out = capsys.readouterr().out
+    assert "1 new" in out
+    assert "dropped 1 singleton component(s)" in out
+    assert "wrote 1 cluster file(s), 1 pending file(s)" in out
+    written = sorted((data_root / "clusters").rglob("*.json"))
+    assert len(written) == 1
+    payload = json.loads(written[0].read_text())
+    assert {entry["outlet"] for entry in payload["items"]} == {
+        "theverge",
+        "arstechnica",
+    }
+
+    before = {path: path.read_bytes() for path in sorted(data_root.rglob("*.json"))}
+    assert main(argv) == 0
+    out_2 = capsys.readouterr().out
+    assert "0 new" in out_2
+    assert "wrote 0 cluster file(s), 0 pending file(s)" in out_2
+    assert {path: path.read_bytes() for path in sorted(data_root.rglob("*.json"))} == (
+        before
+    )

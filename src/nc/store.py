@@ -192,20 +192,47 @@ def append_items(data_root: DataRoot, items: Iterable[Item]) -> AppendResult:
     return AppendResult(added=added, skipped=skipped)
 
 
+def _read_item_file(path: Path) -> list[Item]:
+    rows = []
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                rows.append(_item_from_dict(json.loads(line)))
+    rows.sort(key=lambda item: item.id)
+    return rows
+
+
 def read_items(data_root: DataRoot) -> Iterator[Item]:
     """Every stored item, in a deterministic (file path, then id) order."""
     items_dir = data_root.items_dir()
     if not items_dir.exists():
         return
     for path in sorted(items_dir.glob("*/*/*.jsonl")):
-        rows = []
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if line:
-                    rows.append(_item_from_dict(json.loads(line)))
-        rows.sort(key=lambda item: item.id)
-        yield from rows
+        yield from _read_item_file(path)
+
+
+def read_items_since(data_root: DataRoot, start_date: str) -> Iterator[Item]:
+    """Items filed on or after `start_date` (`YYYY-MM-DD`), same order.
+
+    Added for T21's four-day window: reading every item ever stored to
+    cluster the last four days would get slower every day the project
+    runs. Files are named `items/YYYY/MM/DD.jsonl` by the item's
+    `published` date (see the module docstring), and that date is
+    zero-padded, so a plain string comparison on the path-derived date
+    is the whole filter. There is deliberately no upper bound: an item
+    with a `published` in the future -- a misconfigured feed, a
+    timezone bug at an outlet -- is filed ahead of today and must still
+    be visible to the caller rather than silently skipped.
+    """
+    items_dir = data_root.items_dir()
+    if not items_dir.exists():
+        return
+    for path in sorted(items_dir.glob("*/*/*.jsonl")):
+        date = f"{path.parent.parent.name}-{path.parent.name}-{path.stem}"
+        if date < start_date:
+            continue
+        yield from _read_item_file(path)
 
 
 _SCHEMA = """

@@ -1,0 +1,64 @@
+# Clustering window and thresholds for nc.cluster / `nc cluster` (T21).
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code." A file of its own, next to config/embed.yaml, because the
+# thresholds below are tuned against whichever embedding model that file
+# names -- change the model and these values are meaningless until
+# re-tuned.
+#
+# ===========================================================================
+# PROVISIONAL VALUES. NOT TUNED. T23 SETS THE REAL ONES.
+# ===========================================================================
+#
+# docs/PLAN.md T22 builds `nc label` and `nc tune`; T23 is the owner
+# labelling at least 200 near-threshold pairs and setting tau_low and
+# tau_high from the `nc tune` precision/recall report. Until that has
+# happened, the two numbers below are a defensible starting point and
+# nothing more. They have not been measured against a single real pair.
+# Do not quote them as tuned, and do not treat clustering output
+# produced with them as evidence about the thresholds themselves.
+
+# Pairs at or above tau_high are linked automatically.
+#
+# Chosen high on purpose: the two errors are not symmetric. A false link
+# merges two unrelated stories into one cluster, and the analysis step
+# then dutifully reports "discrepancies" between outlets that were never
+# covering the same event -- a visibly wrong story on the site, with
+# verbatim quotes that make it look authoritative. A missed link only
+# costs a story an outlet, or drops it as a single-outlet component that
+# nobody sees. Recall is also the thing the borderline band and T24's
+# judge exist to recover; precision is not recoverable downstream.
+#
+# 0.80 is where near-duplicate short news text (same event, different
+# newsroom's headline and lede) sits for a static embedding model on
+# cosine, comfortably above the same-topic-different-story range. It is
+# a starting point for T23's labelling, not a measurement.
+tau_high: 0.80
+
+# Pairs below tau_low never link, and are never shown to anyone: they do
+# not reach T24's judge and they do not reach `nc label`.
+#
+# The band [tau_low, tau_high) is 0.15 wide, which is the real decision
+# here. Too narrow and T23 has almost no near-threshold pairs to label
+# and T24's judge sees nothing; too wide and the judge is asked about
+# thousands of obviously unrelated pairs every run, which costs tokens
+# for nothing. 0.65 keeps the band around the range where "same topic,
+# different story" and "same story" actually overlap for this kind of
+# text, which is the population T22/T23 need to look at.
+tau_low: 0.65
+
+# docs/ARCHITECTURE.md, Clustering: "Window: items from the last 4
+# days." Restated here rather than inlined in the module, per CLAUDE.md.
+# Not a tuning knob in the same sense as the thresholds: it is a
+# statement about how long outlets take to pick up each other's stories.
+# Note that it bounds which items can form *new* links, not how long a
+# cluster lives -- membership is monotonic, see src/nc/cluster.py.
+window_days: 4
+
+# docs/ARCHITECTURE.md, Clustering: "A cluster is emitted only with two
+# or more distinct outlets." A product invariant, not a threshold to
+# tune: a story only one outlet ran has nothing to compare, which is the
+# entire point of the site. It lives here because CLAUDE.md puts
+# numbers in config/, not because lowering it to 1 is a supported thing
+# to do.
+min_outlets: 2
