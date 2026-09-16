@@ -81,19 +81,20 @@ also gained `lede_words_max`, which is what exposes the full-text feeds.
 
 ## How to re-measure
 
-From a runner, or any machine with egress to the news domains:
+T10 absorbed `scripts/probe_feeds.py` and `.github/workflows/feeds-probe.yml`
+into `nc.feeds` and `.github/workflows/feeds-check.yml`. From a runner, or
+any machine with egress to the news domains:
 
 ```
-uv run --no-project --with feedparser --with pyyaml python scripts/probe_feeds.py
+nc feeds check
 ```
 
-or trigger `feeds-probe` with `workflow_dispatch`. The probe writes
-`feed-probe.json` and uploads it as an artifact. T10 replaces both the
-script and the workflow with:
-
-```
-nc feeds check --candidates config/outlets.candidates.yaml
-```
+reads `config/outlets.yaml` (the 11-outlet recommended set) and fails if
+any configured feed is unreachable, empty, title-only or stale; add
+`--json` for machine-readable output. It does not re-probe the full
+candidate list in `config/outlets.candidates.yaml` -- that is `--outlets`
+away if a future task wants it, but re-scoring all 42 candidates is T09's
+job, not T10's.
 
 ## Scoring
 

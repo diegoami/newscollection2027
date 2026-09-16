@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Healthy Feed</title>
+    <link>https://example.com/</link>
+    <description>A feed with real ledes on every entry.</description>
+    <item>
+      <title>Startup raises new funding round</title>
+      <link>https://example.com/story-1</link>
+      <description>The company said the money will go toward hiring
+      engineers and expanding into two new markets next year.</description>
+      <pubDate>Mon, 05 Jan 2026 09:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Regulator opens inquiry into platform practices</title>
+      <link>https://example.com/story-2</link>
+      <description>Officials said the review will examine how the
+      company ranks search results against its own competing products.</description>
+      <pubDate>Sun, 04 Jan 2026 15:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Chipmaker unveils next generation processor</title>
+      <link>https://example.com/story-3</link>
+      <description>The new chip promises a large jump in performance
+      per watt compared with the previous generation, the company said.</description>
+      <pubDate>Sat, 03 Jan 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Browser update patches critical vulnerability</title>
+      <link>https://example.com/story-4</link>
+      <description>Security researchers found the flaw could let an
+      attacker run code remotely, and the fix is rolling out automatically.</description>
+      <pubDate>Fri, 02 Jan 2026 08:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Social network changes its recommendation algorithm</title>
+      <link>https://example.com/story-5</link>
+      <description>The company says the change favors posts from
+      accounts a user already follows over those suggested by the system.</description>
+      <pubDate>Thu, 01 Jan 2026 06:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

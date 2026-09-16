@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Static tech-news site that clusters feed items across outlets and checks their claims against each other."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "feedparser>=6.0.14",
+    "pyyaml>=6.0.3",
+]
 
 [project.scripts]
 nc = "nc.cli:main"
@@ -21,6 +24,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "pytest>=8.3",
+    "types-pyyaml>=6.0.12.20260906",
 ]
 
 [tool.ruff]
@@ -35,6 +39,10 @@ strict = true
 python_version = "3.12"
 files = ["src", "tests"]
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "feedparser"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

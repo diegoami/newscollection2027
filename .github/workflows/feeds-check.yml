@@ -1,0 +1,46 @@
+name: feeds-check
+
+# T10. Fetches every configured feed and fails if any is unreachable,
+# empty, title-only or stale. The development sandbox has no egress to
+# news domains, so this is where the AC of T10 actually gets
+# demonstrated; see docs/OUTLETS.md, "Measurement: fetched on a runner,
+# not in this sandbox".
+
+on:
+  # Whenever the registry or the checker itself changes, on a working
+  # branch, so a bad feed url is caught before it reaches main rather
+  # than by the next weekly run.
+  push:
+    branches: ["claude/**", "feat/**"]
+    paths:
+      - "config/outlets.yaml"
+      - "config/feeds.yaml"
+      - "src/nc/feeds.py"
+      - ".github/workflows/feeds-check.yml"
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  # Not `check`: T03 registers the bare `check` as the required status
+  # check on main, GitHub matches check runs by name, and a news site
+  # going down must never post a red `check` that blocks a merge.
+  feeds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      - run: uv run nc feeds check

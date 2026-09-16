@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Stale Feed</title>
+    <link>https://example.com/</link>
+    <description>Real ledes, but nothing published in years.</description>
+    <item>
+      <title>Startup raises new funding round</title>
+      <link>https://example.com/story-1</link>
+      <description>The company said the money will go toward hiring
+      engineers and expanding into two new markets next year.</description>
+      <pubDate>Fri, 03 Jan 2020 09:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Regulator opens inquiry into platform practices</title>
+      <link>https://example.com/story-2</link>
+      <description>Officials said the review will examine how the
+      company ranks search results against its own competing products.</description>
+      <pubDate>Thu, 02 Jan 2020 15:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Chipmaker unveils next generation processor</title>
+      <link>https://example.com/story-3</link>
+      <description>The new chip promises a large jump in performance
+      per watt compared with the previous generation, the company said.</description>
+      <pubDate>Wed, 01 Jan 2020 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
