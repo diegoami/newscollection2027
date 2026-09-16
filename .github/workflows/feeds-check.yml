@@ -28,7 +28,10 @@ env:
   UV_LOCKED: "1"
 
 jobs:
-  check:
+  # Not `check`: T03 registers the bare `check` as the required status
+  # check on main, GitHub matches check runs by name, and a news site
+  # going down must never post a red `check` that blocks a merge.
+  feeds:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
