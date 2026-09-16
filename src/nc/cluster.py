@@ -111,13 +111,16 @@ loser is *not* deleted: its file is kept exactly as it was and gains
 analysis stays in `analyses/` and becomes history.
 
   Consumers must therefore treat an analysis as current only when its
-  `cluster_id` names a cluster with no `superseded_by` *and* its
+  `cluster_id` names a cluster whose status is not `superseded`
+  *and* its
   `cluster_version` equals that cluster's current `version`. T30's
   validator and T40's site builder both need this rule; it is stated
   here because this module is what creates the situation.
 
-  `superseded_by` is another additive field. The alternative --
-  a fourth `status` value -- would change the documented
+  `superseded_by` names the survivor. The owner ratified a fourth
+  `status` value on #38, so supersession is now both: the status
+  marks it, the field says which cluster absorbed it. That changed
+  the documented
   `pending | analyzed | rejected` enum, which is the owner's to ratify,
   so this module stays inside the documented enum and adds a field
   beside it.
@@ -222,6 +225,11 @@ _BLOCK = 512
 _MAX_ID_ATTEMPTS = 1000
 
 STATUS_PENDING = "pending"
+# Ratified by the owner on #38: supersession is a status value, not
+# only a field. `superseded_by` stays alongside it, because the status
+# says a cluster was absorbed and the field says which cluster took
+# it; a reader needs both to follow the chain.
+STATUS_SUPERSEDED = "superseded"
 
 
 # --- config ---------------------------------------------------------------
@@ -590,7 +598,7 @@ def cluster_items(
     matching output seam is `ClusterRun.borderline`, the pairs T24 has
     to judge.
     """
-    live = [cluster for cluster in existing if cluster.superseded_by is None]
+    live = [cluster for cluster in existing if cluster.status != STATUS_SUPERSEDED]
 
     known: dict[str, ClusterItem] = {}
     for cluster in existing:
@@ -689,7 +697,9 @@ def cluster_items(
         else:
             emitted.append(winner)
         for loser in losers:
-            superseded.append(replace(loser, superseded_by=winner.id))
+            superseded.append(
+                replace(loser, status=STATUS_SUPERSEDED, superseded_by=winner.id)
+            )
 
     emitted.sort(key=lambda cluster: cluster.id)
     superseded.sort(key=lambda cluster: cluster.id)
@@ -762,9 +772,7 @@ def write_run(data_root: DataRoot, run: ClusterRun) -> WriteResult:
         if _write_if_changed(cluster_path(data_root, cluster), text):
             clusters_written += 1
         path = pending_path(data_root, cluster.id)
-        wants_pending = (
-            cluster.status == STATUS_PENDING and cluster.superseded_by is None
-        )
+        wants_pending = cluster.status == STATUS_PENDING
         if wants_pending:
             if _write_if_changed(path, text):
                 pending_written += 1

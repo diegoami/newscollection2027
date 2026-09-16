@@ -29,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from nc.cluster import (
+    STATUS_SUPERSEDED,
     Cluster,
     ClusterConfig,
     ClusterItem,
@@ -448,6 +449,8 @@ def test_a_bridging_item_merges_two_clusters_earliest_anchor_surviving() -> None
     retired = second.superseded[0]
     assert retired.id == new_cluster.id
     assert retired.superseded_by == survivor.id
+    # Ratified on #38: supersession is a status value, not only a field.
+    assert retired.status == STATUS_SUPERSEDED
     # The loser's own record is frozen, not rewritten: an analysis
     # written against it still describes exactly what it says.
     assert retired.items == new_cluster.items
@@ -655,6 +658,7 @@ def test_a_merge_retires_the_pending_file_of_the_loser(tmp_path: Path) -> None:
         data_root.resolve("clusters", loser_id[:10], f"{loser_id}.json").read_text()
     )
     assert retired["superseded_by"] == second.run.clusters[0].id
+    assert retired["status"] == STATUS_SUPERSEDED
     # Reloading is stable: the retired cluster is not reconsidered, and
     # a third run is a byte-level no-op.
     reloaded = load_clusters(data_root)

@@ -82,11 +82,39 @@ tags         list of strings from the feed
 **Cluster** (one story, two or more outlets)
 
 ```
-id           <YYYY-MM-DD>-<6 hex of sorted item ids>   (date of earliest item)
+id           <YYYY-MM-DD>-<6 hex of sha1 of the anchor item id>
+             (date of the anchor item)
+anchor       the earliest-published item when the cluster was first
+             emitted; chosen once and never recomputed
 version      increments when membership changes; analysis is per version
 items        list of item ids with outlet, title, lede, published
-status       pending | analyzed | rejected
+status       pending | analyzed | rejected | superseded
+superseded_by  the cluster that absorbed this one, when superseded
 ```
+
+The id comes from the anchor rather than from the membership, because an
+id that is a function of its members cannot also be stable when those
+members change: a fourth outlet arriving late to a story would rewrite
+the hash, produce a different cluster, and orphan the analysis written
+against the old id. Late arrivals are the normal case, so the anchor is
+fixed when the cluster is born and the id survives every later change.
+The cost is that the date prefix is the earliest item known at that
+moment, not necessarily the earliest the cluster will ever hold; the
+true earliest is always in `items`, and the site orders by that.
+
+Membership is monotonic. The four-day window decides which items can
+form new links, never what a cluster already contains, so a cluster
+whose oldest member has left the window does not shrink, bump its
+version, or re-queue itself for analysis. When a new item bridges two
+clusters, the one with the earlier anchor survives and takes the whole
+component; the other keeps its own membership, becomes `superseded` and
+names its survivor, so an analysis already written against it stays
+readable as history rather than disappearing.
+
+**An analysis is current** when its `cluster_id` names a cluster whose
+status is not `superseded` and its `cluster_version` equals that
+cluster's current `version`. Anything else is history. The validator,
+the site and the nightly run all decide staleness this way.
 
 **Analysis** (see `contract/analysis.schema.json`)
 
