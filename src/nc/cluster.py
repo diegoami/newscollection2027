@@ -263,6 +263,7 @@ import yaml
 
 from nc.embed import DEFAULT_VECTORS_DB_PATH, load_vectors
 from nc.feeds import Item
+from nc.promo import DEFAULT_PROMO_CONFIG_PATH, PromoRules, load_promo_rules, partition
 from nc.store import DataRoot, read_items_since
 
 DEFAULT_CLUSTER_CONFIG_PATH = Path("config/cluster.yaml")
@@ -1130,6 +1131,20 @@ def select_label_sample(
     docstring and docs/CLUSTERING.md for the corpus-size math. This is
     what keeps the labelling corpus from growing the way an all-pairs
     dump would.
+
+    **Same-outlet pairs are skipped.** A cluster is emitted only with
+    two or more distinct outlets, so the judgment the thresholds
+    actually govern is whether two *outlets* are on the same story.
+    Measured on the first real corpus, same-outlet pairs were 97 of the
+    223 pairs in the labelling pool and 7 of the 10 scoring above 0.80
+    -- they crowded the top buckets, which is the part of the range the
+    thresholds get set from, with one masthead's own follow-ups and
+    shopping copy. They stay in `pending-pairs/` for T24's judge: a
+    same-outlet link still matters to clustering, because it can bridge
+    two items from one outlet into a component that reaches a second
+    outlet, and that component is a legitimate cluster carrying two
+    items from the same masthead. It is the *human's* hour that should
+    not be spent on them.
     """
     if width <= 0:
         return []
@@ -1147,6 +1162,8 @@ def select_label_sample(
         # for the same reason: the value that matters is the one that
         # will be persisted (`PendingPair.to_dict` rounds it too), not
         # whatever extra float32 jitter this run's matmul added.
+        if pair.a.outlet == pair.b.outlet:
+            continue
         rounded_score = round(pair.score, 6)
         if rounded_score < floor or pair.pair_id in already_ids:
             continue
@@ -1186,6 +1203,7 @@ class RunReport:
     written: WriteResult
     pending_pairs_written: int
     label_sample_written: int
+    promotional_dropped: int = 0
 
 
 def run_clustering(
@@ -1194,20 +1212,31 @@ def run_clustering(
     db_path: Path = DEFAULT_VECTORS_DB_PATH,
     now: datetime | None = None,
     extra_links: Iterable[tuple[str, str]] = (),
+    promo_rules: PromoRules | None = None,
 ) -> RunReport:
     """`nc cluster`: window, link, emit, write.
 
     `now` is injected rather than read from the clock inside the
     algorithm so the window is reproducible in a test and in a backfill.
+    `promo_rules` likewise: the default reads `config/promo.yaml`, and
+    a test passes its own rather than depending on the shipped file.
     """
     moment = datetime.now(UTC) if now is None else now
     cutoff = (moment - timedelta(days=config.window_days)).strftime(_TIME_FORMAT)
 
-    items = [
+    windowed = [
         item
         for item in read_items_since(data_root, cutoff[:10])
         if item.published >= cutoff
     ]
+    # Before anything is compared: a coupon page is not a story, and it
+    # is a near duplicate of every other coupon page. See nc/promo.py.
+    rules = (
+        load_promo_rules(DEFAULT_PROMO_CONFIG_PATH)
+        if promo_rules is None
+        else promo_rules
+    )
+    items, promotional = partition(windowed, rules)
     existing = load_clusters(data_root)
     vectors = load_vectors([item.id for item in items], db_path)
     run = cluster_items(items, vectors, existing, config, extra_links)
@@ -1256,6 +1285,7 @@ def run_clustering(
         written=written,
         pending_pairs_written=pending_pairs_written,
         label_sample_written=label_sample_written,
+        promotional_dropped=len(promotional),
     )
 
 
@@ -1266,7 +1296,8 @@ def format_report(report: RunReport, config: ClusterConfig) -> str:
     return "\n".join(
         (
             f"cluster: window since {report.cutoff} ({config.window_days} days), "
-            f"{stats.window_items} item(s), "
+            f"{stats.window_items} item(s) after dropping "
+            f"{report.promotional_dropped} promotional (config/promo.yaml), "
             f"{stats.items_without_vectors} without a vector, "
             f"{stats.items_skipped_dim_mismatch} with a stale vector size",
             f"cluster: {stats.linked_pairs} linked pair(s), "
