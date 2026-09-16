@@ -8,3 +8,12 @@ scheduled Claude Code Routine.
 
 Start with `docs/ARCHITECTURE.md`, then `docs/WORKFLOW.md` and
 `docs/PLAN.md`.
+
+## Development
+
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
+
+```
+make install   # uv sync: creates the venv, installs dev deps
+make check     # ruff + mypy + pytest
+```
