@@ -16,6 +16,7 @@ import sys
 from calendar import timegm
 from html import unescape
 from pathlib import Path
+from time import time
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
@@ -90,13 +91,21 @@ def probe(slug: str, url: str) -> dict[str, Any]:
     result["canonical_links_clean"] = not tracked
 
     if dates:
-        newest, oldest = max(dates), min(dates)
-        span_days = (timegm(newest) - timegm(oldest)) / 86400
+        stamps = sorted(timegm(d) for d in dates)
+        newest = max(dates)
         result["newest_entry"] = (
             f"{newest.tm_year:04d}-{newest.tm_mon:02d}-{newest.tm_mday:02d}"
         )
-        if span_days > 0.5:
-            result["items_per_day"] = round(len(entries) / span_days, 1)
+        result["age_of_newest_hours"] = round((time() - stamps[-1]) / 3600, 1)
+        # Entries in the last week, and the typical gap between consecutive
+        # entries. Dividing the count by the newest-to-oldest span looks
+        # simpler but a single stale entry drags it to near zero, and a feed
+        # whose entries all land within a day divides by ~0.
+        week_ago = time() - 7 * 86400
+        result["items_last_7d"] = sum(1 for s in stamps if s >= week_ago)
+        if len(stamps) > 2:
+            gaps = sorted(b - a for a, b in zip(stamps, stamps[1:], strict=True))
+            result["median_gap_hours"] = round(gaps[len(gaps) // 2] / 3600, 1)
     return result
 
 
