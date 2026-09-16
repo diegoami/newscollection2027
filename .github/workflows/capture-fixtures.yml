@@ -1,0 +1,59 @@
+name: capture-fixtures
+
+# Temporary. Captures the first few entries of each configured feed as
+# test fixtures for T11, byte-for-byte apart from the dropped entries, so
+# normalization is tested against what outlets really send rather than
+# what we imagine they send. The development sandbox has no egress to
+# news domains, so the capture happens here and comes back through the
+# job log. Deleted in the same PR that uses its output.
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/workflows/capture-fixtures.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.12
+      - name: Capture and emit
+        run: |
+          uv run --no-project --with pyyaml python - <<'PY'
+          import base64, gzip, io, re, tarfile, urllib.request, yaml
+
+          KEEP = 3
+          UA = "newscollection2027/0.1 (+fixture capture)"
+          outlets = yaml.safe_load(open("config/outlets.yaml"))["outlets"]
+          buf = io.BytesIO()
+
+          with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+              for o in outlets:
+                  req = urllib.request.Request(o["feed_url"], headers={"User-Agent": UA})
+                  raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+                  # Keep the document intact and drop all but the first few
+                  # items, so namespaces, CDATA and date formats survive exactly.
+                  for tag in ("item", "entry"):
+                      spans = [m.span() for m in re.finditer(rf"<{tag}[\s>].*?</{tag}>", raw, re.S)]
+                      if len(spans) > KEEP:
+                          raw = raw[: spans[KEEP][0]] + raw[spans[-1][1] :]
+                          break
+                  data = raw.encode("utf-8")
+                  info = tarfile.TarInfo(f"{o['slug']}.xml")
+                  info.size = len(data)
+                  tar.addfile(info, io.BytesIO(data))
+                  print(f"captured {o['slug']:<20} {len(data):>7} bytes", flush=True)
+
+          payload = base64.b64encode(buf.getvalue()).decode()
+          print(f"\nPAYLOAD_BYTES={len(payload)}")
+          print("-----BEGIN FIXTURES-----")
+          for i in range(0, len(payload), 200):
+              print(payload[i : i + 200])
+          print("-----END FIXTURES-----")
+          PY
