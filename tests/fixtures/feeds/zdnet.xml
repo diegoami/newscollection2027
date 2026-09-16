@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><feed
+	xmlns="http://www.w3.org/2005/Atom"
+	xmlns:thr="http://purl.org/syndication/thread/1.0"
+	xml:lang="en-US"
+	xmlns:media="http://search.yahoo.com/mrss/"
+>
+	<title type="text">news – ZDNET</title>
+	<subtitle type="text">News and Advice on the World&#039;s Latest Innovations</subtitle>
+
+	<updated>2026-09-16T12:05:37Z</updated>
+
+	<link rel="alternate" type="text/html" href="https://www.zdnet.com" />
+	<id>https://www.zdnet.com/feed/atom/</id>
+	<link rel="self" type="application/atom+xml" href="https://www.zdnet.com/rss/news/" />
+
+	<generator uri="https://wordpress.org/" version="6.9.7">WordPress</generator>
+<icon>https://www.zdnet.com/wp-content/uploads/sites/3/cropped-ZDNET-512Yellow.png?w=32</icon>
+	<entry>
+		<author>
+			<name>Kerry Wan</name>
+					</author>
+
+		<title type="html"><![CDATA[I’ve used both iPhone 18 Pro models – here’s how my buying advice is changing in 2026]]></title>
+		<link rel="alternate" type="text/html" href="https://www.zdnet.com/business/iphone-18-pro-vs-pro-max-buying-advice-2026/" />
+
+		<id>1312386</id>
+		<updated>2026-09-16T12:05:35Z</updated>
+		<published>2026-09-16T12:05:35Z</published>
+		<category scheme="https://www.zdnet.com" term="Apple" />
+		<summary type="html"><![CDATA[Can’t decide between the iPhone 18 Pro and 18 Pro Max? Absolute feature parity makes this year’s decision a little easier for me.]]></summary>
+
+		
+		<media:content url="https://www.zdnet.com/wp-content/uploads/sites/3/DSC00614.jpeg" medium="image" width="6192" height="3480" />
+<media:content url="https://www.zdnet.com/wp-content/uploads/sites/3/DSC00614.jpeg?w=300&#038;h=300&#038;crop=1" medium="image" width="300" height="300" />
+	</entry>
+		<entry>
+		<author>
+			<name>Lance Whitney</name>
+					</author>
+
+		<title type="html"><![CDATA[Windows 11 out-of-band update fixes audio glitch and other bugs – grab it now]]></title>
+		<link rel="alternate" type="text/html" href="https://www.zdnet.com/business/windows-11-out-of-band-update-fixes-audio-glitch/" />
+
+		<id>1311627</id>
+		<updated>2026-09-16T09:04:02Z</updated>
+		<published>2026-09-16T09:04:02Z</published>
+		<category scheme="https://www.zdnet.com" term="Microsoft" />
+		<summary type="html"><![CDATA[The latest out-of-band update resolves a few problems in Windows 11, including one that cut off the sound for certain USB audio devices.]]></summary>
+
+		
+		<media:content url="https://www.zdnet.com/wp-content/uploads/sites/3/Windows-11-out-of-band-patch.jpg" medium="image" width="3000" height="1688" />
+<media:content url="https://www.zdnet.com/wp-content/uploads/sites/3/Windows-11-out-of-band-patch.jpg?w=300&#038;h=300&#038;crop=1" medium="image" width="300" height="300" />
+	</entry>
+		<entry>
+		<author>
+			<name>ZDNET BrandX</name>
+					</author>
+
+		<title type="html"><![CDATA[How Cisco is confronting the security crisis of agentic AI]]></title>
+		<link rel="alternate" type="text/html" href="https://www.zdnet.com/paid-content/article/how-cisco-is-confronting-the-security-crisis-of-agentic-ai/" />
+
+		<id>1278881</id>
+		<updated>2026-09-15T17:22:04Z</updated>
+		<published>2026-08-22T00:13:27Z</published>
+		<category scheme="https://www.zdnet.com" term="Tech" />
+		<summary type="html"><![CDATA[“There are shadow agents running in almost every environment we look at,” warns Cisco’s VP of product for identity, who oversees the company’s Duo Agentic Identity product designed to solve the problem.]]></summary>
+
+		
+		<media:content url="https://www.zdnet.com/wp-content/uploads/sites/3/zdnet-cisco-duo-interview-article-header_06c6b8.jpg" medium="image" width="1920" height="1080" />
+<media:content url="https://www.zdnet.com/wp-content/uploads/sites/3/zdnet-cisco-duo-interview-article-header_06c6b8.jpg?w=300&#038;h=300&#038;crop=1" medium="image" width="300" height="300" />
+	</entry>
+		
+	</feed>

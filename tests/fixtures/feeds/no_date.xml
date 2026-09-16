@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>No-Date Feed</title>
+    <link>https://example.com/</link>
+    <description>T11: an entry with no pubDate at all, to exercise the fetched-time fallback.</description>
+    <item>
+      <title>Outlet ships a feed with no publish date</title>
+      <link>https://example.com/no-date-story</link>
+      <description>An entry that omits pubDate entirely, unlike the other fixtures.</description>
+    </item>
+  </channel>
+</rss>

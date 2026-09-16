@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:atom="http://www.w3.org/2005/Atom"
+    xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+    xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+            xmlns:media="http://search.yahoo.com/mrss/"
+        
+    >
+    <channel>
+        <title>Engadget - Technology News &amp; Expert Reviews</title>
+        <atom:link href="https://www.engadget.com/feed/" rel="self" type="application/rss+xml" />
+        <link>https://www.engadget.com/</link>
+        <description>Breaking news from the worlds of technology and entertainment, and expert reviews of the latest consumer tech products.</description>
+        <lastBuildDate>Wed, 16 Sep 2026 14:00:00 +0000</lastBuildDate>
+        <language>en-US</language>
+        <sy:updatePeriod>hourly</sy:updatePeriod>
+        <sy:updateFrequency>1</sy:updateFrequency>
+                                <item>
+                    <title><![CDATA[Threads leans even further into podcasts with transcripts, analytics and more]]></title>
+                    <link>https://www.engadget.com/2259605/threads-leans-even-further-into-podcasts-with-transcripts-analytics-and-more/</link>
+                    <pubDate>Wed, 16 Sep 2026 14:00:00 +0000</pubDate>
+                                            <author>staff@engadget.com (Ian Carlos Campbell)</author>
+                                                            		<category><![CDATA[Apps]]></category>
+		<category><![CDATA[Social Media]]></category>
+		<category><![CDATA[Meta]]></category>
+                    <guid>https://www.engadget.com/2259605/threads-leans-even-further-into-podcasts-with-transcripts-analytics-and-more/</guid>
+                                            <description><![CDATA[Meta is making the platform even better for podcast promotion.]]></description>
+
+                                                                                    <content:encoded><![CDATA[Meta is making the platform even better for podcast promotion.<p><img src="https://www.engadget.com/img/gallery/threads-leans-even-further-into-podcasts-with-transcripts-analytics-and-more/intro-1789505906.jpg" /></p>]]></content:encoded>
+                                                                                                                    <media:thumbnail url="https://www.engadget.com/img/gallery/threads-leans-even-further-into-podcasts-with-transcripts-analytics-and-more/l-intro-1789505906.jpg"/>
+                        <enclosure url="https://www.engadget.com/img/gallery/threads-leans-even-further-into-podcasts-with-transcripts-analytics-and-more/l-intro-1789505906.jpg" type="image/jpg" length="178382"/>
+                                    </item>
+                                    <item>
+                    <title><![CDATA[Here's how the iPhone 18 Pro's Apple Reference Image tech works]]></title>
+                    <link>https://www.engadget.com/2259654/how-iphone-18-pro-apple-reference-image-works/</link>
+                    <pubDate>Wed, 16 Sep 2026 12:00:00 +0000</pubDate>
+                                            <author>staff@engadget.com (Jack Whitcombe)</author>
+                                                            		<category><![CDATA[AI]]></category>
+		<category><![CDATA[Smartphones]]></category>
+		<category><![CDATA[Apple]]></category>
+                    <guid>https://www.engadget.com/2259654/how-iphone-18-pro-apple-reference-image-works/</guid>
+                                            <description><![CDATA[Apple Reference Image is like giving your photos a tamper-proof seal. ]]></description>
+
+                                                                                    <content:encoded><![CDATA[Apple Reference Image is like giving your photos a tamper-proof seal. <p><img src="https://www.engadget.com/img/gallery/heres-how-the-iphone-18-pros-apple-reference-image-tech-works/intro-1789497687.jpg" /></p>]]></content:encoded>
+                                                                                                                    <media:thumbnail url="https://www.engadget.com/img/gallery/heres-how-the-iphone-18-pros-apple-reference-image-tech-works/l-intro-1789497687.jpg"/>
+                        <enclosure url="https://www.engadget.com/img/gallery/heres-how-the-iphone-18-pros-apple-reference-image-tech-works/l-intro-1789497687.jpg" type="image/jpg" length="182863"/>
+                                    </item>
+                                    <item>
+                    <title><![CDATA[iPhone 18 Pro review: The standard setter]]></title>
+                    <link>https://www.engadget.com/2259790/apple-iphone-18-pro-review-cameras-performance-variable-aperture-siri-ai/</link>
+                    <pubDate>Wed, 16 Sep 2026 12:00:00 +0000</pubDate>
+                                            <author>staff@engadget.com (Cherlynn Low)</author>
+                                                            		<category><![CDATA[Smartphones]]></category>
+                    <guid>https://www.engadget.com/2259790/apple-iphone-18-pro-review-cameras-performance-variable-aperture-siri-ai/</guid>
+                                            <description><![CDATA[The yardstick that all phones, including the Duo, will be measured by.]]></description>
+
+                                                                                    <content:encoded><![CDATA[The yardstick that all phones, including the Duo, will be measured by.<p><img src="https://www.engadget.com/img/gallery/apple-iphone-18-pro-review-cameras-performance-variable-aperture-siri-ai/intro-1789555938.jpg" /></p>]]></content:encoded>
+                                                                                                                    <media:thumbnail url="https://www.engadget.com/img/gallery/apple-iphone-18-pro-review-cameras-performance-variable-aperture-siri-ai/l-intro-1789555938.jpg"/>
+                        <enclosure url="https://www.engadget.com/img/gallery/apple-iphone-18-pro-review-cameras-performance-variable-aperture-siri-ai/l-intro-1789555938.jpg" type="image/jpg" length="228746"/>
+                                    </item>
+                                    
+                        </channel>
+
+</rss>

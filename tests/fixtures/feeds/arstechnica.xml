@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:sy="http://purl.org/rss/1.0/modules/syndication/" xmlns:slash="http://purl.org/rss/1.0/modules/slash/" xmlns:media="http://search.yahoo.com/mrss/" >
+    <channel>
+        <title>Ars Technica</title>
+        <atom:link href="https://arstechnica.com/feed/" rel="self" type="application/rss+xml" />
+        <link>https://arstechnica.com</link>
+        <description>Serving the Technologist since 1998. News, reviews, and analysis.</description>
+        <lastBuildDate>Wed, 16 Sep 2026 14:19:01 +0000</lastBuildDate>
+        <language>en-US</language>
+        <sy:updatePeriod>
+            hourly        </sy:updatePeriod>
+        <sy:updateFrequency>
+            1        </sy:updateFrequency>
+        
+<image>
+	<url>https://cdn.arstechnica.net/wp-content/uploads/2016/10/cropped-ars-logo-512_480-60x60.png</url>
+	<title>Ars Technica</title>
+	<link>https://arstechnica.com</link>
+	<width>32</width>
+	<height>32</height>
+</image> 
+            <item>
+                <title>The world’s best racing driver is about to race 100 karts at once</title>
+                <link>https://arstechnica.com/cars/2026/09/the-worlds-best-racing-driver-is-about-to-race-100-karts-at-once/</link>
+                
+                <dc:creator>
+                    <![CDATA[Jonathan M. Gitlin]]>
+                </dc:creator>
+                <pubDate>Wed, 16 Sep 2026 14:19:01 +0000</pubDate>
+                		<category><![CDATA[Cars]]></category>
+		<category><![CDATA[Racing]]></category>
+		<category><![CDATA[red bull]]></category>
+                <guid isPermaLink="true">https://arstechnica.com/cars/2026/09/the-worlds-best-racing-driver-is-about-to-race-100-karts-at-once/</guid>
+
+                                    <description>
+                        <![CDATA[Red Bull, Disney+, and ESPN are streaming the race at noon Eastern today.]]>
+                    </description>
+                                                                <content:encoded>
+                            <![CDATA[<p>Later today, Max Verstappen will strap on his helmet and take to the track at the Silverstone circuit in England for a rather unusual race. The four-time Formula 1 world champion is recognized as the leading talent of his generation, but unlike some of the legends that have preceded him, Verstappen’s passion for motorsport extends beyond just the rarified world of F1. With apologies to Midweek Motorsport, but if it has wheels and they keep score, odds are good Verstappen's down to race it. So at noon Eastern Time (5 pm BST) today, September 16, Verstappen will slip into something a little more basic: a kart.</p>
+<p>It’s one of 101 identical karts that have been sourced from Eastern Europe for the event—the other 100 will be driven by a mix of content creators and Red Bull athletes, all of whom fancy their chances at beating one of the world’s greatest drivers at his own game. They get a bit of an advantage, all starting ahead of Verstappen. Once he passes another karter, they’re out of the race, and Verstappen has 30 laps of a purpose-designed layout at Silverstone to get through them all and win.</p>
+<p>Other F1 drivers have attempted slightly similar challenges in the past—Alex Albon <a href="https://www.youtube.com/watch?v=JCwCQ8egn18">raced 25 kids</a> last year, and last month Oliver Bearman <a href="https://www.youtube.com/watch?v=YqKqlBGwozo">raced 50 amateurs.</a> But neither is as high-profile as Verstappen, and neither is facing as much competition.</p><p><a href="https://arstechnica.com/cars/2026/09/the-worlds-best-racing-driver-is-about-to-race-100-karts-at-once/">Read full article</a></p>
+<p><a href="https://arstechnica.com/cars/2026/09/the-worlds-best-racing-driver-is-about-to-race-100-karts-at-once/#comments">Comments</a></p>
+]]>
+                        </content:encoded>
+                                    
+                
+                
+                <media:content url="https://cdn.arstechnica.net/wp-content/uploads/2026/09/SI202608250383-1152x648.jpg" type="image/jpeg" medium="image" width="1152" height="648">
+<media:thumbnail url="https://cdn.arstechnica.net/wp-content/uploads/2026/09/SI202608250383-500x500.jpg" width="500" height="500" />
+<media:credit>Joerg Mitter / Red Bull Content Pool</media:credit><media:text>Max Verstappen will try and beat 100 identical karts in a 30 lap race, starting from the back.</media:text></media:content>
+            </item>
+                    <item>
+                <title>Lawmakers target Flock cameras with a threat to highway funding</title>
+                <link>https://arstechnica.com/tech-policy/2026/09/lawmakers-target-flock-cameras-with-a-threat-to-highway-funding/</link>
+                                    <comments>https://arstechnica.com/tech-policy/2026/09/lawmakers-target-flock-cameras-with-a-threat-to-highway-funding/#comments</comments>
+                
+                <dc:creator>
+                    <![CDATA[Paresh Dave, wired.com]]>
+                </dc:creator>
+                <pubDate>Wed, 16 Sep 2026 14:03:39 +0000</pubDate>
+                		<category><![CDATA[Policy]]></category>
+		<category><![CDATA[big tech]]></category>
+		<category><![CDATA[Flock!]]></category>
+		<category><![CDATA[surveillance]]></category>
+		<category><![CDATA[tech backlash]]></category>
+                <guid isPermaLink="true">https://arstechnica.com/tech-policy/2026/09/lawmakers-target-flock-cameras-with-a-threat-to-highway-funding/</guid>
+
+                                    <description>
+                        <![CDATA[A bipartisan bill would restrict Flock cameras to a handful of public safety uses.]]>
+                    </description>
+                                                                <content:encoded>
+                            <![CDATA[<p>A bipartisan pair of US lawmakers tell WIRED they plan to introduce legislation today that would strip federal funding from states that fail to restrict the use of <a href="https://www.wired.com/tag/flock/">Flock cameras</a> and other automated license plate readers. The devices, which <a href="https://www.wired.com/story/flock-safety-os-investigate/">help police track</a> the location of vehicles tied to crimes, have become the subject of nationwide backlash in recent months over more nefarious uses by officers.</p>
+<p>The No FLOCK Act—for Federal License-Plate Observation and Camera Keeping—directs the US secretary of transportation to withhold 10 percent of annual financial support due to states for highways, roads, and bridges if it fails to ban Flock and similar devices for all but five use cases. Congressmen Raja Krishnamoorthi, a Democrat representing Chicago suburbs, and Michael Cloud, a Republican whose Texas district includes Corpus Christi, are cosponsoring the bill.</p>
+<p>The legislation <a href="https://krishnamoorthi.house.gov/sites/evo-subsites/krishnamoorthi-evo.house.gov/files/evo-media-document/krishn_154_xml.pdf">says that</a> Flock cameras could be used only for “enforcing toll systems, identifying stolen vehicles, missing or endangered persons, vehicles registered to persons with a warrant for a felony offense, or investigating a vehicle involved in a felony offense.” Notably absent are uses like conducting traffic studies, investigating minor drug crimes, and enforcing parking and speeding rules.</p><p><a href="https://arstechnica.com/tech-policy/2026/09/lawmakers-target-flock-cameras-with-a-threat-to-highway-funding/">Read full article</a></p>
+<p><a href="https://arstechnica.com/tech-policy/2026/09/lawmakers-target-flock-cameras-with-a-threat-to-highway-funding/#comments">Comments</a></p>
+]]>
+                        </content:encoded>
+                                    
+                                    <slash:comments>1</slash:comments>
+                
+                
+                <media:content url="https://cdn.arstechnica.net/wp-content/uploads/2026/09/noflock-1152x648.jpg" type="image/jpeg" medium="image" width="1152" height="648">
+<media:thumbnail url="https://cdn.arstechnica.net/wp-content/uploads/2026/09/noflock-500x500.jpg" width="500" height="500" />
+<media:credit>Barry Chin/Getty</media:credit></media:content>
+            </item>
+                    <item>
+                <title>How chimps teach their kids tool tricks</title>
+                <link>https://arstechnica.com/science/2026/09/how-chimps-teach-their-kids-tool-tricks/</link>
+                                    <comments>https://arstechnica.com/science/2026/09/how-chimps-teach-their-kids-tool-tricks/#comments</comments>
+                
+                <dc:creator>
+                    <![CDATA[Jennifer Ouellette]]>
+                </dc:creator>
+                <pubDate>Wed, 16 Sep 2026 04:00:39 +0000</pubDate>
+                		<category><![CDATA[Science]]></category>
+		<category><![CDATA[animal behavior]]></category>
+		<category><![CDATA[animal psychology]]></category>
+		<category><![CDATA[animal tool use]]></category>
+		<category><![CDATA[chimpanzees]]></category>
+		<category><![CDATA[primates]]></category>
+                <guid isPermaLink="true">https://arstechnica.com/science/2026/09/how-chimps-teach-their-kids-tool-tricks/</guid>
+
+                                    <description>
+                        <![CDATA[Adults first demonstrate tool use, then hand over the implements to their infants, who copy the behavior.]]>
+                    </description>
+                                                                <content:encoded>
+                            <![CDATA[<p>Chimpanzees are known to use rudimentary tools when foraging for food. According to a new paper in the journal Frontiers in Psychology, this learned behavior is passed down from adults to offspring through social learning. Specifically, adult chimps deliberately model the behavior, then turn their tools over to the youngsters so they can mimic the same motions.</p>
+<p>"Receiving food and tools from experienced individuals, which we call food or tool transfer, may help chimpanzees learn to use technology to extract foods that are difficult to access,” <a href="https://www.eurekalert.org/news-releases/1143218?">said co-author Andreu Sánchez-Megías</a>, a graduate student at the University of Barcelona and the Jane Goodall Institute Spain in Senegal. “Tool transfers thus appear to be a form of teaching, together with observation and supervised practice. It appears that mothers are the main models and teachers for young chimpanzees in this manner.”</p>
+<p>As <a href="https://arstechnica.com/science/2012/11/parrot-in-captivity-manufactures-tools-something-not-seen-in-the-wild/">we have previously reported</a>, tool use was once thought to be one of the defining features of humans, although Charles Darwin observed chimpanzees using stones to crack nuts in 1871. In 1960, the late primatologist <a href="https://arstechnica.com/science/2025/10/world-famous-primatologist-jane-goodall-dead-at-91/">Jane Goodall</a> observed a chimp named David Greybeard bend a twig, strip off the leaves, and use it to spoon termites out of a nest and into his mouth. When he learned of the behavior, Goodall's mentor, Louis Leakey, famously observed, “Now we must redefine ‘tool,’ redefine ‘man,’ or accept chimpanzees as humans.” Since then, chimps have been observed making sponges out of leaves to soak up liquids, shaping sticks to collect algae, and sharpening rudimentary spears for hunting.</p><p><a href="https://arstechnica.com/science/2026/09/how-chimps-teach-their-kids-tool-tricks/">Read full article</a></p>
+<p><a href="https://arstechnica.com/science/2026/09/how-chimps-teach-their-kids-tool-tricks/#comments">Comments</a></p>
+]]>
+                        </content:encoded>
+                                    
+                                    <slash:comments>15</slash:comments>
+                
+                
+                <media:content url="https://cdn.arstechnica.net/wp-content/uploads/2026/09/chimps1-1152x648.jpg" type="image/jpeg" medium="image" width="1152" height="648">
+<media:thumbnail url="https://cdn.arstechnica.net/wp-content/uploads/2026/09/chimps1-500x500-1789408227.jpg" width="500" height="500" />
+<media:credit>Jane Goodall Institute Spain in Senegal</media:credit></media:content>
+            </item>
+                    
+            </channel>
+</rss>
