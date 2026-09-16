@@ -1,58 +1,99 @@
 # Outlets
 
-Candidate feeds for the ingest step, scored, with a recommended starting
-set. T10 turns the recommended set into `config/outlets.yaml`.
+Candidate feeds for the ingest step, scored from a live measurement, with
+a recommended starting set. T10 turns the recommended set into
+`config/outlets.yaml`.
 
-Compiled 2026-09-16. 42 candidates: the 27 the old project scraped, plus
-15 English-language tech outlets that belong in a cross-outlet comparison
-and were missing from that list.
+Compiled and measured 2026-09-16. 42 candidates: the 27 the old project
+scraped, plus 15 English-language tech outlets that belong in a
+cross-outlet comparison and were missing from that list.
 
-## Measurement status: nothing here was fetched
+## Measurement: fetched on a runner, not in this sandbox
 
-Read this before using any number in this file.
+The development sandbox has no outbound HTTPS to news domains. The
+organization egress proxy denies CONNECT to every candidate host: `curl`
+exits 56 with `CONNECT tunnel failed, response 403` and WebFetch returns
+`EGRESS_BLOCKED`. github.com and pypi.org are reachable and nothing else
+is. That is a permanent fact of this setup, not a transient failure, so
+every measurement of a news feed has to happen somewhere else.
 
-T09 asks for scores taken from live fetches. The session that compiled
-this ran behind an organization egress proxy that denied every candidate
-host. All 42 feed URLs were probed with `curl`; all 42 returned exit 56,
-`CONNECT tunnel failed, response 403`, and the proxy logged
-`connect_rejected` for each host. The WebFetch path returned
-`EGRESS_BLOCKED` for the same hosts. github.com and pypi.org are
-reachable; no news domain is.
+It happened on a GitHub Actions `ubuntu-latest` runner:
+`scripts/probe_feeds.py`, driven by `.github/workflows/feeds-probe.yml`,
+one `feedparser` fetch per url on 2026-09-16 at about 13:30 UTC with the
+user agent `newscollection2027/0.1 (+feed evaluation)`.
 
-So:
+What came back:
 
-- No entry count, items-per-day figure, HTTP status, lede word count or
-  link-cleanliness value was measured. Every such field in
-  `config/outlets.candidates.yaml` is `null` and `measured: false`.
-- The feed URLs are the outlets' documented or conventional feed paths.
-  None was confirmed to resolve. `documented` means the outlet publishes
-  a feeds page or advertises the URL in its markup; `convention` means it
-  is the platform default, usually WordPress `/feed/`; `search` means it
-  came from a web search and nothing else.
-- The scores below are priors: editorial judgment about overlap, cadence
-  and known feed behaviour. They are not measurements, and the YAML marks
-  every one of them `score_basis: prior`.
-- The acceptance criterion "the recommended set has no outlet whose feed
-  is title-only" is therefore asserted, not verified. T10 is the gate:
-  `nc feeds check` must confirm it before `config/outlets.yaml` is
-  written, and any recommended outlet whose feed turns out to be
-  title-only is dropped there, not here.
+- 40 feed urls across 42 candidates. `recode` and `reuters` have no feed
+  url to probe; both stay in the table as scored rows with a reason.
+- 32 urls returned entries. 8 returned none.
+- **All 32 feeds that returned entries carry a real lede.** Not one
+  title-only feed among them. The lowest median is 12 words (Ars
+  Technica, Android Authority) and only one entry in the whole sweep had
+  a lede identical to its title (1 of 25 at Forbes). The acceptance
+  criterion "the recommended set has no outlet whose feed is title-only"
+  is now measured rather than asserted.
+- Four feeds ship whole article bodies rather than ledes, and three ship
+  entry links with tracking parameters. Both matter to T11; see findings.
+
+### What each field means
+
+`config/outlets.candidates.yaml` records, per candidate:
+
+| field | meaning |
+|---|---|
+| `http_status` | status of the fetch that produced the entries; 301 and 302 mean the feed answered after a redirect |
+| `reachable` | true when the host served a feed response, including CNBC's empty one; false when it refused the request (403, 429) or the path is gone (404) |
+| `entries_per_fetch` | entries in one fetch, which is a cap the outlet chooses, not an output rate |
+| `has_lede` | median lede at least 8 words and fewer than half the entries with a lede equal to the title |
+| `lede_words_median`, `lede_words_max` | words left after HTML is stripped from summary, description or first content block |
+| `lede_equals_title` | entries whose lede is the title again |
+| `items_last_7d` | entries published in the 7 days before the fetch |
+| `median_gap_hours` | median gap between consecutive entries in the feed |
+| `age_of_newest_hours` | hours between the newest entry and the fetch |
+| `canonical_links_clean`, `tracking_params_seen` | tracking query parameters on entry links |
+| `terms` | always `not_checked`; nothing was read |
+| `failure` | why a feed returned nothing, where it returned nothing |
+
+The earlier schema had a single `items_per_day`. It is gone, because
+neither obvious way to compute it survives contact with real feeds:
+dividing entries by the newest-to-oldest span collapses to nearly zero
+when one stale entry sits at the bottom of a feed, and goes to infinity
+for a feed whose entries all land within an hour. `items_last_7d`,
+`median_gap_hours` and `age_of_newest_hours` each say something a rate
+cannot, and a feed is only healthy if all three look right. The schema
+also gained `lede_words_max`, which is what exposes the full-text feeds.
+
+### What one fetch cannot tell you
+
+- It is one sample at one moment. Gaps, ages and counts are a snapshot,
+  and a burst or a quiet afternoon moves them.
+- `items_last_7d` is a floor for any feed whose entries all fall inside
+  the window: the feed was full, so it may well publish more than it
+  serves. 24 of the 32 are in that state.
+- Overlap cannot be measured this way at all. Knowing which outlets carry
+  the same story needs the clustering step over several days of items.
+- Tracking parameters were read from the entry link's query string. No
+  redirect chain was resolved, so a wrapper host that redirects cleanly
+  would not show up here.
+- No robots.txt, feed documentation or terms page was read for any
+  candidate. `terms` stays a prior everywhere.
 
 ## How to re-measure
 
-From a session or a runner with outbound HTTPS to the news domains:
+From a runner, or any machine with egress to the news domains:
+
+```
+uv run --no-project --with feedparser --with pyyaml python scripts/probe_feeds.py
+```
+
+or trigger `feeds-probe` with `workflow_dispatch`. The probe writes
+`feed-probe.json` and uploads it as an artifact. T10 replaces both the
+script and the workflow with:
 
 ```
 nc feeds check --candidates config/outlets.candidates.yaml
 ```
-
-That command is T10's deliverable. Until it exists, a throwaway probe
-does the same job: fetch each feed URL, count entries, strip HTML from
-the summary and content fields, compare the result with the title,
-report the median word count, derive items per day from the published
-timestamps, and look for `utm_` and other tracking parameters in the
-entry links. Keep such probes out of the repository; `feedparser` enters
-`pyproject.toml` at T11, not before.
 
 ## Scoring
 
@@ -67,169 +108,302 @@ Six criteria, 0 to 5 each, weighted:
 | canonical | C | 1 | entry links are clean, no tracking parameters, no redirector |
 | terms | T | 1 | terms, robots and feed docs appear to permit aggregation with attribution |
 
-Maximum 60.
+Maximum 60. The weights are unchanged from the first pass; only the
+scores moved.
 
 `lede` carries the highest weight and is also a hard gate: an outlet
 whose feed is title-only cannot enter the recommended set at any score.
 The reason is the product. Every claim and every discrepancy on the site
-carries a verbatim quote from an item's title or lede, and v1 never
-reads article bodies. A title-only feed gives the analysis step one
-sentence per item, so there is nothing to compare beyond the headline
-wording, and the outlet joins a cluster without contributing evidence.
+carries a verbatim quote from an item's title or lede, and v1 never reads
+article bodies. A title-only feed gives the analysis step one sentence
+per item, so the outlet joins a cluster without contributing evidence.
 Overlap is weighted next because a cluster is only emitted with two or
-more outlets: an excellent feed nobody overlaps with produces no
-clusters at all. Reachability, link hygiene and terms are one point each
-because they are fixable or binary — a redirector can be followed,
-tracking parameters are stripped at T11 anyway, and terms are a go or
-no-go for the owner rather than a score.
+more outlets: an excellent feed nobody overlaps with produces no clusters
+at all. Reachability, link hygiene and terms are one point each because
+they are fixable or binary.
 
-The `terms` column is the weakest in the table: no robots.txt and no
-terms page was read for any candidate, every YAML entry records
-`terms: not_checked`, and none of this is legal advice.
+Four criteria are now scored from the measurement by fixed bands, so the
+table can be regenerated from the numbers:
+
+| criterion | band |
+|---|---|
+| lede | `lede_words_median`: 5 at 30 or more, 4 at 20, 3 at 12, 2 at 8, 1 below; 0 when no entries came back |
+| volume | `items_last_7d`: 5 at 40 or more, 4 at 20, 3 at 10, 2 at 4, 1 at 1, 0 at none. A cap-bound feed is scored from `median_gap_hours` instead: 5 at 2 h or less, 4 at 6 h, 3 at 12 h, 2 at 24 h, 1 slower. Capped at 3 when the newest entry is over 12 h old |
+| reachability | 5 for 200 with entries, 4 for a redirect to entries, 1 for a feed that answered or was blocked but returned nothing, 0 for 404 or no feed url |
+| canonical | 5 for no tracking parameter, 3 for `utm_` only, 2 for non-standard parameters, 0 when nothing was measured |
+
+`overlap` and `terms` stay priors. Overlap is a prior by nature — one
+fetch per outlet cannot show which outlets carry the same story, and only
+clustering can — and terms are a prior because nobody read them. The YAML
+records this per criterion in `score_basis`, with values `measured`,
+`prior` and `unmeasured`; the eight feeds that returned nothing have
+`unmeasured` for lede, volume and canonical, because a blocked or missing
+feed tells us nothing about its ledes.
+
+## Measured numbers
+
+The 32 feeds that returned entries, sorted by score. Gaps and ages are
+hours. `links` lists the tracking parameters found on entry links.
+
+| outlet | http | entries | 7d | gap | newest | lede med | lede max | links |
+|---|--:|--:|--:|--:|--:|--:|--:|---|
+| `theverge` | 200 | 10 | 10 | 1.4 | 1.5 | 56 | 56 | clean |
+| `techcrunch` | 200 | 20 | 20 | 0.5 | 0.1 | 21 | 41 | clean |
+| `theguardian` | 200 | 32 | 23 | 6.0 | 1.6 | 107 | 301 | clean |
+| `bleepingcomputer` | 200 | 15 | 15 | 1.5 | 1.2 | 26 | 43 | clean |
+| `arstechnica` | 200 | 20 | 20 | 0.6 | 9.5 | 12 | 17 | clean |
+| `engadget` | 200 | 20 | 20 | 0.5 | 1.5 | 16 | 28 | clean |
+| `wired` | 200 | 50 | 50 | 0.1 | 1.5 | 22 | 38 | clean |
+| `techdirt` | 200 | 10 | 10 | 4.0 | 1.0 | 56 | 56 | clean |
+| `9to5mac` | 200 | 100 | 100 | 0.6 | 0.0 | 39 | 188 | clean |
+| `macrumors` | 200 | 20 | 20 | 0.7 | 0.8 | 370 | 1718 | clean |
+| `thehackernews` | 200 | 50 | 47 | 1.3 | 1.5 | 60 | 71 | clean |
+| `thenextweb` | 200 | 10 | 10 | 0.4 | 1.2 | 63 | 65 | clean |
+| `nytimes-technology` | 200 | 28 | 28 | 2.6 | 4.3 | 23 | 29 | clean |
+| `pcmag` | 200 | 100 | 100 | 0.2 | 0.5 | 27 | 42 | clean |
+| `theregister` | 302 | 50 | 50 | 0.8 | 0.7 | 14 | 25 | clean |
+| `tomshardware` | 301 | 50 | 50 | 0.3 | 1.2 | 25 | 45 | clean |
+| `cnet` | 200 | 25 | 20 | 2.0 | 1.5 | 19 | 32 | clean |
+| `mashable` | 200 | 100 | 100 | 0.1 | 1.0 | 20 | 34 | clean |
+| `techrepublic` | 200 | 20 | 20 | 0.2 | 17.0 | 40 | 45 | clean |
+| `404media` | 200 | 15 | 15 | 2.9 | 3.0 | 21 | 32 | clean |
+| `digit-fyi` | 200 | 15 | 15 | 2.2 | 0.0 | 71 | 76 | clean |
+| `forbes` | 200 | 25 | 25 | 0.2 | 0.2 | 20 | 30 | clean |
+| `neowin` | 200 | 40 | 40 | 0.5 | 0.7 | 24 | 31 | `utm_source` |
+| `slashdot` | 200 | 15 | 15 | 4.5 | 0.4 | 432 | 778 | `utm_medium`, `utm_source` |
+| `zdnet` | 301 | 25 | 17 | 7.6 | 1.4 | 19 | 32 | clean |
+| `androidauthority` | 200 | 80 | 80 | 0.3 | 0.6 | 12 | 24 | clean |
+| `bbc-technology` | 200 | 21 | 15 | 17.2 | 3.5 | 15 | 25 | `at_campaign`, `at_medium` |
+| `inc` | 200 | 39 | 39 | 0.4 | 0.3 | 20 | 37 | clean |
+| `qz` | 200 | 21 | 21 | 0.1 | 0.1 | 21 | 25 | clean |
+| `inverse` | 200 | 50 | 47 | 1.6 | 1.0 | 19 | 32 | clean |
+| `inquisitr` | 200 | 30 | 0 | 1.9 | 376.8 | 55 | 58 | clean |
+| `platformer` | 200 | 15 | 2 | 95.4 | 37.0 | 17 | 28 | clean |
+
+## Feeds that returned nothing
+
+| outlet | http | what happened |
+|---|--:|---|
+| `gizmodo` | 403 | bot-blocked; the body was not well-formed XML |
+| `venturebeat` | 429 | rate-limited; the body was an error page, not a feed |
+| `cnbc` | 200 | answered 200 with zero entries |
+| `digitaltrends` | 202 | answered 202 with zero entries, a bot-mitigation interstitial |
+| `axios-technology` | 404 | feed path gone: 404 and a syntax error |
+| `businessinsider-tech` | 404 | feed path gone: 404 and not well-formed |
+| `techtimes` | 404 | feed path gone: 404 |
+| `technicalhint` | 404 | feed path gone: 404 |
+
+Two of these are worth retrying, six are not. Gizmodo and VentureBeat are
+blocked, not gone: a 403 and a 429 are what a live site says to an
+unfamiliar client, and one retry with backoff and a browser-shaped
+User-Agent may well get a feed. CNBC and Digital Trends answered with a
+success status and no items, which is a different failure and is not
+fixed by retrying. The four 404s are dead paths; the real url has to be
+rediscovered from the homepage `<link rel="alternate">` element before
+those candidates mean anything.
 
 ## Scoring table
 
-Sorted by score. Every candidate has a score and a one-line reason.
-The score columns are the criteria keys above; `set` marks membership of
-the recommended starting set.
+Sorted by score. Every candidate has a score and a one-line reason. The
+score columns are the criteria keys above; `set` marks membership of the
+recommended starting set. L, V, R and C are measured where a feed
+answered, O and T are priors throughout.
 
 | outlet | L | O | V | R | C | T | score | set | reason |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|
-| `theverge` | 5 | 5 | 5 | 5 | 4 | 3 | 57 | yes | highest-volume generalist, overlaps with everything else |
-| `arstechnica` | 5 | 5 | 4 | 5 | 4 | 3 | 55 | yes | broad daily coverage, entries carry a real summary paragraph |
-| `theregister` | 5 | 4 | 4 | 5 | 5 | 4 | 54 | yes | enterprise and security with a distinctly different framing |
-| `engadget` | 4 | 5 | 4 | 4 | 3 | 3 | 49 | yes | consumer and platform news, same beats as Verge and Ars |
-| `techcrunch` | 4 | 5 | 4 | 4 | 3 | 3 | 49 | yes | startup, funding and AI beat that the others follow same-day |
-| `theguardian` | 4 | 4 | 3 | 5 | 5 | 4 | 48 | yes | general-press framing of the stories the trade press runs |
-| `bleepingcomputer` | 4 | 4 | 3 | 3 | 4 | 3 | 44 | yes | breach and malware stories that Register and ZDNET also run |
-| `wired` | 4 | 4 | 3 | 4 | 3 | 2 | 43 | yes | mainstream-analytical framing of the same platform stories |
-| `tomshardware` | 4 | 3 | 4 | 4 | 3 | 2 | 42 | yes | silicon and hardware stories shared with Ars and The Register |
-| `bbc-technology` | 3 | 4 | 2 | 5 | 5 | 3 | 41 | yes | low volume but only covers stories everyone else covers |
-| `404media` | 5 | 2 | 1 | 4 | 5 | 3 | 40 | — | excellent feed, too little volume to cluster reliably |
-| `nytimes-technology` | 4 | 4 | 2 | 4 | 3 | 1 | 40 | — | good feed, but the terms of service restrict reuse |
-| `zdnet` | 3 | 4 | 4 | 4 | 2 | 2 | 40 | yes | wide overlap, but the feed carries deals and affiliate posts |
-| `cnet` | 3 | 4 | 4 | 3 | 2 | 2 | 39 | — | consumer overlap is real, feed is dominated by buying guides |
-| `techdirt` | 4 | 2 | 2 | 4 | 4 | 5 | 39 | — | commentary on the news rather than reporting of it |
-| `venturebeat` | 4 | 3 | 2 | 4 | 3 | 2 | 38 | — | real AI and enterprise overlap, thin daily volume |
-| `androidauthority` | 4 | 2 | 4 | 3 | 2 | 2 | 37 | — | Android vertical, overlaps only inside that niche |
-| `macrumors` | 4 | 2 | 3 | 4 | 2 | 2 | 36 | — | Apple vertical, feed served through a redirector |
-| `neowin` | 4 | 2 | 3 | 3 | 3 | 2 | 36 | — | solid feed, mostly Microsoft-adjacent, narrow overlap |
-| `platformer` | 5 | 1 | 1 | 4 | 5 | 2 | 36 | — | newsletter cadence, a few posts a week, no cluster partners |
-| `9to5mac` | 4 | 2 | 3 | 3 | 2 | 2 | 35 | — | Apple vertical, overlaps only inside that niche |
-| `gizmodo` | 3 | 3 | 3 | 3 | 2 | 2 | 34 | — | newsroom churn and AI-written articles weaken it as a baseline |
-| `pcmag` | 3 | 3 | 3 | 3 | 2 | 2 | 34 | — | reviews-first mix, limited breaking-news overlap |
-| `cnbc` | 3 | 3 | 3 | 3 | 2 | 1 | 33 | — | business framing, opaque feed endpoint, unclear terms |
-| `digitaltrends` | 3 | 2 | 4 | 3 | 2 | 2 | 33 | — | high volume but mostly reviews, deals and how-to |
-| `slashdot` | 4 | 1 | 3 | 4 | 1 | 3 | 33 | — | aggregator: its lede quotes other outlets, so it double-counts |
-| `axios-technology` | 3 | 3 | 2 | 3 | 2 | 2 | 32 | — | short brevity ledes and an undocumented feed endpoint |
-| `thehackernews` | 4 | 2 | 2 | 3 | 1 | 2 | 32 | — | security-only overlap and FeedBurner link wrapping |
-| `mashable` | 3 | 2 | 3 | 3 | 2 | 2 | 31 | — | drifted to entertainment and deals, weak news overlap |
-| `thenextweb` | 3 | 2 | 2 | 3 | 3 | 2 | 30 | — | output shrank after the FT acquisition, European-events focus |
-| `techrepublic` | 3 | 2 | 2 | 3 | 2 | 2 | 29 | — | B2B how-to and research, few same-day news overlaps |
-| `businessinsider-tech` | 2 | 3 | 3 | 2 | 2 | 1 | 28 | — | hard paywall and truncated feed entries |
-| `digit-fyi` | 3 | 1 | 1 | 3 | 3 | 2 | 25 | — | Scottish regional B2B and events, no global story overlap |
-| `forbes` | 2 | 2 | 3 | 2 | 2 | 1 | 25 | — | contributor network, low and uneven signal |
-| `inverse` | 3 | 1 | 2 | 2 | 2 | 1 | 24 | — | pivoted to science, gaming and culture after the BDG changes |
-| `inquisitr` | 2 | 1 | 3 | 2 | 1 | 1 | 21 | — | celebrity and clickbait aggregation, barely tech at all |
-| `qz` | 2 | 1 | 2 | 3 | 2 | 1 | 21 | — | AI-written articles after the 2025 sale, not a usable baseline |
-| `techtimes` | 2 | 1 | 3 | 2 | 1 | 1 | 21 | — | rewrites other outlets, adds no independent claim |
-| `inc` | 2 | 1 | 2 | 2 | 2 | 1 | 20 | — | small-business advice, not tech news |
-| `technicalhint` | 1 | 0 | 1 | 1 | 1 | 1 | 9 | — | marginal SEO blog with no newsroom |
+| `theverge` | 5 | 5 | 5 | 5 | 5 | 3 | 58 | yes | highest-volume generalist, overlaps with everything else |
+| `techcrunch` | 4 | 5 | 5 | 5 | 5 | 3 | 54 | yes | startup, funding and AI beat that the others follow same-day |
+| `theguardian` | 5 | 4 | 4 | 5 | 5 | 4 | 54 | yes | general-press framing of the stories the trade press runs |
+| `bleepingcomputer` | 4 | 4 | 5 | 5 | 5 | 3 | 51 | yes | breach and malware stories that Register and ZDNET also run |
+| `arstechnica` | 3 | 5 | 5 | 5 | 5 | 3 | 50 | yes | broad daily coverage; the feed summary is one short sentence |
+| `engadget` | 3 | 5 | 5 | 5 | 5 | 3 | 50 | yes | consumer and platform news, same beats as Verge and Ars |
+| `wired` | 4 | 4 | 5 | 5 | 5 | 2 | 50 | yes | mainstream-analytical framing of the same platform stories |
+| `techdirt` | 5 | 2 | 4 | 5 | 5 | 5 | 49 | — | commentary on the news rather than reporting of it |
+| `9to5mac` | 5 | 2 | 5 | 5 | 5 | 2 | 48 | — | Apple vertical, overlaps only inside that niche |
+| `macrumors` | 5 | 2 | 5 | 5 | 5 | 2 | 48 | — | Apple vertical; ships full article bodies rather than ledes |
+| `thehackernews` | 5 | 2 | 5 | 5 | 5 | 2 | 48 | — | security-only overlap; the feed itself measured well |
+| `thenextweb` | 5 | 2 | 5 | 5 | 5 | 2 | 48 | — | European-events focus and thin overlap with the rest of the set |
+| `nytimes-technology` | 4 | 4 | 4 | 5 | 5 | 1 | 47 | — | good feed, but the terms of service restrict reuse |
+| `pcmag` | 4 | 3 | 5 | 5 | 5 | 2 | 47 | — | reviews-first mix, limited breaking-news overlap |
+| `theregister` | 3 | 4 | 5 | 4 | 5 | 4 | 47 | yes | enterprise and security with a distinctly different framing |
+| `tomshardware` | 4 | 3 | 5 | 4 | 5 | 2 | 46 | yes | silicon and hardware stories shared with Ars and The Register |
+| `cnet` | 3 | 4 | 4 | 5 | 5 | 2 | 44 | — | consumer overlap is real, feed is dominated by buying guides |
+| `mashable` | 4 | 2 | 5 | 5 | 5 | 2 | 44 | — | drifted to entertainment and deals, weak news overlap |
+| `techrepublic` | 5 | 2 | 3 | 5 | 5 | 2 | 44 | — | B2B how-to and research, few same-day news overlaps |
+| `404media` | 4 | 2 | 4 | 5 | 5 | 3 | 43 | — | excellent feed; breaks stories rather than following them, so overlap is thin |
+| `digit-fyi` | 5 | 1 | 4 | 5 | 5 | 2 | 43 | — | Scottish regional B2B and events, no global story overlap |
+| `forbes` | 4 | 2 | 5 | 5 | 5 | 1 | 43 | — | contributor network, low and uneven signal |
+| `neowin` | 4 | 2 | 5 | 5 | 3 | 2 | 42 | — | solid feed, mostly Microsoft-adjacent, narrow overlap |
+| `slashdot` | 5 | 1 | 4 | 5 | 3 | 3 | 42 | — | aggregator: its lede quotes other outlets, so it double-counts |
+| `zdnet` | 3 | 4 | 3 | 4 | 5 | 2 | 41 | yes | wide overlap; clean feed, second-slowest cadence in the set |
+| `androidauthority` | 3 | 2 | 5 | 5 | 5 | 2 | 40 | — | Android vertical, overlaps only inside that niche |
+| `bbc-technology` | 3 | 4 | 3 | 5 | 2 | 3 | 40 | yes | low volume but only covers stories everyone else covers |
+| `inc` | 4 | 1 | 5 | 5 | 5 | 1 | 40 | — | small-business advice, not tech news |
+| `qz` | 4 | 1 | 5 | 5 | 5 | 1 | 40 | — | AI-written articles after the 2025 sale, not a usable baseline |
+| `inverse` | 3 | 1 | 5 | 5 | 5 | 1 | 36 | — | pivoted to science, gaming and culture after the BDG changes |
+| `inquisitr` | 5 | 1 | 0 | 5 | 5 | 1 | 34 | — | nothing published in the probe window, and celebrity aggregation anyway |
+| `platformer` | 3 | 1 | 1 | 5 | 5 | 2 | 29 | — | newsletter cadence, a few posts a week, no cluster partners |
+| `gizmodo` | 0 | 3 | 0 | 1 | 0 | 2 | 12 | — | bot-blocked on probe; the trustworthiness doubts stand regardless |
+| `venturebeat` | 0 | 3 | 0 | 1 | 0 | 2 | 12 | — | rate-limited on probe; the overlap case is real but unverifiable |
+| `axios-technology` | 0 | 3 | 0 | 0 | 0 | 2 | 11 | — | feed path 404s, nothing to score |
+| `cnbc` | 0 | 3 | 0 | 1 | 0 | 1 | 11 | — | feed answered 200 with zero entries, so there is nothing to ingest |
+| `businessinsider-tech` | 0 | 3 | 0 | 0 | 0 | 1 | 10 | — | feed path 404s, nothing to score |
+| `digitaltrends` | 0 | 2 | 0 | 1 | 0 | 2 | 9 | — | 202 bot-mitigation interstitial, zero entries |
+| `techtimes` | 0 | 1 | 0 | 0 | 0 | 1 | 4 | — | feed path 404s, nothing to score |
+| `technicalhint` | 0 | 0 | 0 | 0 | 0 | 1 | 1 | — | feed path 404s; marginal SEO blog with no newsroom |
 | `recode` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | brand retired into Vox.com in 2023, no feed of its own |
 | `reuters` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | public RSS withdrawn around 2020, syndication is a paid product |
 
+Measuring flattened the middle of the table. Reachability and link
+hygiene were priors that ranged from 1 to 5 and are now 5 for almost
+everything that answered, so they stopped separating outlets, and the
+verticals rose: 9to5Mac, MacRumors, TheHackerNews and TNW all sit at 48
+on the strength of fast, rich, clean feeds. What keeps them out is
+overlap, the one criterion a fetch cannot measure. The ranking is a
+ranking of feeds; the set is a choice about clustering.
+
 ## Feed URLs
 
-Unverified, see the measurement status section. `kind` is `site` for an
-outlet-wide feed and `section` where a section feed is the sane choice.
+`kind` is `site` for an outlet-wide feed and `section` where a section
+feed is the sane choice. `verified` means this url returned entries on
+2026-09-16.
 
-| outlet | feed url | kind, how found |
-|---|---|---|
-| `theverge` | `https://www.theverge.com/rss/index.xml` | site, documented |
-| `arstechnica` | `https://arstechnica.com/feed/` | site, documented |
-| `theregister` | `https://www.theregister.com/headlines.atom` | site, documented |
-| `engadget` | `https://www.engadget.com/rss.xml` | site, documented |
-| `techcrunch` | `https://techcrunch.com/feed/` | site, convention |
-| `theguardian` | `https://www.theguardian.com/uk/technology/rss` | section, documented |
-| `bleepingcomputer` | `https://www.bleepingcomputer.com/feed/` | site, convention |
-| `wired` | `https://www.wired.com/feed/rss` | site, documented |
-| `tomshardware` | `https://www.tomshardware.com/feeds/all` | site, documented |
-| `bbc-technology` | `https://feeds.bbci.co.uk/news/technology/rss.xml` | section, documented |
-| `404media` | `https://www.404media.co/rss/` | site, documented |
-| `nytimes-technology` | `https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml` | section, documented |
-| `zdnet` | `https://www.zdnet.com/news/rss.xml` | section, documented |
-| `cnet` | `https://www.cnet.com/rss/news/` | section, documented |
-| `techdirt` | `https://www.techdirt.com/feed/` | site, convention |
-| `venturebeat` | `https://venturebeat.com/feed/` | site, convention |
-| `androidauthority` | `https://www.androidauthority.com/feed/` | site, convention |
-| `macrumors` | `https://feeds.macrumors.com/MacRumors-All` | site, documented |
-| `neowin` | `https://www.neowin.net/news/rss/` | site, documented |
-| `platformer` | `https://www.platformer.news/rss/` | site, documented |
-| `9to5mac` | `https://9to5mac.com/feed/` | site, convention |
-| `gizmodo` | `https://gizmodo.com/feed` | site, convention |
-| `pcmag` | `https://www.pcmag.com/feeds/rss/latest` | site, documented |
-| `cnbc` | `https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss25&id=19854910` | section, documented |
-| `digitaltrends` | `https://www.digitaltrends.com/feed/` | site, convention |
-| `slashdot` | `https://rss.slashdot.org/Slashdot/slashdotMain` | site, documented |
-| `axios-technology` | `https://api.axios.com/feed/technology` | section, search |
-| `thehackernews` | `https://feeds.feedburner.com/TheHackersNews` | site, documented |
-| `mashable` | `https://mashable.com/feeds/rss/all` | site, documented |
-| `thenextweb` | `https://thenextweb.com/feed` | site, convention |
-| `techrepublic` | `https://www.techrepublic.com/rssfeeds/articles/` | site, documented |
-| `businessinsider-tech` | `https://www.businessinsider.com/sai/rss` | section, documented |
-| `digit-fyi` | `https://www.digit.fyi/feed/` | site, convention |
-| `forbes` | `https://www.forbes.com/innovation/feed2/` | section, documented |
-| `inverse` | `https://www.inverse.com/rss` | site, convention |
-| `inquisitr` | `https://www.inquisitr.com/feed/` | site, convention |
-| `qz` | `https://qz.com/rss` | site, convention |
-| `techtimes` | `https://www.techtimes.com/rss/sections/tech.xml` | section, documented |
-| `inc` | `https://www.inc.com/rss/` | site, convention |
-| `technicalhint` | `https://www.technicalhint.com/feed/` | site, convention |
-| `recode` | none | no public feed |
-| `reuters` | none | no public feed |
+| outlet | feed url | kind, how found | verified |
+|---|---|---|---|
+| `theverge` | `https://www.theverge.com/rss/index.xml` | site, documented | yes |
+| `arstechnica` | `https://arstechnica.com/feed/` | site, documented | yes |
+| `theregister` | `https://www.theregister.com/headlines.atom` | site, documented | yes |
+| `engadget` | `https://www.engadget.com/rss.xml` | site, documented | yes |
+| `techcrunch` | `https://techcrunch.com/feed/` | site, convention | yes |
+| `theguardian` | `https://www.theguardian.com/uk/technology/rss` | section, documented | yes |
+| `bleepingcomputer` | `https://www.bleepingcomputer.com/feed/` | site, convention | yes |
+| `wired` | `https://www.wired.com/feed/rss` | site, documented | yes |
+| `tomshardware` | `https://www.tomshardware.com/feeds/all` | site, documented | yes |
+| `bbc-technology` | `https://feeds.bbci.co.uk/news/technology/rss.xml` | section, documented | yes |
+| `404media` | `https://www.404media.co/rss/` | site, documented | yes |
+| `nytimes-technology` | `https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml` | section, documented | yes |
+| `zdnet` | `https://www.zdnet.com/news/rss.xml` | section, documented | yes |
+| `cnet` | `https://www.cnet.com/rss/news/` | section, documented | yes |
+| `techdirt` | `https://www.techdirt.com/feed/` | site, convention | yes |
+| `venturebeat` | `https://venturebeat.com/feed/` | site, convention | no |
+| `androidauthority` | `https://www.androidauthority.com/feed/` | site, convention | yes |
+| `macrumors` | `https://feeds.macrumors.com/MacRumors-All` | site, documented | yes |
+| `neowin` | `https://www.neowin.net/news/rss/` | site, documented | yes |
+| `platformer` | `https://www.platformer.news/rss/` | site, documented | yes |
+| `9to5mac` | `https://9to5mac.com/feed/` | site, convention | yes |
+| `gizmodo` | `https://gizmodo.com/feed` | site, convention | no |
+| `pcmag` | `https://www.pcmag.com/feeds/rss/latest` | site, documented | yes |
+| `cnbc` | `https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss25&id=19854910` | section, documented | no |
+| `digitaltrends` | `https://www.digitaltrends.com/feed/` | site, convention | no |
+| `slashdot` | `https://rss.slashdot.org/Slashdot/slashdotMain` | site, documented | yes |
+| `axios-technology` | `https://api.axios.com/feed/technology` | section, search | no |
+| `thehackernews` | `https://feeds.feedburner.com/TheHackersNews` | site, documented | yes |
+| `mashable` | `https://mashable.com/feeds/rss/all` | site, documented | yes |
+| `thenextweb` | `https://thenextweb.com/feed` | site, convention | yes |
+| `techrepublic` | `https://www.techrepublic.com/rssfeeds/articles/` | site, documented | yes |
+| `businessinsider-tech` | `https://www.businessinsider.com/sai/rss` | section, documented | no |
+| `digit-fyi` | `https://www.digit.fyi/feed/` | site, convention | yes |
+| `forbes` | `https://www.forbes.com/innovation/feed2/` | section, documented | yes |
+| `inverse` | `https://www.inverse.com/rss` | site, convention | yes |
+| `inquisitr` | `https://www.inquisitr.com/feed/` | site, convention | yes |
+| `qz` | `https://qz.com/rss` | site, convention | yes |
+| `techtimes` | `https://www.techtimes.com/rss/sections/tech.xml` | section, documented | no |
+| `inc` | `https://www.inc.com/rss/` | site, convention | yes |
+| `technicalhint` | `https://www.technicalhint.com/feed/` | site, convention | no |
+| `recode` | none | no public feed | n/a |
+| `reuters` | none | no public feed | n/a |
+
+Of the 24 urls taken from outlet documentation, 21 answered with entries.
+Of the 15 taken from platform convention alone, 11 did. The one url that
+came from a web search and nothing else, Axios, 404s.
 
 ## Recommended starting set
 
-11 outlets, inside the 8 to 12 the task asks for.
+11 outlets, unchanged from the first pass: The Verge, Ars Technica, The
+Register, Engadget, TechCrunch, The Guardian (Technology),
+BleepingComputer, WIRED, Tom's Hardware, BBC News (Technology), ZDNET.
 
-This is deliberately not the top 11 rows of the table. The score ranks
-a feed; the set has to cluster. 404 Media, the New York Times, Techdirt
-and CNET all score at or above the bottom of the chosen set and are still
-out — on volume, terms, role and noise respectively — while ZDNET is in
-at 40 because it overlaps with nearly everything else here. Where score
-and overlap disagree, overlap wins, because a cluster is only emitted
-when two outlets carry the same story.
+The measurement did not disqualify anyone in it, and it did not make a
+strong enough case for anyone outside it. Every member passed the lede
+gate on measurement:
 
-- **Ars Technica** — the widest daily generalist here, and its entries
-  carry a full summary paragraph, the most useful lede shape we can get.
-- **The Verge** — highest volume of the generalists and the outlet most
-  likely to be the second member of an arbitrary cluster.
-- **Engadget** — the same consumer and platform beats as Ars and The
-  Verge, with a different house framing of the same announcements.
-- **TechCrunch** — funding, startup and AI stories the rest of the set
-  picks up within a day; the most obvious gap in the old list.
-- **The Register** — enterprise, silicon and security written from a
-  deliberately different angle, which is where discrepancies come from.
-- **BleepingComputer** — breaches and malware in detail; the specialist
-  that supplies the numbers the generalists then round off.
-- **WIRED** — analytical framing of the same platform stories, and the
-  outlet most likely to disagree about significance rather than fact.
-- **ZDNET** — broad enterprise and consumer overlap, included with a
-  caveat, see below.
-- **Tom's Hardware** — GPUs, chips and supply chain, overlapping with
-  Ars and The Register on exactly the stories that carry hard numbers.
-- **The Guardian (Technology)** — general-press treatment of the trade
-  press's stories, and the section feed keeps its other desks out.
-- **BBC News (Technology)** — low volume by design: it covers only
-  stories everyone else also covers, so nearly every item should cluster.
+- lede medians run from 12 words (Ars Technica) to 107 (the Guardian),
+  every one of them above the 8-word floor, and not one member had a
+  single entry whose lede repeated its title.
+- the 11 feeds returned at least 290 items in the probe week. That is a
+  floor: 8 of the 11 served a full window, so their `items_last_7d`
+  equals `entries_per_fetch` and is bounded by the feed, not the
+  newsroom.
+- 8 of the 11 post at a median gap under 2 hours. Only the Guardian
+  (6.0), ZDNET (7.6) and the BBC (17.2) are slower.
+- 10 of the 11 serve clean entry links. The BBC is the exception.
+- 8 answered 200 directly; The Register (302) and Tom's Hardware and
+  ZDNET (301) answered after a redirect, which costs a point of
+  reachability and nothing else.
+
+### The two arguments the measurement forced
+
+**BBC Technology is the slowest member** — 17.2 hours between items, 15
+in the week, and the only member whose links carry tracking parameters,
+which are also the non-standard `at_campaign` and `at_medium` rather than
+`utm_`. It stays, for the reason it was picked: it publishes about two
+items a day and they are the stories everyone else also ran, so its hit
+rate into clusters should be far higher than its volume suggests. It also
+serves 21 entries covering more than a week, so a three-hourly ingest
+cannot miss anything of it. Its dirty links cost a point, not a seat:
+stripping them is T11's job and the parameters are now recorded there.
+
+**ZDNET measured better than its prior** — the first pass put it in with
+a warning that its ledes were the weakest in the set, thin and padded
+with deals posts. Measured: 19-word ledes, no entry with a lede equal to
+its title, clean links. Its actual weakness is cadence, 7.6 hours and 17
+items a week, which is the second-slowest here. That is a better reason
+to keep it than the one it had.
+
+### Who nearly changed the set
+
+- **CNET** (44) is the closest. Same overlap prior as ZDNET, faster
+  (2.0 h, 20 items a week), clean links, 19-word ledes. What keeps it out
+  is the buying-guide mix, and that is exactly what a single fetch cannot
+  see: the probe counted entries, it did not classify them. CNET is now
+  the first reserve, replacing VentureBeat, whose feed did not answer.
+- **NYT Technology** (47) measured as well as anything here: 28 items a
+  week, 2.6 h gap, 23-word ledes, clean links. It is out on terms, which
+  are still unread. It remains the strongest single addition available if
+  the owner is comfortable with them.
+- **404 Media** (43) is the one rejection whose stated reason the
+  measurement destroyed. It was rejected for publishing "a handful of
+  items a week". It published 15 in the probe week, the same as
+  BleepingComputer, at a 2.9 h median gap. The volume argument is dead;
+  the overlap argument is what keeps it out, and it is a prior: 404 Media
+  breaks stories rather than following them, so its items are likely to
+  be singletons in this set rather than second members of a cluster.
+- **PCMag** (47) has the strongest measurements of any excluded generalist
+  — 100 entries a fetch, 0.2 h gap, 27-word ledes — and the same doubt as
+  CNET, one the probe cannot settle.
+
+### What would change my mind
+
+Concrete, and checkable once ingest has run for a week:
+
+- If the BBC contributes fewer than about one clustered item a day, drop
+  it. The set goes to 10 and nothing is lost.
+- If ZDNET clusters on fewer than half its items, swap it for CNET, which
+  measured faster on every axis and carries the same overlap prior.
+- If the set as a whole emits too few clusters, add in this order: CNET,
+  then NYT Technology if the owner accepts the terms, then 404 Media.
+  VentureBeat is no longer first reserve; it has to answer a fetch first.
+- If any member's median lede falls below 8 words at T10, it leaves on
+  the gate, whatever it scores.
+- If two outlets in the set turn out to be near-duplicates of each other
+  in clusters, drop the lower-scoring one rather than adding anyone.
 
 ### Will they actually overlap
 
-Yes, with a caveat about the tails. Seven of the 11 — Ars, The Verge,
-Engadget, TechCrunch, WIRED, ZDNET and the Guardian — run the same daily
-platform stories: Apple, Google, Meta, OpenAI, Microsoft, Nvidia,
-antitrust, EU and US regulation. Any of those should be a two-outlet
-cluster most days. Security stories bind The Register, BleepingComputer
+Unchanged and still a prior. Seven of the 11 — Ars, The Verge, Engadget,
+TechCrunch, WIRED, ZDNET and the Guardian — run the same daily platform
+stories: Apple, Google, Meta, OpenAI, Microsoft, Nvidia, antitrust, EU
+and US regulation. Security stories bind The Register, BleepingComputer
 and ZDNET; hardware and silicon bind Tom's Hardware, Ars and The
 Register; the largest stories pull in the Guardian and the BBC. The set
 is three overlapping communities sharing the generalists, not 11
@@ -237,89 +411,137 @@ independent streams.
 
 The tails will not cluster. Tom's Hardware component reviews,
 BleepingComputer's smaller advisories and Guardian technology features
-have no partner in the set and will be dropped as singletons. That is
-the design working, not a defect, but it means items per day is not
-clusters per day and the ratio is unknown until ingest runs.
+have no partner in the set and will be dropped as singletons. That is the
+design working, not a defect, but it means items a week is not clusters a
+week and the ratio is unknown until ingest runs.
 
-Two risks specific to this set. ZDNET is here for overlap and is the
-weakest on lede quality — deals and affiliate posts in the feed, and a
-history of thin descriptions — so it is the first outlet T10 should
-measure and the first to drop if the gate fails. BleepingComputer sits
-behind bot protection, so the second thing T10 should confirm is that
-its feed answers a plain client at all.
+One thing the measurement did settle: nothing in the set is at risk of
+being missed by a three-hourly ingest. The tightest feed is WIRED, whose
+50 entries at a 0.1 h median gap cover roughly five hours — an estimate
+from the median, not a measured span, but comfortably wider than the
+ingest interval. The Verge's 10-entry feed at 1.4 h covers roughly
+fourteen.
 
 ## Rejected and why
 
 By category. The per-row reasons are in the scoring table.
 
-**Dead or gone.** `recode`, brand retired into Vox.com in 2023, with no
-feed of its own; `reuters`, whose public RSS was withdrawn around 2020
-and whose syndication is now a paid product. Both are scored 0 with a
-reason rather than dropped from the table.
+**Feed did not answer.** `axios-technology`, `businessinsider-tech`,
+`techtimes` and `technicalhint` 404: those feed paths are gone and the
+candidates cannot be scored on anything until a real url is found.
+`cnbc` (200) and `digitaltrends` (202) answered with zero entries.
+`gizmodo` (403) and `venturebeat` (429) were blocked; both are worth one
+retry with backoff and a real User-Agent before being written off, and
+VentureBeat's AI and enterprise overlap makes it the one to retry first.
 
-**Not an independent voice.** `qz` — Quartz was sold in 2025, its
-editorial staff cut, and it published AI-written articles; checking
-another outlet's claim against generated text tells us nothing. Its
-score is about trustworthiness, not about the feed. `slashdot` — an
-aggregator whose entry text quotes the outlets we already ingest, so it
-would re-enter their claims under a second outlet name and inflate every
-cluster it touches. `techtimes`, `inquisitr` and `technicalhint` —
+**Dead or gone.** `recode`, retired into Vox.com in 2023; `reuters`,
+whose public RSS was withdrawn around 2020 and whose syndication is a
+paid product. Neither has a feed url, so neither was probed; both are
+scored 0 with a reason rather than dropped from the table.
+
+**Not an independent voice.** `qz` — sold in 2025, editorial staff cut,
+AI-written articles; checking another outlet's claim against generated
+text tells us nothing, and its 21 clean 21-word entries do not change
+that. `slashdot` — an aggregator whose entry text quotes the outlets we
+already ingest, confirmed by measurement: a 432-word median body, which
+is other people's copy. `techtimes`, `inquisitr` and `technicalhint` —
 rewrite and SEO operations with no newsroom.
 
-**Wrong scope.** `inc` (small-business advice), `inverse` (science and
-culture since the BDG changes), `digit-fyi` (Scottish regional B2B and
-events, alive and publishing but the wrong beat entirely), `forbes`
-(contributor network, uneven signal), `techrepublic` (B2B how-to and
-research), `techdirt` (commentary on the news rather than reporting of
-it, and worth revisiting later as a deliberate framing counterweight).
+**Wrong scope.** `inc`, `inverse`, `digit-fyi`, `forbes`, `techrepublic`
+and `techdirt`. All six measured as working feeds — `digit-fyi` and
+`techdirt` have some of the richest ledes in the sweep — and all six are
+on the wrong beat for a tech-news comparison. Techdirt is worth
+revisiting later as a deliberate framing counterweight.
 
-**Right outlet, wrong shape for v1.** `404media` and `platformer`
-publish a handful of items a week: excellent feeds with nobody to
-cluster against inside a four-day window. `businessinsider-tech` is hard
-paywalled with truncated entries.
+**Right outlet, wrong shape for v1.** `platformer` published 2 items in
+the week with the newest 37 hours old: the newsletter-cadence prior held
+exactly. `404media` is no longer rejected on volume, only on overlap.
 
 **Verticals.** `9to5mac`, `macrumors`, `androidauthority`, `neowin` and
-`thehackernews` have strong feeds but each overlaps only inside its own
-niche. Worth revisiting if the site grows per-topic sections.
+`thehackernews` all measured excellently and all score 40 to 48, above
+two members of the recommended set. Each overlaps only inside its own
+niche, which is worth 2 points of overlap and 6 weighted points. Worth
+revisiting first if the site grows per-topic sections.
 
-**Close calls.** `venturebeat` is the first reserve: real AI and
-enterprise overlap with TechCrunch, rejected on daily volume and a
-sponsored-post mix alone. `cnet` is the second: genuine consumer overlap
-buried under buying guides. `gizmodo` was excluded on newsroom churn and
-the AI-written posts its previous owner ran in 2025, which is again a
-judgment about trustworthiness rather than about the feed, and it is the
-closest of the three. `nytimes-technology` scores well and was excluded
-on terms alone; if the owner is comfortable with the New York Times
-terms of service it is the strongest single addition available.
-`axios-technology` was excluded because its ledes are short by editorial
-policy — exactly the risk the lede gate exists to catch — and because
-its feed endpoint is undocumented.
+**Close calls.** `cnet` first reserve, `nytimes-technology` on terms
+alone, `pcmag` on an unmeasurable mix, `404media` on overlap. See the
+section above.
+
+## Findings for other tasks
+
+These came out of the measurement and belong in the tasks that will act
+on them.
+
+**T11, canonicalization.** Tracking parameters in the wild are not only
+`utm_*`. The BBC uses `at_campaign` and `at_medium`, Neowin `utm_source`,
+Slashdot `utm_medium` and `utm_source`. Item ids are a sha1 of the
+canonical url, so a parameter the stripper misses gives the same article
+two different ids on two fetches and duplicates it across the site.
+Fixtures for T11 should include a BBC item with `at_*` parameters
+specifically, because a `utm_`-only rule passes every other feed in the
+set and fails that one.
+
+**T11, lede extraction.** Four feeds ship whole article bodies rather
+than ledes: Slashdot (432-word median, 778 max), MacRumors (370, 1718),
+digit.fyi (71) and TheHackerNews (60). The Guardian is a milder case at
+107 median and 301 max. T11's rule — strip HTML, take the first 60 words
+of summary or content — handles all of them, but the fixtures should
+include one so the cap is actually exercised.
+
+**T30, quote validation.** For those full-content feeds the verbatim
+quote haystack is the entire article body, not a headline and a lede. A
+quote can then validate against text from the middle of an article, which
+is not what "a verbatim quote from that item's title or lede" is supposed
+to mean. Open question for T30's design: does the validator check quotes
+against the stored lede — the capped 60 words — or against everything the
+feed sent? The first is the honest reading of the rule and is what the
+stored item should contain.
+
+**T10, `nc feeds check`.** Reachable is not usable. CNBC returned 200 and
+Digital Trends 202, both with zero entries; a check that only looks at
+the HTTP status passes both. Freshness is the other half: Inquisitr
+returned 30 entries with none in the last 7 days and the newest 377 hours
+old. `nc feeds check` should fail a feed that returns no entries and flag
+one whose newest entry is stale, as well as reporting counts, newest date
+and lede presence.
+
+**T10 and T13, retry versus dead.** A 403 or 429 means blocked, not gone.
+VentureBeat and Gizmodo deserve one retry with backoff and a real
+User-Agent before being written off; the four 404s deserve url
+rediscovery instead. The check should say which of the two it is.
 
 ## Caveats
 
-- Nothing was fetched. Every number in this file is a prior, and the
-  whole table needs re-running once a session has egress. See the
-  measurement status section for the evidence.
-- Feed URLs may have moved. Several are conventions rather than
-  documented paths. Where one 404s, discover the real URL from the
-  homepage `<link rel="alternate" type="application/rss+xml">` element
-  and record it in the YAML.
-- Terms were read for nobody. Before launch the owner should at least
-  read the terms of the recommended set and confirm that quoting a
-  headline and lede with attribution and a link is acceptable.
-- Lede judgments are the softest part of the table. Feeds change shape
-  without notice and several of these outlets have moved between full
-  text, summary and title-only over the years. The gate has to be
-  enforced by measurement at T10, not by this file.
-- Posting frequency is unknown for every candidate, so the volume scores
-  are estimates of editorial output, not counts from timestamps. That
-  matters most for the reserves, whose rejection turns on volume.
-- Overlap is an assertion about editorial beats, not a measurement. It
-  can only be confirmed after ingest and clustering have run for a few
-  days. If the recommended set produces too few clusters, add
-  VentureBeat and then CNET before widening any other criterion.
-- One feed per outlet was assumed throughout; section feeds are used for
-  the Guardian, the BBC, ZDNET and the rejected general-news candidates.
-  If a site-wide feed proves too noisy at T10, prefer its section feed
-  over dropping the outlet.
-- 42 candidates were scored. None was fetched.
+- One fetch, one moment. Every count, gap and age here is a snapshot from
+  2026-09-16 around 13:30 UTC. A feed that was bursting looks fast and a
+  feed that was quiet looks slow.
+- `entries_per_fetch` is what the outlet chooses to serve, so
+  `items_last_7d` is a floor wherever the whole feed fell inside the
+  window, which is 24 of the 32 feeds that answered. The Verge serving 10
+  entries does not mean The Verge publishes 10 items a week.
+- Overlap is still an assertion about editorial beats. It is the
+  second-heaviest criterion and nothing in this measurement touched it.
+  Only clustering over several days can confirm or refute it.
+- Terms were read for nobody. `terms` is a prior for all 42 candidates,
+  no robots.txt or terms page was fetched, and none of this is legal
+  advice. Before launch the owner should at least read the terms of the
+  recommended set and confirm that quoting a headline and lede with
+  attribution and a link is acceptable.
+- Link cleanliness means no tracking parameters in the entry link's query
+  string. Redirect chains were not resolved, so a wrapper host such as
+  `feeds.feedburner.com` or `feeds.macrumors.com` that redirects cleanly
+  would be recorded as clean. T11 should resolve and canonicalize those
+  before trusting the item id.
+- The lede gate was measured for the 32 feeds that answered and is
+  unknown for the 8 that did not. Those 8 score 0 for lede, which keeps
+  them out, but that is absence of evidence rather than a title-only
+  feed.
+- Feed shape changes without notice. Several of these outlets have moved
+  between full text, summary and title-only over the years, and four of
+  them are serving full text today. T10 re-measures before writing
+  `config/outlets.yaml`, and the gate is enforced there, not here.
+- One feed per outlet throughout; section feeds are used for the
+  Guardian, the BBC, ZDNET, CNET, the NYT and the rejected general-news
+  candidates. If a site-wide feed proves too noisy at T10, prefer its
+  section feed over dropping the outlet.
+- 42 candidates scored, 40 urls probed, 32 measured with entries.

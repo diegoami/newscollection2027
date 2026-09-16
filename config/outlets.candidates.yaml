@@ -1,23 +1,35 @@
 # Outlet candidates for newscollection2027.
 #
-# Compiled 2026-09-16 by T09. THE FEEDS WERE NOT FETCHED.
-# The session that compiled this ran behind an egress proxy that
-# denied CONNECT to all 42 candidate hosts, so every field under
-# `measurement` is null and `measured` is false everywhere. The
-# scores under `scores` are editorial priors, not measurements.
-# See docs/OUTLETS.md for the method, the evidence and the caveats.
+# Compiled 2026-09-16 by T09 and measured the same day. Every feed url
+# was fetched once from a GitHub Actions ubuntu-latest runner with
+# `scripts/probe_feeds.py` (feedparser): the development sandbox has no
+# egress to news domains, so measurement happens on a runner.
 #
-# T10 fills the `measurement` blocks with `nc feeds check` and
-# rescores before generating config/outlets.yaml. Treat every
-# number here as unverified until it does.
+# 40 feed urls across 42 candidates (recode and reuters have no feed to
+# probe). 32 returned entries and all 32 carry a real lede.
+#
+# One fetch is one sample at one moment. `entries_per_fetch` is capped by
+# what each feed chooses to serve, so `items_last_7d` is a floor for any
+# feed whose whole payload falls inside the window, and the gaps and ages
+# are a snapshot. `terms` was not measured for anyone: no robots.txt and
+# no terms page was read.
+#
+# `score_basis` records, per criterion, whether the score came from the
+# measurement, from editorial judgement (`prior`), or from nothing
+# (`unmeasured`, for feeds that returned no entries). Overlap is a prior
+# by nature: one fetch per outlet cannot show which outlets carry the
+# same story. See docs/OUTLETS.md for the method and the caveats.
+#
+# T10 regenerates these numbers with `nc feeds check` before writing
+# config/outlets.yaml.
 
 compiled_on: 2026-09-16
-measured_on: null
-measured: false
-measurement_blocked_reason: >-
-  organization egress policy denied CONNECT to every candidate
-  host (HTTP 403 from the egress proxy, curl exit 56) and the
-  WebFetch path returned EGRESS_BLOCKED for the same hosts
+measured_on: 2026-09-16
+measured: true
+measurement_method: >-
+  scripts/probe_feeds.py on a GitHub Actions ubuntu-latest runner,
+  one feedparser fetch per url at about 13:30 UTC, user agent
+  "newscollection2027/0.1 (+feed evaluation)"
 
 scoring:
   max_score: 60
@@ -29,6 +41,29 @@ scoring:
     reachability: 1
     canonical: 1
     terms: 1
+  bands:
+    lede: >-
+      from lede_words_median: 5 at 30 or more, 4 at 20, 3 at 12, 2 at 8,
+      1 below that; 0 when the feed returned no entries to measure
+    overlap: >-
+      prior, not measurable from one fetch: editorial judgement about how
+      often this outlet carries the same story as the rest of the set
+    volume: >-
+      from items_last_7d: 5 at 40 or more, 4 at 20, 3 at 10, 2 at 4, 1 at
+      1, 0 at none; a feed whose entries all fall inside the window is
+      capped by entries_per_fetch, so it is scored from median_gap_hours
+      instead (5 at 2 h or less, 4 at 6 h, 3 at 12 h, 2 at 24 h, 1 slower);
+      capped at 3 when age_of_newest_hours is over 12
+    reachability: >-
+      5 for 200 with entries, 4 for a redirect to entries, 1 for a feed
+      that answered or was blocked but returned no entries, 0 for 404 or
+      for no feed url at all
+    canonical: >-
+      5 when no tracking parameter was seen, 3 for utm_ only, 2 when a
+      non-standard parameter is in play, 0 when nothing was measured
+    terms: >-
+      prior, unmeasured: no robots.txt, feed documentation or terms page
+      was read for any candidate, and none of this is legal advice
 
 candidates:
   - slug: theverge
@@ -38,19 +73,21 @@ candidates:
       - url: "https://www.theverge.com/rss/index.xml"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 10
+      has_lede: true
+      lede_words_median: 56
+      lede_words_max: 56
+      lede_equals_title: 0
+      items_last_7d: 10
+      median_gap_hours: 1.4
+      age_of_newest_hours: 1.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
@@ -58,13 +95,19 @@ candidates:
       overlap: 5
       volume: 5
       reachability: 5
-      canonical: 4
+      canonical: 5
       terms: 3
-    score: 57
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 58
     recommended: true
     reason: "highest-volume generalist, overlaps with everything else"
-    note: "publishes a feed index; per-section feeds also exist"
+    note: "serves only 10 entries a fetch, but a 1.4 h median gap keeps it fresh"
   - slug: arstechnica
     display_name: "Ars Technica"
     homepage: "https://arstechnica.com/"
@@ -72,33 +115,41 @@ candidates:
       - url: "https://arstechnica.com/feed/"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 20
+      has_lede: true
+      lede_words_median: 12
+      lede_words_max: 17
+      lede_equals_title: 0
+      items_last_7d: 20
+      median_gap_hours: 0.6
+      age_of_newest_hours: 9.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 5
+      lede: 3
       overlap: 5
-      volume: 4
+      volume: 5
       reachability: 5
-      canonical: 4
+      canonical: 5
       terms: 3
-    score: 55
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 50
     recommended: true
-    reason: "broad daily coverage, entries carry a real summary paragraph"
-    note: "old project scraped the homepage; the site-wide /feed/ replaces it"
+    reason: "broad daily coverage; the feed summary is one short sentence"
+    note: "12-word median lede, 17 at most: the summary-paragraph prior was wrong"
   - slug: theregister
     display_name: "The Register"
     homepage: "https://www.theregister.com/"
@@ -106,33 +157,41 @@ candidates:
       - url: "https://www.theregister.com/headlines.atom"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 302
+      reachable: true
+      entries_per_fetch: 50
+      has_lede: true
+      lede_words_median: 14
+      lede_words_max: 25
+      lede_equals_title: 0
+      items_last_7d: 50
+      median_gap_hours: 0.8
+      age_of_newest_hours: 0.7
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 5
+      lede: 3
       overlap: 4
-      volume: 4
-      reachability: 5
+      volume: 5
+      reachability: 4
       canonical: 5
       terms: 4
-    score: 54
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 47
     recommended: true
     reason: "enterprise and security with a distinctly different framing"
-    note: "publishes a feeds page; Atom, clean links, no feed wrapper"
+    note: "302 redirect to the Atom feed, 50 entries, links clean"
   - slug: engadget
     display_name: "Engadget"
     homepage: "https://www.engadget.com/"
@@ -140,33 +199,41 @@ candidates:
       - url: "https://www.engadget.com/rss.xml"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 20
+      has_lede: true
+      lede_words_median: 16
+      lede_words_max: 28
+      lede_equals_title: 0
+      items_last_7d: 20
+      median_gap_hours: 0.5
+      age_of_newest_hours: 1.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 3
       overlap: 5
-      volume: 4
-      reachability: 4
-      canonical: 3
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 3
-    score: 49
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 50
     recommended: true
     reason: "consumer and platform news, same beats as Verge and Ars"
-    note: "Yahoo-owned; links have carried tracking suffixes in the past"
+    note: "links measured clean; the tracking suffixes of earlier years did not show"
   - slug: techcrunch
     display_name: "TechCrunch"
     homepage: "https://techcrunch.com/"
@@ -174,33 +241,41 @@ candidates:
       - url: "https://techcrunch.com/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 20
+      has_lede: true
+      lede_words_median: 21
+      lede_words_max: 41
+      lede_equals_title: 0
+      items_last_7d: 20
+      median_gap_hours: 0.5
+      age_of_newest_hours: 0.1
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 4
       overlap: 5
-      volume: 4
-      reachability: 4
-      canonical: 3
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 3
-    score: 49
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 54
     recommended: true
     reason: "startup, funding and AI beat that the others follow same-day"
-    note: "not in the old project; an obvious gap in that list"
+    note: "20 entries, 0.5 h median gap, links clean"
   - slug: theguardian
     display_name: "The Guardian (Technology)"
     homepage: "https://www.theguardian.com/technology"
@@ -208,33 +283,41 @@ candidates:
       - url: "https://www.theguardian.com/uk/technology/rss"
         kind: section
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 32
+      has_lede: true
+      lede_words_median: 107
+      lede_words_max: 301
+      lede_equals_title: 0
+      items_last_7d: 23
+      median_gap_hours: 6.0
+      age_of_newest_hours: 1.6
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 5
       overlap: 4
-      volume: 3
+      volume: 4
       reachability: 5
       canonical: 5
       terms: 4
-    score: 48
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 54
     recommended: true
     reason: "general-press framing of the stories the trade press runs"
-    note: "old project scraped the whole site; the section feed is the fit"
+    note: "107-word median lede, the longest of any outlet in the set"
   - slug: bleepingcomputer
     display_name: "BleepingComputer"
     homepage: "https://www.bleepingcomputer.com/"
@@ -242,33 +325,41 @@ candidates:
       - url: "https://www.bleepingcomputer.com/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 15
+      has_lede: true
+      lede_words_median: 26
+      lede_words_max: 43
+      lede_equals_title: 0
+      items_last_7d: 15
+      median_gap_hours: 1.5
+      age_of_newest_hours: 1.2
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 4
       overlap: 4
-      volume: 3
-      reachability: 3
-      canonical: 4
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 3
-    score: 44
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 51
     recommended: true
     reason: "breach and malware stories that Register and ZDNET also run"
-    note: "bot protection is the main reachability risk; verify at T10"
+    note: "answered a plain client with 200; the bot-protection worry did not show"
   - slug: wired
     display_name: "WIRED"
     homepage: "https://www.wired.com/"
@@ -276,33 +367,41 @@ candidates:
       - url: "https://www.wired.com/feed/rss"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 50
+      has_lede: true
+      lede_words_median: 22
+      lede_words_max: 38
+      lede_equals_title: 0
+      items_last_7d: 50
+      median_gap_hours: 0.1
+      age_of_newest_hours: 1.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 4
       overlap: 4
-      volume: 3
-      reachability: 4
-      canonical: 3
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 43
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 50
     recommended: true
     reason: "mainstream-analytical framing of the same platform stories"
-    note: "site is metered; the feed itself is public"
+    note: "50 entries a fetch, 0.1 h median gap, links clean"
   - slug: tomshardware
     display_name: "Tom's Hardware"
     homepage: "https://www.tomshardware.com/"
@@ -310,33 +409,41 @@ candidates:
       - url: "https://www.tomshardware.com/feeds/all"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 301
+      reachable: true
+      entries_per_fetch: 50
+      has_lede: true
+      lede_words_median: 25
+      lede_words_max: 45
+      lede_equals_title: 0
+      items_last_7d: 50
+      median_gap_hours: 0.3
+      age_of_newest_hours: 1.2
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 4
       overlap: 3
-      volume: 4
+      volume: 5
       reachability: 4
-      canonical: 3
+      canonical: 5
       terms: 2
-    score: 42
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 46
     recommended: true
     reason: "silicon and hardware stories shared with Ars and The Register"
-    note: "Future plc; feed has at times carried full article text"
+    note: "301 redirect; 25-word ledes, not the full article text it once carried"
   - slug: bbc-technology
     display_name: "BBC News (Technology)"
     homepage: "https://www.bbc.com/news/technology"
@@ -344,33 +451,41 @@ candidates:
       - url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
         kind: section
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
-      tracking_params_seen: []
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 21
+      has_lede: true
+      lede_words_median: 15
+      lede_words_max: 25
+      lede_equals_title: 0
+      items_last_7d: 15
+      median_gap_hours: 17.2
+      age_of_newest_hours: 3.5
+      canonical_links_clean: false
+      tracking_params_seen: [at_campaign, at_medium]
       terms: not_checked
     scores:
       lede: 3
       overlap: 4
-      volume: 2
+      volume: 3
       reachability: 5
-      canonical: 5
+      canonical: 2
       terms: 3
-    score: 41
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 40
     recommended: true
     reason: "low volume but only covers stories everyone else covers"
-    note: "descriptions are a single sentence; adds a non-US voice"
+    note: "slowest in the set at 17.2 h, and the only member with dirty links"
   - slug: 404media
     display_name: "404 Media"
     homepage: "https://www.404media.co/"
@@ -378,33 +493,41 @@ candidates:
       - url: "https://www.404media.co/rss/"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 15
+      has_lede: true
+      lede_words_median: 21
+      lede_words_max: 32
+      lede_equals_title: 0
+      items_last_7d: 15
+      median_gap_hours: 2.9
+      age_of_newest_hours: 3.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 5
+      lede: 4
       overlap: 2
-      volume: 1
-      reachability: 4
+      volume: 4
+      reachability: 5
       canonical: 5
       terms: 3
-    score: 40
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 43
     recommended: false
-    reason: "excellent feed, too little volume to cluster reliably"
-    note: "breaks stories others follow; revisit once clustering is tuned"
+    reason: "excellent feed; breaks stories rather than following them, so overlap is thin"
+    note: "the volume prior was wrong: 15 items in 7 days, the same as BleepingComputer"
   - slug: nytimes-technology
     display_name: "The New York Times (Technology)"
     homepage: "https://www.nytimes.com/section/technology"
@@ -412,33 +535,41 @@ candidates:
       - url: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
         kind: section
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 28
+      has_lede: true
+      lede_words_median: 23
+      lede_words_max: 29
+      lede_equals_title: 0
+      items_last_7d: 28
+      median_gap_hours: 2.6
+      age_of_newest_hours: 4.3
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 4
       overlap: 4
-      volume: 2
-      reachability: 4
-      canonical: 3
+      volume: 4
+      reachability: 5
+      canonical: 5
       terms: 1
-    score: 40
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 47
     recommended: false
     reason: "good feed, but the terms of service restrict reuse"
-    note: "rejected on terms, not on feed quality; owner call if wanted"
+    note: "measured clean and steady; rejected on terms, which nobody has read"
   - slug: zdnet
     display_name: "ZDNET"
     homepage: "https://www.zdnet.com/"
@@ -446,33 +577,41 @@ candidates:
       - url: "https://www.zdnet.com/news/rss.xml"
         kind: section
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 301
+      reachable: true
+      entries_per_fetch: 25
+      has_lede: true
+      lede_words_median: 19
+      lede_words_max: 32
+      lede_equals_title: 0
+      items_last_7d: 17
+      median_gap_hours: 7.6
+      age_of_newest_hours: 1.4
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 3
       overlap: 4
-      volume: 4
+      volume: 3
       reachability: 4
-      canonical: 2
+      canonical: 5
       terms: 2
-    score: 40
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 41
     recommended: true
-    reason: "wide overlap, but the feed carries deals and affiliate posts"
-    note: "lede quality is the weakest of the recommended set; check first"
+    reason: "wide overlap; clean feed, second-slowest cadence in the set"
+    note: "the deals-and-thin-lede prior did not show: 19-word ledes, none title-only"
   - slug: cnet
     display_name: "CNET"
     homepage: "https://www.cnet.com/"
@@ -480,33 +619,41 @@ candidates:
       - url: "https://www.cnet.com/rss/news/"
         kind: section
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 25
+      has_lede: true
+      lede_words_median: 19
+      lede_words_max: 32
+      lede_equals_title: 0
+      items_last_7d: 20
+      median_gap_hours: 2.0
+      age_of_newest_hours: 1.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 3
       overlap: 4
       volume: 4
-      reachability: 3
-      canonical: 2
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 39
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 44
     recommended: false
     reason: "consumer overlap is real, feed is dominated by buying guides"
-    note: "second reserve if the recommended set clusters too thinly"
+    note: "first reserve; faster than ZDNET at 2.0 h, but the mix is unmeasured"
   - slug: techdirt
     display_name: "Techdirt"
     homepage: "https://www.techdirt.com/"
@@ -514,33 +661,41 @@ candidates:
       - url: "https://www.techdirt.com/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 10
+      has_lede: true
+      lede_words_median: 56
+      lede_words_max: 56
+      lede_equals_title: 0
+      items_last_7d: 10
+      median_gap_hours: 4.0
+      age_of_newest_hours: 1.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 5
       overlap: 2
-      volume: 2
-      reachability: 4
-      canonical: 4
+      volume: 4
+      reachability: 5
+      canonical: 5
       terms: 5
-    score: 39
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 49
     recommended: false
     reason: "commentary on the news rather than reporting of it"
-    note: "CC-licensed; worth a later experiment as a framing counterweight"
+    note: "CC-licensed; 56-word ledes, 10 items in 7 days"
   - slug: venturebeat
     display_name: "VentureBeat"
     homepage: "https://venturebeat.com/"
@@ -550,31 +705,40 @@ candidates:
         source: convention
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 429
+      reachable: false
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "rate-limited; the body was an error page, not a feed"
     scores:
-      lede: 4
+      lede: 0
       overlap: 3
-      volume: 2
-      reachability: 4
-      canonical: 3
+      volume: 0
+      reachability: 1
+      canonical: 0
       terms: 2
-    score: 38
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 12
     recommended: false
-    reason: "real AI and enterprise overlap, thin daily volume"
-    note: "closest call among the rejected; first reserve"
+    reason: "rate-limited on probe; the overlap case is real but unverifiable"
+    note: "429 with an error-page body; retry with backoff and a real User-Agent"
   - slug: androidauthority
     display_name: "Android Authority"
     homepage: "https://www.androidauthority.com/"
@@ -582,32 +746,41 @@ candidates:
       - url: "https://www.androidauthority.com/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 80
+      has_lede: true
+      lede_words_median: 12
+      lede_words_max: 24
+      lede_equals_title: 0
+      items_last_7d: 80
+      median_gap_hours: 0.3
+      age_of_newest_hours: 0.6
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 3
       overlap: 2
-      volume: 4
-      reachability: 3
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 37
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 40
     recommended: false
     reason: "Android vertical, overlaps only inside that niche"
+    note: "80 items in 7 days, all of them inside the niche"
   - slug: macrumors
     display_name: "MacRumors"
     homepage: "https://www.macrumors.com/"
@@ -615,32 +788,41 @@ candidates:
       - url: "https://feeds.macrumors.com/MacRumors-All"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 20
+      has_lede: true
+      lede_words_median: 370
+      lede_words_max: 1718
+      lede_equals_title: 0
+      items_last_7d: 20
+      median_gap_hours: 0.7
+      age_of_newest_hours: 0.8
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 5
       overlap: 2
-      volume: 3
-      reachability: 4
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 36
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 48
     recommended: false
-    reason: "Apple vertical, feed served through a redirector"
+    reason: "Apple vertical; ships full article bodies rather than ledes"
+    note: "370-word median body, 1718 at most; entry links carried no tracking params"
   - slug: neowin
     display_name: "Neowin"
     homepage: "https://www.neowin.net/"
@@ -648,32 +830,41 @@ candidates:
       - url: "https://www.neowin.net/news/rss/"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
-      tracking_params_seen: []
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 40
+      has_lede: true
+      lede_words_median: 24
+      lede_words_max: 31
+      lede_equals_title: 0
+      items_last_7d: 40
+      median_gap_hours: 0.5
+      age_of_newest_hours: 0.7
+      canonical_links_clean: false
+      tracking_params_seen: [utm_source]
       terms: not_checked
     scores:
       lede: 4
       overlap: 2
-      volume: 3
-      reachability: 3
+      volume: 5
+      reachability: 5
       canonical: 3
       terms: 2
-    score: 36
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 42
     recommended: false
     reason: "solid feed, mostly Microsoft-adjacent, narrow overlap"
+    note: "utm_source on entry links"
   - slug: platformer
     display_name: "Platformer"
     homepage: "https://www.platformer.news/"
@@ -681,32 +872,41 @@ candidates:
       - url: "https://www.platformer.news/rss/"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 15
+      has_lede: true
+      lede_words_median: 17
+      lede_words_max: 28
+      lede_equals_title: 0
+      items_last_7d: 2
+      median_gap_hours: 95.4
+      age_of_newest_hours: 37.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 5
+      lede: 3
       overlap: 1
       volume: 1
-      reachability: 4
+      reachability: 5
       canonical: 5
       terms: 2
-    score: 36
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 29
     recommended: false
     reason: "newsletter cadence, a few posts a week, no cluster partners"
+    note: "2 items in 7 days, newest 37 h old: the cadence prior held exactly"
   - slug: 9to5mac
     display_name: "9to5Mac"
     homepage: "https://9to5mac.com/"
@@ -714,32 +914,41 @@ candidates:
       - url: "https://9to5mac.com/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 100
+      has_lede: true
+      lede_words_median: 39
+      lede_words_max: 188
+      lede_equals_title: 0
+      items_last_7d: 100
+      median_gap_hours: 0.6
+      age_of_newest_hours: 0.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 5
       overlap: 2
-      volume: 3
-      reachability: 3
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 35
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 48
     recommended: false
     reason: "Apple vertical, overlaps only inside that niche"
+    note: "100 entries a fetch, 39-word ledes"
   - slug: gizmodo
     display_name: "Gizmodo"
     homepage: "https://gizmodo.com/"
@@ -749,31 +958,40 @@ candidates:
         source: convention
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 403
+      reachable: false
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "bot-blocked; the body was not well-formed XML"
     scores:
-      lede: 3
+      lede: 0
       overlap: 3
-      volume: 3
-      reachability: 3
-      canonical: 2
+      volume: 0
+      reachability: 1
+      canonical: 0
       terms: 2
-    score: 34
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 12
     recommended: false
-    reason: "newsroom churn and AI-written articles weaken it as a baseline"
-    note: "sold to Keleops in 2024; G/O ran AI-written English posts in 2025"
+    reason: "bot-blocked on probe; the trustworthiness doubts stand regardless"
+    note: "403 with a non-XML body; retry with a real User-Agent before writing it off"
   - slug: pcmag
     display_name: "PCMag"
     homepage: "https://www.pcmag.com/"
@@ -781,33 +999,41 @@ candidates:
       - url: "https://www.pcmag.com/feeds/rss/latest"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 100
+      has_lede: true
+      lede_words_median: 27
+      lede_words_max: 42
+      lede_equals_title: 0
+      items_last_7d: 100
+      median_gap_hours: 0.2
+      age_of_newest_hours: 0.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 3
+      lede: 4
       overlap: 3
-      volume: 3
-      reachability: 3
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 34
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 47
     recommended: false
     reason: "reviews-first mix, limited breaking-news overlap"
-    note: "old project used the UK edition; the US edition is the main one"
+    note: "measured strong: 100 entries, 27-word ledes, clean links; overlap is the doubt"
   - slug: cnbc
     display_name: "CNBC (Technology)"
     homepage: "https://www.cnbc.com/technology/"
@@ -817,30 +1043,40 @@ candidates:
         source: documented
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "answered 200 with zero entries"
     scores:
-      lede: 3
+      lede: 0
       overlap: 3
-      volume: 3
-      reachability: 3
-      canonical: 2
+      volume: 0
+      reachability: 1
+      canonical: 0
       terms: 1
-    score: 33
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 11
     recommended: false
-    reason: "business framing, opaque feed endpoint, unclear terms"
+    reason: "feed answered 200 with zero entries, so there is nothing to ingest"
+    note: "reachable but unusable: the case `nc feeds check` has to fail on"
   - slug: digitaltrends
     display_name: "Digital Trends"
     homepage: "https://www.digitaltrends.com/"
@@ -850,30 +1086,40 @@ candidates:
         source: convention
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 202
+      reachable: true
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "answered 202 with zero entries, a bot-mitigation interstitial"
     scores:
-      lede: 3
+      lede: 0
       overlap: 2
-      volume: 4
-      reachability: 3
-      canonical: 2
+      volume: 0
+      reachability: 1
+      canonical: 0
       terms: 2
-    score: 33
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 9
     recommended: false
-    reason: "high volume but mostly reviews, deals and how-to"
+    reason: "202 bot-mitigation interstitial, zero entries"
+    note: "the reviews-and-deals prior is now untested; the feed did not answer with items"
   - slug: slashdot
     display_name: "Slashdot"
     homepage: "https://slashdot.org/"
@@ -881,33 +1127,41 @@ candidates:
       - url: "https://rss.slashdot.org/Slashdot/slashdotMain"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
-      tracking_params_seen: []
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 15
+      has_lede: true
+      lede_words_median: 432
+      lede_words_max: 778
+      lede_equals_title: 0
+      items_last_7d: 15
+      median_gap_hours: 4.5
+      age_of_newest_hours: 0.4
+      canonical_links_clean: false
+      tracking_params_seen: [utm_medium, utm_source]
       terms: not_checked
     scores:
-      lede: 4
+      lede: 5
       overlap: 1
-      volume: 3
-      reachability: 4
-      canonical: 1
+      volume: 4
+      reachability: 5
+      canonical: 3
       terms: 3
-    score: 33
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 42
     recommended: false
     reason: "aggregator: its lede quotes other outlets, so it double-counts"
-    note: "structurally wrong for cross-outlet comparison, not a feed problem"
+    note: "432-word median body and utm_ parameters on entry links"
   - slug: axios-technology
     display_name: "Axios (Technology)"
     homepage: "https://www.axios.com/technology"
@@ -917,31 +1171,40 @@ candidates:
         source: search
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 404
+      reachable: false
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "feed path gone: 404 and a syntax error"
     scores:
-      lede: 3
+      lede: 0
       overlap: 3
-      volume: 2
-      reachability: 3
-      canonical: 2
+      volume: 0
+      reachability: 0
+      canonical: 0
       terms: 2
-    score: 32
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 11
     recommended: false
-    reason: "short brevity ledes and an undocumented feed endpoint"
-    note: "close call; re-score if the endpoint proves stable at T10"
+    reason: "feed path 404s, nothing to score"
+    note: "the endpoint came from a search and is gone; find the real one before retrying"
   - slug: thehackernews
     display_name: "The Hacker News"
     homepage: "https://thehackernews.com/"
@@ -949,32 +1212,41 @@ candidates:
       - url: "https://feeds.feedburner.com/TheHackersNews"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 50
+      has_lede: true
+      lede_words_median: 60
+      lede_words_max: 71
+      lede_equals_title: 0
+      items_last_7d: 47
+      median_gap_hours: 1.3
+      age_of_newest_hours: 1.5
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 4
+      lede: 5
       overlap: 2
-      volume: 2
-      reachability: 3
-      canonical: 1
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 32
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 48
     recommended: false
-    reason: "security-only overlap and FeedBurner link wrapping"
+    reason: "security-only overlap; the feed itself measured well"
+    note: "60-word bodies; no FeedBurner tracking params on the entry links"
   - slug: mashable
     display_name: "Mashable"
     homepage: "https://mashable.com/"
@@ -982,32 +1254,41 @@ candidates:
       - url: "https://mashable.com/feeds/rss/all"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 100
+      has_lede: true
+      lede_words_median: 20
+      lede_words_max: 34
+      lede_equals_title: 0
+      items_last_7d: 100
+      median_gap_hours: 0.1
+      age_of_newest_hours: 1.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 3
+      lede: 4
       overlap: 2
-      volume: 3
-      reachability: 3
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 31
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 44
     recommended: false
     reason: "drifted to entertainment and deals, weak news overlap"
+    note: "100 entries a fetch, 20-word ledes, links clean"
   - slug: thenextweb
     display_name: "TNW"
     homepage: "https://thenextweb.com/"
@@ -1015,32 +1296,41 @@ candidates:
       - url: "https://thenextweb.com/feed"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 10
+      has_lede: true
+      lede_words_median: 63
+      lede_words_max: 65
+      lede_equals_title: 0
+      items_last_7d: 10
+      median_gap_hours: 0.4
+      age_of_newest_hours: 1.2
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 3
+      lede: 5
       overlap: 2
-      volume: 2
-      reachability: 3
-      canonical: 3
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 30
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 48
     recommended: false
-    reason: "output shrank after the FT acquisition, European-events focus"
+    reason: "European-events focus and thin overlap with the rest of the set"
+    note: "the shrunken-output prior did not show: 10 entries at a 0.4 h median gap"
   - slug: techrepublic
     display_name: "TechRepublic"
     homepage: "https://www.techrepublic.com/"
@@ -1048,32 +1338,41 @@ candidates:
       - url: "https://www.techrepublic.com/rssfeeds/articles/"
         kind: site
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 20
+      has_lede: true
+      lede_words_median: 40
+      lede_words_max: 45
+      lede_equals_title: 0
+      items_last_7d: 20
+      median_gap_hours: 0.2
+      age_of_newest_hours: 17.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 3
+      lede: 5
       overlap: 2
-      volume: 2
-      reachability: 3
-      canonical: 2
+      volume: 3
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 29
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 44
     recommended: false
     reason: "B2B how-to and research, few same-day news overlaps"
+    note: "bursty: 20 entries at a 0.2 h median gap, but the newest was 17 h old"
   - slug: businessinsider-tech
     display_name: "Business Insider (Tech)"
     homepage: "https://www.businessinsider.com/tech"
@@ -1083,30 +1382,40 @@ candidates:
         source: documented
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 404
+      reachable: false
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "feed path gone: 404 and not well-formed"
     scores:
-      lede: 2
+      lede: 0
       overlap: 3
-      volume: 3
-      reachability: 2
-      canonical: 2
+      volume: 0
+      reachability: 0
+      canonical: 0
       terms: 1
-    score: 28
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 10
     recommended: false
-    reason: "hard paywall and truncated feed entries"
+    reason: "feed path 404s, nothing to score"
+    note: "the paywall prior is untested; the documented feed path no longer resolves"
   - slug: digit-fyi
     display_name: "DIGIT"
     homepage: "https://www.digit.fyi/"
@@ -1114,33 +1423,41 @@ candidates:
       - url: "https://www.digit.fyi/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 15
+      has_lede: true
+      lede_words_median: 71
+      lede_words_max: 76
+      lede_equals_title: 0
+      items_last_7d: 15
+      median_gap_hours: 2.2
+      age_of_newest_hours: 0.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 3
+      lede: 5
       overlap: 1
-      volume: 1
-      reachability: 3
-      canonical: 3
+      volume: 4
+      reachability: 5
+      canonical: 5
       terms: 2
-    score: 25
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 43
     recommended: false
     reason: "Scottish regional B2B and events, no global story overlap"
-    note: "alive and publishing, simply the wrong scope for this product"
+    note: "ships full bodies, 71-word median; alive, simply the wrong scope"
   - slug: forbes
     display_name: "Forbes (Innovation)"
     homepage: "https://www.forbes.com/innovation/"
@@ -1148,32 +1465,41 @@ candidates:
       - url: "https://www.forbes.com/innovation/feed2/"
         kind: section
         source: documented
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 25
+      has_lede: true
+      lede_words_median: 20
+      lede_words_max: 30
+      lede_equals_title: 1
+      items_last_7d: 25
+      median_gap_hours: 0.2
+      age_of_newest_hours: 0.2
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 2
+      lede: 4
       overlap: 2
-      volume: 3
-      reachability: 2
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 1
-    score: 25
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 43
     recommended: false
     reason: "contributor network, low and uneven signal"
+    note: "1 of 25 entries had a lede identical to its title, the only such feed measured"
   - slug: inverse
     display_name: "Inverse"
     homepage: "https://www.inverse.com/"
@@ -1181,32 +1507,41 @@ candidates:
       - url: "https://www.inverse.com/rss"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 50
+      has_lede: true
+      lede_words_median: 19
+      lede_words_max: 32
+      lede_equals_title: 0
+      items_last_7d: 47
+      median_gap_hours: 1.6
+      age_of_newest_hours: 1.0
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
       lede: 3
       overlap: 1
-      volume: 2
-      reachability: 2
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 1
-    score: 24
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 36
     recommended: false
     reason: "pivoted to science, gaming and culture after the BDG changes"
+    note: "47 items in 7 days: publishing steadily, on the wrong beats"
   - slug: inquisitr
     display_name: "The Inquisitr"
     homepage: "https://www.inquisitr.com/"
@@ -1214,33 +1549,41 @@ candidates:
       - url: "https://www.inquisitr.com/feed/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 30
+      has_lede: true
+      lede_words_median: 55
+      lede_words_max: 58
+      lede_equals_title: 0
+      items_last_7d: 0
+      median_gap_hours: 1.9
+      age_of_newest_hours: 376.8
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 2
+      lede: 5
       overlap: 1
-      volume: 3
-      reachability: 2
-      canonical: 1
+      volume: 0
+      reachability: 5
+      canonical: 5
       terms: 1
-    score: 21
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 34
     recommended: false
-    reason: "celebrity and clickbait aggregation, barely tech at all"
-    note: "still publishing in 2026, which is the only point in its favour"
+    reason: "nothing published in the probe window, and celebrity aggregation anyway"
+    note: "30 entries but 0 in 7 days, newest 377 h old: the still-publishing prior was wrong"
   - slug: qz
     display_name: "Quartz"
     homepage: "https://qz.com/"
@@ -1248,30 +1591,38 @@ candidates:
       - url: "https://qz.com/rss"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 21
+      has_lede: true
+      lede_words_median: 21
+      lede_words_max: 25
+      lede_equals_title: 0
+      items_last_7d: 21
+      median_gap_hours: 0.1
+      age_of_newest_hours: 0.1
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 2
+      lede: 4
       overlap: 1
-      volume: 2
-      reachability: 3
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 1
-    score: 21
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 40
     recommended: false
     reason: "AI-written articles after the 2025 sale, not a usable baseline"
     note: "comparing another outlet's claims against generated text is void"
@@ -1284,30 +1635,40 @@ candidates:
         source: documented
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 404
+      reachable: false
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "feed path gone: 404"
     scores:
-      lede: 2
+      lede: 0
       overlap: 1
-      volume: 3
-      reachability: 2
-      canonical: 1
+      volume: 0
+      reachability: 0
+      canonical: 0
       terms: 1
-    score: 21
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 4
     recommended: false
-    reason: "rewrites other outlets, adds no independent claim"
+    reason: "feed path 404s, nothing to score"
+    note: "rewrite operation; the section feed path is gone"
   - slug: inc
     display_name: "Inc."
     homepage: "https://www.inc.com/"
@@ -1315,32 +1676,41 @@ candidates:
       - url: "https://www.inc.com/rss/"
         kind: site
         source: convention
-        verified_by_fetch: false
+        verified_by_fetch: true
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
-      has_lede: null
-      lede_words_median: null
-      lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
-      canonical_links_clean: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 200
+      reachable: true
+      entries_per_fetch: 39
+      has_lede: true
+      lede_words_median: 20
+      lede_words_max: 37
+      lede_equals_title: 0
+      items_last_7d: 39
+      median_gap_hours: 0.4
+      age_of_newest_hours: 0.3
+      canonical_links_clean: true
       tracking_params_seen: []
       terms: not_checked
     scores:
-      lede: 2
+      lede: 4
       overlap: 1
-      volume: 2
-      reachability: 2
-      canonical: 2
+      volume: 5
+      reachability: 5
+      canonical: 5
       terms: 1
-    score: 20
-    score_basis: prior
+    score_basis:
+      lede: measured
+      overlap: prior
+      volume: measured
+      reachability: measured
+      canonical: measured
+      terms: prior
+    score: 40
     recommended: false
     reason: "small-business advice, not tech news"
+    note: "39 items in 7 days, 20-word ledes, on the wrong beat"
   - slug: technicalhint
     display_name: "Technical Hint"
     homepage: "https://www.technicalhint.com/"
@@ -1350,30 +1720,39 @@ candidates:
         source: convention
         verified_by_fetch: false
     measurement:
-      measured: false
-      measured_at: null
-      http_status: null
-      reachable: null
-      entries_per_fetch: null
+      measured: true
+      measured_at: 2026-09-16
+      http_status: 404
+      reachable: false
+      entries_per_fetch: 0
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "feed path gone: 404"
     scores:
-      lede: 1
+      lede: 0
       overlap: 0
-      volume: 1
-      reachability: 1
-      canonical: 1
+      volume: 0
+      reachability: 0
+      canonical: 0
       terms: 1
-    score: 9
-    score_basis: prior
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: measured
+      canonical: unmeasured
+      terms: prior
+    score: 1
     recommended: false
-    reason: "marginal SEO blog with no newsroom"
+    reason: "feed path 404s; marginal SEO blog with no newsroom"
   - slug: recode
     display_name: "Recode"
     homepage: "https://www.vox.com/technology"
@@ -1386,12 +1765,15 @@ candidates:
       entries_per_fetch: null
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "no feed url to probe"
     scores:
       lede: 0
       overlap: 0
@@ -1399,11 +1781,17 @@ candidates:
       reachability: 0
       canonical: 0
       terms: 0
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: unmeasured
+      canonical: unmeasured
+      terms: prior
     score: 0
-    score_basis: prior
     recommended: false
     reason: "brand retired into Vox.com in 2023, no feed of its own"
-    note: "dead candidate; Vox technology is a different outlet, not scored"
+    note: "no feed url to probe, so nothing was measured"
   - slug: reuters
     display_name: "Reuters (Technology)"
     homepage: "https://www.reuters.com/technology/"
@@ -1416,12 +1804,15 @@ candidates:
       entries_per_fetch: null
       has_lede: null
       lede_words_median: null
+      lede_words_max: null
       lede_equals_title: null
-      items_per_day: null
-      newest_entry: null
+      items_last_7d: null
+      median_gap_hours: null
+      age_of_newest_hours: null
       canonical_links_clean: null
       tracking_params_seen: []
       terms: not_checked
+      failure: "no feed url to probe"
     scores:
       lede: 0
       overlap: 0
@@ -1429,8 +1820,14 @@ candidates:
       reachability: 0
       canonical: 0
       terms: 0
+    score_basis:
+      lede: unmeasured
+      overlap: prior
+      volume: unmeasured
+      reachability: unmeasured
+      canonical: unmeasured
+      terms: prior
     score: 0
-    score_basis: prior
     recommended: false
     reason: "public RSS withdrawn around 2020, syndication is a paid product"
-    note: "dead candidate for our purposes; no free feed to ingest"
+    note: "no feed url to probe, so nothing was measured"
