@@ -1,0 +1,39 @@
+name: feeds-probe
+
+# T09 measurement. The development sandbox cannot reach news domains, so
+# the candidate feeds are fetched here instead. Remove this workflow once
+# T10 lands `nc feeds check`.
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - "config/outlets.candidates.yaml"
+      - "scripts/probe_feeds.py"
+      - ".github/workflows/feeds-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      - name: Probe every candidate feed
+        run: uv run --no-project --with feedparser --with pyyaml python scripts/probe_feeds.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: feed-probe
+          path: feed-probe.json
