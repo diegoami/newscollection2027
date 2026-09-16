@@ -20,3 +20,12 @@ user_agent: "newscollection2027/0.1 (+feed check)"
 lede_min_median_words: 8
 lede_max_equal_title_share: 0.5
 stale_after_hours: 168
+
+# lede_word_cap: T11. docs/ARCHITECTURE.md's Item.lede is "first ~60
+# words of summary or content". This cap is load-bearing, not
+# decorative: T09's measurement found four feeds shipping whole article
+# bodies rather than ledes (Slashdot 432-word median, MacRumors 370,
+# digit.fyi 71, TheHackerNews 60) and the Guardian, a member of the
+# recommended set, at a 107-word median (docs/OUTLETS.md, "T11, lede
+# extraction").
+lede_word_cap: 60

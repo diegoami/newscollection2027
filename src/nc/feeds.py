@@ -1,11 +1,17 @@
-"""Outlet registry and feed health check.
+"""Outlet registry, feed health check, and feed-item normalization.
 
 Owns config/outlets.yaml (the outlet registry named in
-docs/ARCHITECTURE.md) and `nc feeds check`, which absorbs the
-measurement logic of the retired scripts/probe_feeds.py: entry count,
-lede presence, tracking params on entry links, recency and posting
-cadence. Thresholds come from config/feeds.yaml, never inline here, per
-CLAUDE.md.
+docs/ARCHITECTURE.md), `nc feeds check` (T10, absorbing the measurement
+logic of the retired scripts/probe_feeds.py: entry count, lede presence,
+tracking params on entry links, recency and posting cadence), and item
+normalization (T11: feed entry -> the Item shape in
+docs/ARCHITECTURE.md). Both live here because both are "ingest" per the
+architecture's component table and both need the same tracking-param
+regex and HTML-to-plain-text helpers -- see docs/OUTLETS.md, "Findings
+for other tasks". Storage (`DataRoot`, JSONL append, `nc ingest`) is
+T12, not this module: normalization stops at producing `Item` values
+from a parsed feed. Thresholds and tunables come from config/feeds.yaml,
+never inline here, per CLAUDE.md.
 """
 
 from __future__ import annotations
@@ -14,11 +20,12 @@ import re
 import time
 from calendar import timegm
 from dataclasses import dataclass
+from hashlib import sha1
 from html import unescape
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import feedparser
 import yaml
@@ -226,6 +233,170 @@ def check_feeds(
     return [check_feed(outlet, thresholds, now) for outlet in outlets]
 
 
+# --- T11: feed entry -> Item -------------------------------------------
+#
+# Canonicalization rules (docs/ARCHITECTURE.md: "id sha1 of canonical URL
+# (utm and tracking params stripped)"), decided here because inconsistency
+# silently splits one article into two items across fetches:
+#
+# - scheme and host lowercased; the path is left exactly as the feed
+#   sent it, including case, because it is significant (e.g. WordPress
+#   slugs) and there is no safe way to normalize it.
+# - tracking parameters stripped with the shared TRACKING_PARAM regex --
+#   the same one `nc feeds check` uses, not a second copy.
+# - the fragment is dropped. It addresses a spot on the page, never a
+#   different article, and some outlets vary it across copies of the
+#   same link.
+# - a default port (80 for http, 443 for https) is dropped since it
+#   changes nothing about the resource; any other port is kept.
+# - the trailing slash is left exactly as the feed sent it. Normalizing
+#   it either way risks colliding two different resources or splitting
+#   one that legitimately needs it; a feed is internally consistent
+#   about it per outlet, so leaving it alone is the safer default.
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+# RSS's <author> element is "email (Display Name)" per the spec, and
+# outlets that follow it literally (e.g. engadget: "staff@engadget.com
+# (Ian Carlos Campbell)") leave feedparser's `.author` holding that whole
+# string. Extract the display name; feeds that just give a name pass
+# through unchanged.
+_AUTHOR_EMAIL_NAME = re.compile(r"^\S+@\S+\s*\((?P<name>.+)\)$")
+
+
+@dataclass(frozen=True)
+class Item:
+    """One feed entry, normalized. docs/ARCHITECTURE.md, "Item"."""
+
+    id: str
+    outlet: str
+    url: str
+    title: str
+    lede: str
+    author: str | None
+    published: str  # ISO 8601 UTC
+    fetched: str  # ISO 8601 UTC
+    tags: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NormalizeConfig:
+    lede_word_cap: int
+
+
+def canonical_url(url: str) -> str:
+    """Canonical form of an item link -- see the rules above this section."""
+    parts = urlsplit(url)
+    scheme = parts.scheme.lower()
+    hostname = (parts.hostname or "").lower()
+    port = parts.port
+    if port == _DEFAULT_PORTS.get(scheme):
+        port = None
+    netloc = hostname if port is None else f"{hostname}:{port}"
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if not TRACKING_PARAM.match(key)
+    ]
+    return urlunsplit((scheme, netloc, parts.path, urlencode(query), ""))
+
+
+def item_id(url: str) -> str:
+    """sha1 of `canonical_url(url)`. Canonicalizing first is idempotent,
+    so this accepts a raw feed link or an already-canonical one."""
+    return sha1(canonical_url(url).encode("utf-8")).hexdigest()
+
+
+def _iso_utc(epoch_seconds: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch_seconds))
+
+
+def utc_now_iso() -> str:
+    """Current instant as ISO 8601 UTC, for callers stamping `fetched`."""
+    return _iso_utc(time.time())
+
+
+def _first_words(text: str, limit: int) -> str:
+    return " ".join(text.split()[:limit])
+
+
+def _capped_lede(entry: Any, word_cap: int) -> str:
+    return _first_words(_lede_of(entry), word_cap)
+
+
+def _normalize_author(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    text = _plain_text(raw)
+    if not text:
+        return None
+    match = _AUTHOR_EMAIL_NAME.match(text)
+    if match:
+        text = match.group("name").strip()
+    return text or None
+
+
+def _normalize_tags(entry: Any) -> tuple[str, ...]:
+    raw_tags = getattr(entry, "tags", None) or []
+    names = (_plain_text(tag.get("term") or "") for tag in raw_tags)
+    return tuple(name for name in names if name)
+
+
+def _entry_published_utc(entry: Any, fetched: str) -> str:
+    """The entry's UTC published time, or `fetched` when it has none.
+
+    feedparser already normalizes every date format it recognizes --
+    RFC 822 with a numeric or named offset, and ISO 8601 with an offset
+    or a bare Z -- into a UTC time.struct_time, so this only has to pick
+    published over updated and convert. A missing or unparseable date
+    falls back to `fetched` rather than dropping the item: the item is
+    real and worth keeping, an approximate timestamp still places it
+    inside clustering's four-day window, and a dropped item is invisible
+    forever while a fallback timestamp is only ever slightly wrong.
+    """
+    parsed_date = getattr(entry, "published_parsed", None) or getattr(
+        entry, "updated_parsed", None
+    )
+    if parsed_date is None:
+        return fetched
+    return _iso_utc(timegm(parsed_date))
+
+
+def normalize_entry(
+    outlet: Outlet, entry: Any, fetched: str, lede_word_cap: int
+) -> Item | None:
+    """One feed entry -> one `Item`, or None when it cannot be identified.
+
+    An entry with no link cannot be canonicalized or given a stable id,
+    so it is dropped rather than given one made up.
+    """
+    url = getattr(entry, "link", "") or ""
+    if not url:
+        return None
+    canon = canonical_url(url)
+    return Item(
+        id=sha1(canon.encode("utf-8")).hexdigest(),
+        outlet=outlet.slug,
+        url=canon,
+        title=_plain_text(getattr(entry, "title", "")),
+        lede=_capped_lede(entry, lede_word_cap),
+        author=_normalize_author(getattr(entry, "author", None)),
+        published=_entry_published_utc(entry, fetched),
+        fetched=fetched,
+        tags=_normalize_tags(entry),
+    )
+
+
+def normalize_entries(
+    outlet: Outlet, parsed: Any, fetched: str, lede_word_cap: int
+) -> list[Item]:
+    """Every entry of one parsed feed -> `Item`s, dropping unidentifiable ones."""
+    items = (
+        normalize_entry(outlet, entry, fetched, lede_word_cap)
+        for entry in parsed.entries
+    )
+    return [item for item in items if item is not None]
+
+
 def load_outlets(path: Path = DEFAULT_OUTLETS_PATH) -> list[Outlet]:
     raw = yaml.safe_load(path.read_text())
     if not isinstance(raw, dict) or not isinstance(raw.get("outlets"), list):
@@ -255,6 +426,14 @@ def load_thresholds(path: Path = DEFAULT_THRESHOLDS_PATH) -> FeedThresholds:
         lede_max_equal_title_share=float(raw["lede_max_equal_title_share"]),
         stale_after_hours=float(raw["stale_after_hours"]),
     )
+
+
+def load_normalize_config(path: Path = DEFAULT_THRESHOLDS_PATH) -> NormalizeConfig:
+    raw = yaml.safe_load(path.read_text())
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: expected a mapping at the top level")
+
+    return NormalizeConfig(lede_word_cap=int(raw["lede_word_cap"]))
 
 
 def result_to_dict(result: FeedCheckResult) -> dict[str, Any]:
