@@ -7,6 +7,16 @@ name: feeds-check
 # not in this sandbox".
 
 on:
+  # Whenever the registry or the checker itself changes, on a working
+  # branch, so a bad feed url is caught before it reaches main rather
+  # than by the next weekly run.
+  push:
+    branches: ["claude/**", "feat/**"]
+    paths:
+      - "config/outlets.yaml"
+      - "config/feeds.yaml"
+      - "src/nc/feeds.py"
+      - ".github/workflows/feeds-check.yml"
   schedule:
     - cron: "0 6 * * 1" # weekly, Monday 06:00 UTC
   workflow_dispatch:
