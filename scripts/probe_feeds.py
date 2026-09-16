@@ -15,6 +15,7 @@ import re
 import sys
 from calendar import timegm
 from html import unescape
+from itertools import pairwise
 from pathlib import Path
 from time import time
 from typing import Any
@@ -104,7 +105,7 @@ def probe(slug: str, url: str) -> dict[str, Any]:
         week_ago = time() - 7 * 86400
         result["items_last_7d"] = sum(1 for s in stamps if s >= week_ago)
         if len(stamps) > 2:
-            gaps = sorted(b - a for a, b in zip(stamps, stamps[1:], strict=True))
+            gaps = sorted(b - a for a, b in pairwise(stamps))
             result["median_gap_hours"] = round(gaps[len(gaps) // 2] / 3600, 1)
     return result
 
