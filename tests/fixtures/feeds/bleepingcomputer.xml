@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+        xmlns:content="http://purl.org/rss/1.0/modules/content/"
+        xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+        xmlns:dc="http://purl.org/dc/elements/1.1/"
+        xmlns:atom="http://www.w3.org/2005/Atom"
+        >
+
+<channel>
+        <title>BleepingComputer</title>
+
+        <link>https://www.bleepingcomputer.com/</link>
+        <description>BleepingComputer - All Stories</description>
+        <pubDate>Wed, 16 Sep 2026 14:16:59 GMT</pubDate>
+        <generator>https://www.bleepingcomputer.com/</generator>
+        <language>en</language>
+        <atom:link href="https://www.bleepingcomputer.com/feed/" rel="self" type="application/rss+xml" />
+        
+ <item>
+        <title>The true cost of a ransomware attack, with and without BCDR</title>
+        <link>https://www.bleepingcomputer.com/news/security/the-true-cost-of-a-ransomware-attack-with-and-without-bcdr/</link>
+        <pubDate>Wed, 16 Sep 2026 10:00:10 -0400</pubDate>
+        <dc:creator>Sponsored by Datto</dc:creator>
+        
+        <category><![CDATA[Security]]></category>
+
+        <guid>https://www.bleepingcomputer.com/news/security/the-true-cost-of-a-ransomware-attack-with-and-without-bcdr/</guid>
+        <description><![CDATA[The ransom itself can be only a fraction of the total cost of a ransomware attack, with downtime, recovery, remediation, and legal obligations adding millions to the bill. Datto explains how a mature BCDR strategy can reduce downtime and provide a faster, more predictable path to recovery. [...]]]></description>
+ </item>
+
+ <item>
+        <title>Microsoft says Copilot buttons still missing in classic Outlook</title>
+        <link>https://www.bleepingcomputer.com/news/microsoft/microsoft-shares-workaround-for-missing-outlook-copilot-buttons/</link>
+        <pubDate>Wed, 16 Sep 2026 08:16:32 -0400</pubDate>
+        <dc:creator>Sergiu Gatlan</dc:creator>
+        
+        <category><![CDATA[Microsoft]]></category>
+
+        <guid>https://www.bleepingcomputer.com/news/microsoft/microsoft-shares-workaround-for-missing-outlook-copilot-buttons/</guid>
+        <description><![CDATA[Microsoft says it's still investigating a known issue that causes the Copilot and Copilot Chat buttons in Classic Outlook to disappear for some Windows users. [...]]]></description>
+ </item>
+
+ <item>
+        <title>Webinar: What happens in the first hours of a Google Workspace breach</title>
+        <link>https://www.bleepingcomputer.com/news/security/webinar-what-happens-in-the-first-hours-of-a-google-workspace-breach/</link>
+        <pubDate>Wed, 16 Sep 2026 08:11:19 -0400</pubDate>
+        <dc:creator>BleepingComputer</dc:creator>
+        
+        <category><![CDATA[Security]]></category>
+
+        <guid>https://www.bleepingcomputer.com/news/security/webinar-what-happens-in-the-first-hours-of-a-google-workspace-breach/</guid>
+        <description><![CDATA[The first hours after discovering a Google Workspace breach can determine how an incident unfolds. This webinar examines real-world breaches to show which early response decisions can limit the impact and which can make matters worse. [...]]]></description>
+ </item>
+
+ 
+
+</channel>
+</rss>

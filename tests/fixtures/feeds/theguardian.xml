@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+  <channel>
+    <title>Technology | The Guardian</title>
+    <link>https://www.theguardian.com/uk/technology</link>
+    <description>Latest Technology news, comment and analysis from the Guardian, the world's leading liberal voice</description>
+    <language>en-gb</language>
+    <copyright>Guardian News and Media Limited or its affiliated companies. All rights reserved. 2026</copyright>
+    <pubDate>Wed, 16 Sep 2026 14:19:12 GMT</pubDate>
+    <dc:date>2026-09-16T14:19:12Z</dc:date>
+    <dc:language>en-gb</dc:language>
+    <dc:rights>Guardian News and Media Limited or its affiliated companies. All rights reserved. 2026</dc:rights>
+    <image>
+      <title>The Guardian</title>
+      <url>https://assets.guim.co.uk/images/guardian-logo-rss.c45beb1bafa34b347ac333af2e6fe23f.png</url>
+      <link>https://www.theguardian.com</link>
+    </image>
+    <item>
+      <title>‘If you’re building Frankenstein, stop’: JD Vance dismisses calls for AI regulation</title>
+      <link>https://www.theguardian.com/technology/2026/sep/16/building-frankenstein-jd-vance-dismisses-ai-regulation</link>
+      <description>&lt;p&gt;US vice-president’s comments come as former Anthropic researcher revisits recent claim AI could destroy humanity&lt;/p&gt;&lt;p&gt;The US vice-president has dismissed calls for global regulation of AI safety risks, telling companies creating the most advanced models: “If you’re building Frankenstein, stop.”&lt;/p&gt;&lt;p&gt;In remarks addressed towards Dario Amodei, the co-founder of Anthropic who has &lt;a href="https://www.theguardian.com/technology/2026/sep/12/we-must-slow-the-pace-ceo-of-anthropic-calls-for-an-ai-slowdown"&gt;called on Washington DC to coordinate control of AI systems&lt;/a&gt;, including with China, JD Vance said: “If you’re gonna create Frankenstein, don’t come to the government and say we need regulation.”&lt;/p&gt; &lt;a href="https://www.theguardian.com/technology/2026/sep/16/building-frankenstein-jd-vance-dismisses-ai-regulation"&gt;Continue reading...&lt;/a&gt;</description>
+      <category domain="https://www.theguardian.com/technology/anthropic">Anthropic</category>
+      <category domain="https://www.theguardian.com/us-news/jd-vance">JD Vance</category>
+      <category domain="https://www.theguardian.com/technology/artificialintelligenceai">AI (artificial intelligence)</category>
+      <category domain="https://www.theguardian.com/us-news/us-news">US news</category>
+      <category domain="https://www.theguardian.com/technology/technology">Technology</category>
+      <category domain="https://www.theguardian.com/world/world">World news</category>
+      <category domain="https://www.theguardian.com/technology/computing">Computing</category>
+      <category domain="https://www.theguardian.com/technology/silicon-valley">Silicon Valley</category>
+      <category domain="https://www.theguardian.com/technology/openai">OpenAI</category>
+      <category domain="https://www.theguardian.com/technology/sam-altman">Sam Altman</category>
+      <category domain="https://www.theguardian.com/technology/mark-zuckerberg">Mark Zuckerberg</category>
+      <pubDate>Wed, 16 Sep 2026 10:42:07 GMT</pubDate>
+      <guid>https://www.theguardian.com/technology/2026/sep/16/building-frankenstein-jd-vance-dismisses-ai-regulation</guid>
+      <media:content width="140" url="https://i.guim.co.uk/img/media/2a29a3d6979b1db484649ea644abd122682b1d13/855_0_4262_3411/master/4262.jpg?width=140&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=36032ac229337a2c957991cc379a7e25">
+        <media:credit scheme="urn:ebu">Photograph: Mark Schiefelbein/Reuters</media:credit>
+      </media:content>
+      <media:content width="460" url="https://i.guim.co.uk/img/media/2a29a3d6979b1db484649ea644abd122682b1d13/855_0_4262_3411/master/4262.jpg?width=460&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=2df5580a8f0362e5508a4e31ff222043">
+        <media:credit scheme="urn:ebu">Photograph: Mark Schiefelbein/Reuters</media:credit>
+      </media:content>
+      <media:content width="700" url="https://i.guim.co.uk/img/media/2a29a3d6979b1db484649ea644abd122682b1d13/855_0_4262_3411/master/4262.jpg?width=700&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=9e543ed7400cd0e4047804784cca8e18">
+        <media:credit scheme="urn:ebu">Photograph: Mark Schiefelbein/Reuters</media:credit>
+      </media:content>
+      <dc:creator>Robert Booth UK technology editor</dc:creator>
+      <dc:date>2026-09-16T10:42:07Z</dc:date>
+    </item>
+    <item>
+      <title>Could AI really wipe out humanity – six experts spell out the risks</title>
+      <link>https://www.theguardian.com/technology/2026/sep/15/could-ai-really-wipe-out-humanity-and-hijack-the-internet</link>
+      <description>&lt;p&gt;We examine claims and counterclaims about the risks and calls to slow down the pace of AI development&lt;/p&gt;&lt;p&gt;There have been some shocking claims in recent days about AI safety: we face a 10% chance of doom; AIs are worse than nukes; a “botnet” threatens the entire internet; it’s all a big tech psyop.&lt;/p&gt;&lt;p&gt;Below, we look at six claims and reactions to them.&lt;/p&gt; &lt;a href="https://www.theguardian.com/technology/2026/sep/15/could-ai-really-wipe-out-humanity-and-hijack-the-internet"&gt;Continue reading...&lt;/a&gt;</description>
+      <category domain="https://www.theguardian.com/technology/artificialintelligenceai">AI (artificial intelligence)</category>
+      <category domain="https://www.theguardian.com/technology/anthropic">Anthropic</category>
+      <category domain="https://www.theguardian.com/world/ethics">Ethics</category>
+      <category domain="https://www.theguardian.com/technology/technology">Technology</category>
+      <category domain="https://www.theguardian.com/technology/sam-altman">Sam Altman</category>
+      <category domain="https://www.theguardian.com/technology/elon-musk">Elon Musk</category>
+      <category domain="https://www.theguardian.com/technology/openai">OpenAI</category>
+      <category domain="https://www.theguardian.com/world/datacentres">Datacentres</category>
+      <category domain="https://www.theguardian.com/world/world">World news</category>
+      <pubDate>Tue, 15 Sep 2026 17:54:48 GMT</pubDate>
+      <guid>https://www.theguardian.com/technology/2026/sep/15/could-ai-really-wipe-out-humanity-and-hijack-the-internet</guid>
+      <media:content width="140" url="https://i.guim.co.uk/img/media/eadcd6f3311ca07c60d6211bbb3b303b657cf252/1031_0_4874_3900/master/4874.jpg?width=140&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=9ba4b36e5f2a41b4c016388709d1f7ef">
+        <media:credit scheme="urn:ebu">Illustration: wildpixel/Getty Images</media:credit>
+      </media:content>
+      <media:content width="460" url="https://i.guim.co.uk/img/media/eadcd6f3311ca07c60d6211bbb3b303b657cf252/1031_0_4874_3900/master/4874.jpg?width=460&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=a48ee5fd511c2545121d325d3efcaf74">
+        <media:credit scheme="urn:ebu">Illustration: wildpixel/Getty Images</media:credit>
+      </media:content>
+      <media:content width="700" url="https://i.guim.co.uk/img/media/eadcd6f3311ca07c60d6211bbb3b303b657cf252/1031_0_4874_3900/master/4874.jpg?width=700&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=bbc596b1e8aa9a3f745f878457cbe0c4">
+        <media:credit scheme="urn:ebu">Illustration: wildpixel/Getty Images</media:credit>
+      </media:content>
+      <dc:creator>Robert Booth, Dan Milmo and Aisha Down</dc:creator>
+      <dc:date>2026-09-15T17:54:48Z</dc:date>
+    </item>
+    <item>
+      <title>The US government is failing Americans on AI | Shakeel Hashim</title>
+      <link>https://www.theguardian.com/technology/2026/sep/16/us-government-failing-americans-ai</link>
+      <description>&lt;p&gt;Trump and Republicans want companies to regulate themselves. It’s a dereliction of duty that will make AI less safe&lt;/p&gt;&lt;p&gt;It is hard to get Sam Altman, Elon Musk and Dario Amodei to agree on much. But over the weekend, all three AI company CEOs called for AI development to slow down in the face of growing, alarming risks. Their employees are sounding the siren too, with one researcher publicly quitting and accusing OpenAI and Anthropic of “gambling with our lives”.&lt;/p&gt;&lt;p&gt;The combination of dire warnings from insiders and growing real-world evidence of rogue AIs should, in a sane world, lead to government action. Instead, Donald Trump and the Republican leadership have their heads in the sand.&lt;/p&gt; &lt;a href="https://www.theguardian.com/technology/2026/sep/16/us-government-failing-americans-ai"&gt;Continue reading...&lt;/a&gt;</description>
+      <category domain="https://www.theguardian.com/technology/artificialintelligenceai">AI (artificial intelligence)</category>
+      <category domain="https://www.theguardian.com/technology/technology">Technology</category>
+      <category domain="https://www.theguardian.com/us-news/donaldtrump">Donald Trump</category>
+      <category domain="https://www.theguardian.com/technology/openai">OpenAI</category>
+      <category domain="https://www.theguardian.com/technology/anthropic">Anthropic</category>
+      <category domain="https://www.theguardian.com/technology/sam-altman">Sam Altman</category>
+      <category domain="https://www.theguardian.com/technology/elon-musk">Elon Musk</category>
+      <category domain="https://www.theguardian.com/technology/grok-ai">Grok AI</category>
+      <category domain="https://www.theguardian.com/us-news/us-congress">US Congress</category>
+      <category domain="https://www.theguardian.com/us-news/republicans">Republicans</category>
+      <category domain="https://www.theguardian.com/us-news/us-politics">US politics</category>
+      <category domain="https://www.theguardian.com/world/china">China</category>
+      <pubDate>Wed, 16 Sep 2026 10:00:18 GMT</pubDate>
+      <guid>https://www.theguardian.com/technology/2026/sep/16/us-government-failing-americans-ai</guid>
+      <media:content width="140" url="https://i.guim.co.uk/img/media/dc78004d494fd54b683c1575f0828645d8e13701/0_0_5000_4000/master/5000.jpg?width=140&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=0aeacc1d1898229d41c3c1c741ebbb1d">
+        <media:credit scheme="urn:ebu">Composite: Getty Images</media:credit>
+      </media:content>
+      <media:content width="460" url="https://i.guim.co.uk/img/media/dc78004d494fd54b683c1575f0828645d8e13701/0_0_5000_4000/master/5000.jpg?width=460&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=de59fc7367c9276b389a775ead780e4c">
+        <media:credit scheme="urn:ebu">Composite: Getty Images</media:credit>
+      </media:content>
+      <media:content width="700" url="https://i.guim.co.uk/img/media/dc78004d494fd54b683c1575f0828645d8e13701/0_0_5000_4000/master/5000.jpg?width=700&amp;quality=85&amp;auto=format&amp;fit=max&amp;s=641972e21968cc0da2092d09b0cc151e">
+        <media:credit scheme="urn:ebu">Composite: Getty Images</media:credit>
+      </media:content>
+      <dc:creator>Shakeel Hashim</dc:creator>
+      <dc:date>2026-09-16T10:00:18Z</dc:date>
+    </item>
+    
+  </channel>
+</rss>
+
