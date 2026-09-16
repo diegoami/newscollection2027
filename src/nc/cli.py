@@ -15,7 +15,7 @@ from pathlib import Path
 
 import feedparser
 
-from nc import __version__, feeds, store, sync
+from nc import __version__, embed, feeds, store, sync
 from nc.store import DataRoot
 
 
@@ -61,6 +61,28 @@ def _ingest(args: argparse.Namespace) -> int:
 
     result = store.append_items(data_root, items)
     print(f"ingest: {result.added} new item(s), {result.skipped} already stored")
+    return 0
+
+
+def _embed(args: argparse.Namespace) -> int:
+    """Embed every stored item without a vector yet.
+
+    `Model2VecBackend` (the real model) is constructed here, at the CLI
+    boundary, and nowhere else -- `nc.embed.embed_items` only knows the
+    `EmbeddingBackend` protocol, so this is the one place production
+    code chooses which backend runs (see nc/embed.py's module
+    docstring).
+    """
+    data_root = _data_root(args)
+    config = embed.load_embed_config(args.config)
+    backend = embed.Model2VecBackend(config)
+    result = embed.embed_items(
+        data_root, backend, config.model_id, args.db, config.batch_size
+    )
+    print(
+        f"embed: {result.embedded} item(s) embedded, "
+        f"{result.already_stored} already had a vector"
+    )
     return 0
 
 
@@ -152,6 +174,27 @@ def _build_parser() -> argparse.ArgumentParser:
         "--data-root", type=Path, default=None, help=data_root_help
     )
     ingest_parser.set_defaults(func=_ingest)
+
+    embed_parser = subparsers.add_parser(
+        "embed",
+        help="embed every stored item without a vector yet (T20)",
+    )
+    embed_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    embed_parser.add_argument(
+        "--config",
+        type=Path,
+        default=embed.DEFAULT_EMBED_CONFIG_PATH,
+        help=f"embedding config (default: {embed.DEFAULT_EMBED_CONFIG_PATH})",
+    )
+    embed_parser.add_argument(
+        "--db",
+        type=Path,
+        default=embed.DEFAULT_VECTORS_DB_PATH,
+        help=f"vectors SQLite file (default: {embed.DEFAULT_VECTORS_DB_PATH})",
+    )
+    embed_parser.set_defaults(func=_embed)
 
     db_parser = subparsers.add_parser(
         "db", help="the SQLite cache built from the data root"

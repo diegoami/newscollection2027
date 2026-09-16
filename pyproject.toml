@@ -7,6 +7,11 @@ requires-python = ">=3.12"
 dependencies = [
     "feedparser>=6.0.14",
     "pyyaml>=6.0.3",
+    # T20 (nc.embed): a static sentence-embedding model, not
+    # sentence-transformers/torch or fastembed/onnxruntime -- see
+    # src/nc/embed.py's module docstring and config/embed.yaml for the
+    # cost reasoning.
+    "model2vec>=0.9.0",
 ]
 
 [project.scripts]

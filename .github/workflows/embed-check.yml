@@ -1,0 +1,101 @@
+name: embed-check
+
+# T20. Downloads the real embedding model and asserts the same two
+# inputs produce byte-identical vectors across two *separate* process
+# invocations. This sandbox has no egress to huggingface.co, hf.co or
+# the LFS CDN, so this is where T20's actual acceptance criterion --
+# "same input gives the same vector across runs" -- gets demonstrated;
+# see src/nc/embed.py's module docstring and tests/test_embed.py, which
+# prove everything else (storage, idempotence) against a deterministic
+# fake backend instead. Modelled on feeds-check.yml, the other check
+# this repo cannot run inside the sandbox.
+
+on:
+  push:
+    branches: ["claude/**", "feat/**"]
+    paths:
+      - "config/embed.yaml"
+      - "src/nc/embed.py"
+      - ".github/workflows/embed-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  # Not `check`: T03 registers the bare `check` as the required status
+  # check on main, and GitHub matches check runs by name. A slow model
+  # download or a transient Hugging Face outage must never be able to
+  # post a red `check` and block an unrelated PR from merging --
+  # feeds-check.yml names its job `feeds` for the identical reason.
+  embed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      # Keyed on config/embed.yaml so a model id change busts the
+      # cache automatically. This is the directory nc.embed.
+      # Model2VecBackend points HF_HOME at (config/embed.yaml's
+      # model_dir); docs/WORKFLOW.md: "The embedding model is cached
+      # between runs with actions/cache" -- T21 will need it warm every
+      # three hours once nc cluster calls nc.embed too.
+      - name: Cache the embedding model
+        uses: actions/cache@v5
+        with:
+          path: .cache/hf-models
+          key: embed-model-${{ hashFiles('config/embed.yaml') }}
+
+      # Two separate `uv run python` invocations, not two calls inside
+      # one script: a single process can share hidden state (a warm
+      # tokenizer cache, a module-level singleton) that would make
+      # "deterministic" look true even if it weren't. Separate
+      # processes is the honest test of T20's AC.
+      - name: Write the determinism check script
+        run: |
+          cat > /tmp/embed_check.py <<'PY'
+          import json
+
+          from nc.embed import Model2VecBackend, load_embed_config
+
+          # The two items named in T20's AC ("test with two items"),
+          # short tech-news headlines like the real input
+          # (title + " " + lede) this model actually sees.
+          TEXTS = [
+              "SpaceX launches new rocket Starship on a test flight "
+              "that reached orbit for the first time.",
+              "Apple unveils new iPhone with a faster chip and an "
+              "improved camera system for low-light photos.",
+          ]
+
+
+          def main() -> None:
+              config = load_embed_config()
+              backend = Model2VecBackend(config)
+              vectors = backend.embed(TEXTS)
+              print(json.dumps(vectors))
+
+
+          if __name__ == "__main__":
+              main()
+          PY
+
+      - name: Encode the two inputs (first process)
+        run: uv run python /tmp/embed_check.py > /tmp/run1.json
+
+      - name: Encode the same two inputs again (second process)
+        run: uv run python /tmp/embed_check.py > /tmp/run2.json
+
+      - name: Assert byte-identical vectors across the two processes
+        run: |
+          diff /tmp/run1.json /tmp/run2.json
+          echo "embed-check: same input produced byte-identical vectors across two separate process invocations"

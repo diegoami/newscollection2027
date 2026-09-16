@@ -1,0 +1,32 @@
+# Local sentence-embedding model for nc.embed / `nc embed`.
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code." A new file rather than adding to config/feeds.yaml because
+# embedding is a separate component with its own cache directory and
+# batch size, not another feed threshold.
+#
+# model_id: a `model2vec` static sentence-embedding model -- free,
+# deterministic, no API, no torch, no onnxruntime. docs/ARCHITECTURE.md's
+# cost model rules out a transformer + torch stack: ingest and clustering
+# must stay free on a GitHub Actions runner that fires every three hours
+# (docs/PLAN.md T13), and `sentence-transformers` would pull hundreds of
+# MB to over a GB of torch onto that runner on every cold cache. See
+# src/nc/embed.py's module docstring for the full comparison, including
+# why the ONNX-runtime alternative (`fastembed`) was rejected too.
+model_id: "minishlab/potion-base-8M"
+
+# Where model weights are cached (HF_HOME, set by
+# nc.embed.Model2VecBackend before model2vec/huggingface_hub is
+# imported). Under .cache/ like nc.sqlite -- gitignored, never
+# committed -- and cached between runs with actions/cache in
+# .github/workflows/embed-check.yml (and, once T21 wires embedding into
+# ingest.yml, there too), so a cold-start download only happens when
+# that cache misses.
+model_dir: ".cache/hf-models"
+
+# Sentences per model2vec `encode()` call. model2vec's own default is
+# 1024; this project embeds items from a four-day clustering window and
+# roughly fifty clusters a night (docs/ARCHITECTURE.md's cost model), so
+# a smaller batch keeps peak memory flat without costing meaningful
+# throughput on that volume.
+batch_size: 64
