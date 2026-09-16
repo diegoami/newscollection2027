@@ -2,9 +2,13 @@
 
 ## Status
 
-Bootstrap documents committed. Storage decided (separate data repo, see
-`docs/DECISIONS.md`). Next session starts with T01; T03 is the owner's
-prerequisite for merging it. Nothing else is in progress.
+Bootstrap documents merged. Storage decided (separate data repo, see
+`docs/DECISIONS.md`). Owner has applied the `main` ruleset and created
+the empty `newscollection2027-data` repository. Next session starts with
+T01 (repo skeleton with CI) and, in the same PR or the next, adds the
+`check` status check name to the ruleset. Remaining owner steps: enable
+GitHub Pages once `gh-pages` exists (T42) and create `DATA_REPO_TOKEN`
+before T13. Nothing else is in progress.
 
 Milestones are sequential. Tasks inside a milestone marked `[P]` can run
 in parallel with the other `[P]` tasks of the same milestone. Sizes:
@@ -26,11 +30,13 @@ acceptance criteria are shown in a merged PR.
   `docs/ARCHITECTURE.md`, `docs/WORKFLOW.md`, `CLAUDE.md`, skill stubs,
   PR template.
 - **T00 [owner, done]** Storage backend decided: separate data repository.
-- **T03 [owner]** Ruleset on `main`: PR required, required approvals
-  zero, block force pushes, restrict deletions; add the required status
-  check `check` once T01's CI workflow exists. Enable GitHub Pages from the `gh-pages` branch. Create
-  the public repository `newscollection2027-data` with an empty `main`
-  and no branch protection; only automation writes to it.
+- **T03 [owner, in progress]** Ruleset on `main` (done): PR required,
+  required approvals zero, block force pushes, restrict deletions. Data
+  repository `newscollection2027-data` created (done). Still to do: add
+  the required status check `check` once T01's CI workflow exists; enable
+  GitHub Pages from the `gh-pages` branch after T42; create a fine-grained
+  token with contents write on the data repository and store it as the
+  secret `DATA_REPO_TOKEN` before T13.
 - **T04 (S, size S)** Create one GitHub issue per task below with labels
   `milestone:Mx`, `size:x`, `model:S|O`.
 
