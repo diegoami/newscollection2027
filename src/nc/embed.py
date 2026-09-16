@@ -278,6 +278,40 @@ def get_vector(
     return _unpack(dim, blob)
 
 
+def load_vectors(
+    item_ids: Sequence[str], db_path: Path = DEFAULT_VECTORS_DB_PATH
+) -> dict[str, list[float]]:
+    """The stored vectors for `item_ids`, keyed by item id.
+
+    The bulk form of `get_vector`, added for T21: clustering a four-day
+    window asks for thousands of vectors at once, and `get_vector`
+    opens, prepares and closes a connection per call. Ids with no stored
+    vector are simply absent from the result -- the caller (nc.cluster)
+    reports them rather than treating a missing vector as an error,
+    because the ordinary cause is an item ingested after the last
+    `nc embed`.
+    """
+    unique = sorted(set(item_ids))
+    vectors: dict[str, list[float]] = {}
+    conn = _connect(db_path)
+    try:
+        # Chunked to stay well under SQLite's variable limit (999 by
+        # default in older builds) regardless of window size.
+        for start in range(0, len(unique), 500):
+            chunk = unique[start : start + 500]
+            placeholders = ",".join("?" * len(chunk))
+            rows = conn.execute(
+                "SELECT item_id, dim, vector FROM vectors "
+                f"WHERE item_id IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            for item_id, dim, blob in rows:
+                vectors[str(item_id)] = _unpack(int(dim), bytes(blob))
+    finally:
+        conn.close()
+    return vectors
+
+
 @dataclass(frozen=True)
 class EmbedResult:
     embedded: int

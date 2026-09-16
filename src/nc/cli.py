@@ -1,9 +1,9 @@
 """Command-line interface for nc.
 
-Subcommands (`cluster`, `pending`, `validate`, `analyze`, `build`,
-`nightly`) are added by the tasks in `docs/PLAN.md` that implement them.
-`feeds check` is wired here by T10; `ingest`, `db rebuild` and
-`sync pull|push` are wired here by T12.
+Subcommands (`pending`, `validate`, `analyze`, `build`, `nightly`) are
+added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
+is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
+T12; `embed` by T20; `cluster` by T21.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import feedparser
 
-from nc import __version__, embed, feeds, store, sync
+from nc import __version__, cluster, embed, feeds, store, sync
 from nc.store import DataRoot
 
 
@@ -83,6 +83,22 @@ def _embed(args: argparse.Namespace) -> int:
         f"embed: {result.embedded} item(s) embedded, "
         f"{result.already_stored} already had a vector"
     )
+    return 0
+
+
+def _cluster(args: argparse.Namespace) -> int:
+    """Link the four-day window into clusters and queue the new ones.
+
+    Deliberately does not embed anything: `nc embed` (T20) owns the
+    model and is run before this in .github/workflows/ingest.yml, so
+    clustering stays pure numpy and never needs the model to be
+    loadable. Items ingested since the last `nc embed` therefore have no
+    vector yet; they cannot link, and the summary says how many.
+    """
+    data_root = _data_root(args)
+    config = cluster.load_cluster_config(args.config)
+    report = cluster.run_clustering(data_root, config, args.db)
+    print(cluster.format_report(report, config))
     return 0
 
 
@@ -195,6 +211,27 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"vectors SQLite file (default: {embed.DEFAULT_VECTORS_DB_PATH})",
     )
     embed_parser.set_defaults(func=_embed)
+
+    cluster_parser = subparsers.add_parser(
+        "cluster",
+        help="link the four-day window into clusters and queue new ones (T21)",
+    )
+    cluster_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    cluster_parser.add_argument(
+        "--config",
+        type=Path,
+        default=cluster.DEFAULT_CLUSTER_CONFIG_PATH,
+        help=f"clustering config (default: {cluster.DEFAULT_CLUSTER_CONFIG_PATH})",
+    )
+    cluster_parser.add_argument(
+        "--db",
+        type=Path,
+        default=embed.DEFAULT_VECTORS_DB_PATH,
+        help=f"vectors SQLite file (default: {embed.DEFAULT_VECTORS_DB_PATH})",
+    )
+    cluster_parser.set_defaults(func=_cluster)
 
     db_parser = subparsers.add_parser(
         "db", help="the SQLite cache built from the data root"

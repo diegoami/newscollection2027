@@ -1,7 +1,8 @@
 name: ingest
 
-# T13. Every three hours: pull the data repo, fetch feeds, (later) cluster
-# them, and push back only if something changed. See docs/WORKFLOW.md,
+# T13, extended by T21. Every three hours: pull the data repo, fetch
+# feeds, embed and cluster them, and push back only if something
+# changed. See docs/WORKFLOW.md,
 # "Every three hours: ingest", and docs/ARCHITECTURE.md's runtime
 # topology diagram.
 #
@@ -103,14 +104,46 @@ jobs:
 
       - run: uv run nc ingest
 
-      # T21 (M2) implements `nc cluster`; nothing does yet. This step is
-      # deliberately kept in the workflow, disabled, rather than left
-      # out, so the pending wiring is visible instead of silently
-      # forgotten. Flip `if: false` to `if: true` (or delete the guard)
-      # once T21 lands.
-      - name: nc cluster (pending T21 -- not implemented yet)
-        if: false
-        run: uv run nc cluster
+      # T21. Clustering needs vectors and nothing in this workflow
+      # produced them before, so `nc embed` (T20) runs here, between
+      # ingest and cluster: ingest appends the new items, embed gives
+      # them vectors, cluster links them. `nc cluster` deliberately does
+      # not embed anything itself (see src/nc/cluster.py and nc.cli's
+      # `_cluster`), so if this step is ever removed or fails, clustering
+      # does not silently produce empty output -- it reports the items it
+      # had no vector for.
+      #
+      # Both caches are keyed on config/embed.yaml, so changing the model
+      # id busts them and nothing is reused across models.
+      #
+      # The model cache mirrors embed-check.yml's, which is what
+      # docs/WORKFLOW.md means by "The embedding model is cached between
+      # runs with actions/cache": without it this job downloads the model
+      # again every three hours.
+      - name: Cache the embedding model
+        uses: actions/cache@v5
+        with:
+          path: .cache/hf-models
+          key: embed-model-${{ hashFiles('config/embed.yaml') }}
+
+      # The vector cache is a different shape: it grows, so it needs a
+      # key that changes every run plus a restore-key prefix to load the
+      # newest previous one (actions/cache entries are immutable -- a
+      # fixed key would be written once and never updated again).
+      # .cache/vectors.sqlite is never committed (CLAUDE.md: SQLite lives
+      # in .cache/), and it is only a cache: a miss costs a re-embed of
+      # the stored items, not wrong output.
+      - name: Cache the item vectors
+        uses: actions/cache@v5
+        with:
+          path: .cache/vectors.sqlite
+          key: vectors-${{ hashFiles('config/embed.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            vectors-${{ hashFiles('config/embed.yaml') }}-
+
+      - run: uv run nc embed
+
+      - run: uv run nc cluster
 
       # `nc sync push` (T12) already does exactly step 5 of the task:
       # it commits and pushes only when `git status --porcelain` on the
