@@ -32,7 +32,11 @@ jobs:
       - name: Probe every candidate feed
         run: uv run --no-project --with feedparser --with pyyaml python scripts/probe_feeds.py
 
-      - uses: actions/upload-artifact@v4
+      - name: Print the full report
+        if: always()
+        run: cat feed-probe.json
+
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: feed-probe
