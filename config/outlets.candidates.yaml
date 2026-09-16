@@ -1,0 +1,1436 @@
+# Outlet candidates for newscollection2027.
+#
+# Compiled 2026-09-16 by T09. THE FEEDS WERE NOT FETCHED.
+# The session that compiled this ran behind an egress proxy that
+# denied CONNECT to all 42 candidate hosts, so every field under
+# `measurement` is null and `measured` is false everywhere. The
+# scores under `scores` are editorial priors, not measurements.
+# See docs/OUTLETS.md for the method, the evidence and the caveats.
+#
+# T10 fills the `measurement` blocks with `nc feeds check` and
+# rescores before generating config/outlets.yaml. Treat every
+# number here as unverified until it does.
+
+compiled_on: 2026-09-16
+measured_on: null
+measured: false
+measurement_blocked_reason: >-
+  organization egress policy denied CONNECT to every candidate
+  host (HTTP 403 from the egress proxy, curl exit 56) and the
+  WebFetch path returned EGRESS_BLOCKED for the same hosts
+
+scoring:
+  max_score: 60
+  gate: has_lede
+  weights:
+    lede: 4
+    overlap: 3
+    volume: 2
+    reachability: 1
+    canonical: 1
+    terms: 1
+
+candidates:
+  - slug: theverge
+    display_name: "The Verge"
+    homepage: "https://www.theverge.com/"
+    feed_urls:
+      - url: "https://www.theverge.com/rss/index.xml"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 5
+      overlap: 5
+      volume: 5
+      reachability: 5
+      canonical: 4
+      terms: 3
+    score: 57
+    score_basis: prior
+    recommended: true
+    reason: "highest-volume generalist, overlaps with everything else"
+    note: "publishes a feed index; per-section feeds also exist"
+  - slug: arstechnica
+    display_name: "Ars Technica"
+    homepage: "https://arstechnica.com/"
+    feed_urls:
+      - url: "https://arstechnica.com/feed/"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 5
+      overlap: 5
+      volume: 4
+      reachability: 5
+      canonical: 4
+      terms: 3
+    score: 55
+    score_basis: prior
+    recommended: true
+    reason: "broad daily coverage, entries carry a real summary paragraph"
+    note: "old project scraped the homepage; the site-wide /feed/ replaces it"
+  - slug: theregister
+    display_name: "The Register"
+    homepage: "https://www.theregister.com/"
+    feed_urls:
+      - url: "https://www.theregister.com/headlines.atom"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 5
+      overlap: 4
+      volume: 4
+      reachability: 5
+      canonical: 5
+      terms: 4
+    score: 54
+    score_basis: prior
+    recommended: true
+    reason: "enterprise and security with a distinctly different framing"
+    note: "publishes a feeds page; Atom, clean links, no feed wrapper"
+  - slug: engadget
+    display_name: "Engadget"
+    homepage: "https://www.engadget.com/"
+    feed_urls:
+      - url: "https://www.engadget.com/rss.xml"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 5
+      volume: 4
+      reachability: 4
+      canonical: 3
+      terms: 3
+    score: 49
+    score_basis: prior
+    recommended: true
+    reason: "consumer and platform news, same beats as Verge and Ars"
+    note: "Yahoo-owned; links have carried tracking suffixes in the past"
+  - slug: techcrunch
+    display_name: "TechCrunch"
+    homepage: "https://techcrunch.com/"
+    feed_urls:
+      - url: "https://techcrunch.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 5
+      volume: 4
+      reachability: 4
+      canonical: 3
+      terms: 3
+    score: 49
+    score_basis: prior
+    recommended: true
+    reason: "startup, funding and AI beat that the others follow same-day"
+    note: "not in the old project; an obvious gap in that list"
+  - slug: theguardian
+    display_name: "The Guardian (Technology)"
+    homepage: "https://www.theguardian.com/technology"
+    feed_urls:
+      - url: "https://www.theguardian.com/uk/technology/rss"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 4
+      volume: 3
+      reachability: 5
+      canonical: 5
+      terms: 4
+    score: 48
+    score_basis: prior
+    recommended: true
+    reason: "general-press framing of the stories the trade press runs"
+    note: "old project scraped the whole site; the section feed is the fit"
+  - slug: bleepingcomputer
+    display_name: "BleepingComputer"
+    homepage: "https://www.bleepingcomputer.com/"
+    feed_urls:
+      - url: "https://www.bleepingcomputer.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 4
+      volume: 3
+      reachability: 3
+      canonical: 4
+      terms: 3
+    score: 44
+    score_basis: prior
+    recommended: true
+    reason: "breach and malware stories that Register and ZDNET also run"
+    note: "bot protection is the main reachability risk; verify at T10"
+  - slug: wired
+    display_name: "WIRED"
+    homepage: "https://www.wired.com/"
+    feed_urls:
+      - url: "https://www.wired.com/feed/rss"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 4
+      volume: 3
+      reachability: 4
+      canonical: 3
+      terms: 2
+    score: 43
+    score_basis: prior
+    recommended: true
+    reason: "mainstream-analytical framing of the same platform stories"
+    note: "site is metered; the feed itself is public"
+  - slug: tomshardware
+    display_name: "Tom's Hardware"
+    homepage: "https://www.tomshardware.com/"
+    feed_urls:
+      - url: "https://www.tomshardware.com/feeds/all"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 3
+      volume: 4
+      reachability: 4
+      canonical: 3
+      terms: 2
+    score: 42
+    score_basis: prior
+    recommended: true
+    reason: "silicon and hardware stories shared with Ars and The Register"
+    note: "Future plc; feed has at times carried full article text"
+  - slug: bbc-technology
+    display_name: "BBC News (Technology)"
+    homepage: "https://www.bbc.com/news/technology"
+    feed_urls:
+      - url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 4
+      volume: 2
+      reachability: 5
+      canonical: 5
+      terms: 3
+    score: 41
+    score_basis: prior
+    recommended: true
+    reason: "low volume but only covers stories everyone else covers"
+    note: "descriptions are a single sentence; adds a non-US voice"
+  - slug: 404media
+    display_name: "404 Media"
+    homepage: "https://www.404media.co/"
+    feed_urls:
+      - url: "https://www.404media.co/rss/"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 5
+      overlap: 2
+      volume: 1
+      reachability: 4
+      canonical: 5
+      terms: 3
+    score: 40
+    score_basis: prior
+    recommended: false
+    reason: "excellent feed, too little volume to cluster reliably"
+    note: "breaks stories others follow; revisit once clustering is tuned"
+  - slug: nytimes-technology
+    display_name: "The New York Times (Technology)"
+    homepage: "https://www.nytimes.com/section/technology"
+    feed_urls:
+      - url: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 4
+      volume: 2
+      reachability: 4
+      canonical: 3
+      terms: 1
+    score: 40
+    score_basis: prior
+    recommended: false
+    reason: "good feed, but the terms of service restrict reuse"
+    note: "rejected on terms, not on feed quality; owner call if wanted"
+  - slug: zdnet
+    display_name: "ZDNET"
+    homepage: "https://www.zdnet.com/"
+    feed_urls:
+      - url: "https://www.zdnet.com/news/rss.xml"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 4
+      volume: 4
+      reachability: 4
+      canonical: 2
+      terms: 2
+    score: 40
+    score_basis: prior
+    recommended: true
+    reason: "wide overlap, but the feed carries deals and affiliate posts"
+    note: "lede quality is the weakest of the recommended set; check first"
+  - slug: cnet
+    display_name: "CNET"
+    homepage: "https://www.cnet.com/"
+    feed_urls:
+      - url: "https://www.cnet.com/rss/news/"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 4
+      volume: 4
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 39
+    score_basis: prior
+    recommended: false
+    reason: "consumer overlap is real, feed is dominated by buying guides"
+    note: "second reserve if the recommended set clusters too thinly"
+  - slug: techdirt
+    display_name: "Techdirt"
+    homepage: "https://www.techdirt.com/"
+    feed_urls:
+      - url: "https://www.techdirt.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 2
+      volume: 2
+      reachability: 4
+      canonical: 4
+      terms: 5
+    score: 39
+    score_basis: prior
+    recommended: false
+    reason: "commentary on the news rather than reporting of it"
+    note: "CC-licensed; worth a later experiment as a framing counterweight"
+  - slug: venturebeat
+    display_name: "VentureBeat"
+    homepage: "https://venturebeat.com/"
+    feed_urls:
+      - url: "https://venturebeat.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 3
+      volume: 2
+      reachability: 4
+      canonical: 3
+      terms: 2
+    score: 38
+    score_basis: prior
+    recommended: false
+    reason: "real AI and enterprise overlap, thin daily volume"
+    note: "closest call among the rejected; first reserve"
+  - slug: androidauthority
+    display_name: "Android Authority"
+    homepage: "https://www.androidauthority.com/"
+    feed_urls:
+      - url: "https://www.androidauthority.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 2
+      volume: 4
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 37
+    score_basis: prior
+    recommended: false
+    reason: "Android vertical, overlaps only inside that niche"
+  - slug: macrumors
+    display_name: "MacRumors"
+    homepage: "https://www.macrumors.com/"
+    feed_urls:
+      - url: "https://feeds.macrumors.com/MacRumors-All"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 2
+      volume: 3
+      reachability: 4
+      canonical: 2
+      terms: 2
+    score: 36
+    score_basis: prior
+    recommended: false
+    reason: "Apple vertical, feed served through a redirector"
+  - slug: neowin
+    display_name: "Neowin"
+    homepage: "https://www.neowin.net/"
+    feed_urls:
+      - url: "https://www.neowin.net/news/rss/"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 2
+      volume: 3
+      reachability: 3
+      canonical: 3
+      terms: 2
+    score: 36
+    score_basis: prior
+    recommended: false
+    reason: "solid feed, mostly Microsoft-adjacent, narrow overlap"
+  - slug: platformer
+    display_name: "Platformer"
+    homepage: "https://www.platformer.news/"
+    feed_urls:
+      - url: "https://www.platformer.news/rss/"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 5
+      overlap: 1
+      volume: 1
+      reachability: 4
+      canonical: 5
+      terms: 2
+    score: 36
+    score_basis: prior
+    recommended: false
+    reason: "newsletter cadence, a few posts a week, no cluster partners"
+  - slug: 9to5mac
+    display_name: "9to5Mac"
+    homepage: "https://9to5mac.com/"
+    feed_urls:
+      - url: "https://9to5mac.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 2
+      volume: 3
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 35
+    score_basis: prior
+    recommended: false
+    reason: "Apple vertical, overlaps only inside that niche"
+  - slug: gizmodo
+    display_name: "Gizmodo"
+    homepage: "https://gizmodo.com/"
+    feed_urls:
+      - url: "https://gizmodo.com/feed"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 3
+      volume: 3
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 34
+    score_basis: prior
+    recommended: false
+    reason: "newsroom churn and AI-written articles weaken it as a baseline"
+    note: "sold to Keleops in 2024; G/O ran AI-written English posts in 2025"
+  - slug: pcmag
+    display_name: "PCMag"
+    homepage: "https://www.pcmag.com/"
+    feed_urls:
+      - url: "https://www.pcmag.com/feeds/rss/latest"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 3
+      volume: 3
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 34
+    score_basis: prior
+    recommended: false
+    reason: "reviews-first mix, limited breaking-news overlap"
+    note: "old project used the UK edition; the US edition is the main one"
+  - slug: cnbc
+    display_name: "CNBC (Technology)"
+    homepage: "https://www.cnbc.com/technology/"
+    feed_urls:
+      - url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss25&id=19854910"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 3
+      volume: 3
+      reachability: 3
+      canonical: 2
+      terms: 1
+    score: 33
+    score_basis: prior
+    recommended: false
+    reason: "business framing, opaque feed endpoint, unclear terms"
+  - slug: digitaltrends
+    display_name: "Digital Trends"
+    homepage: "https://www.digitaltrends.com/"
+    feed_urls:
+      - url: "https://www.digitaltrends.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 2
+      volume: 4
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 33
+    score_basis: prior
+    recommended: false
+    reason: "high volume but mostly reviews, deals and how-to"
+  - slug: slashdot
+    display_name: "Slashdot"
+    homepage: "https://slashdot.org/"
+    feed_urls:
+      - url: "https://rss.slashdot.org/Slashdot/slashdotMain"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 1
+      volume: 3
+      reachability: 4
+      canonical: 1
+      terms: 3
+    score: 33
+    score_basis: prior
+    recommended: false
+    reason: "aggregator: its lede quotes other outlets, so it double-counts"
+    note: "structurally wrong for cross-outlet comparison, not a feed problem"
+  - slug: axios-technology
+    display_name: "Axios (Technology)"
+    homepage: "https://www.axios.com/technology"
+    feed_urls:
+      - url: "https://api.axios.com/feed/technology"
+        kind: section
+        source: search
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 3
+      volume: 2
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 32
+    score_basis: prior
+    recommended: false
+    reason: "short brevity ledes and an undocumented feed endpoint"
+    note: "close call; re-score if the endpoint proves stable at T10"
+  - slug: thehackernews
+    display_name: "The Hacker News"
+    homepage: "https://thehackernews.com/"
+    feed_urls:
+      - url: "https://feeds.feedburner.com/TheHackersNews"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 4
+      overlap: 2
+      volume: 2
+      reachability: 3
+      canonical: 1
+      terms: 2
+    score: 32
+    score_basis: prior
+    recommended: false
+    reason: "security-only overlap and FeedBurner link wrapping"
+  - slug: mashable
+    display_name: "Mashable"
+    homepage: "https://mashable.com/"
+    feed_urls:
+      - url: "https://mashable.com/feeds/rss/all"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 2
+      volume: 3
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 31
+    score_basis: prior
+    recommended: false
+    reason: "drifted to entertainment and deals, weak news overlap"
+  - slug: thenextweb
+    display_name: "TNW"
+    homepage: "https://thenextweb.com/"
+    feed_urls:
+      - url: "https://thenextweb.com/feed"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 2
+      volume: 2
+      reachability: 3
+      canonical: 3
+      terms: 2
+    score: 30
+    score_basis: prior
+    recommended: false
+    reason: "output shrank after the FT acquisition, European-events focus"
+  - slug: techrepublic
+    display_name: "TechRepublic"
+    homepage: "https://www.techrepublic.com/"
+    feed_urls:
+      - url: "https://www.techrepublic.com/rssfeeds/articles/"
+        kind: site
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 2
+      volume: 2
+      reachability: 3
+      canonical: 2
+      terms: 2
+    score: 29
+    score_basis: prior
+    recommended: false
+    reason: "B2B how-to and research, few same-day news overlaps"
+  - slug: businessinsider-tech
+    display_name: "Business Insider (Tech)"
+    homepage: "https://www.businessinsider.com/tech"
+    feed_urls:
+      - url: "https://www.businessinsider.com/sai/rss"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 2
+      overlap: 3
+      volume: 3
+      reachability: 2
+      canonical: 2
+      terms: 1
+    score: 28
+    score_basis: prior
+    recommended: false
+    reason: "hard paywall and truncated feed entries"
+  - slug: digit-fyi
+    display_name: "DIGIT"
+    homepage: "https://www.digit.fyi/"
+    feed_urls:
+      - url: "https://www.digit.fyi/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 1
+      volume: 1
+      reachability: 3
+      canonical: 3
+      terms: 2
+    score: 25
+    score_basis: prior
+    recommended: false
+    reason: "Scottish regional B2B and events, no global story overlap"
+    note: "alive and publishing, simply the wrong scope for this product"
+  - slug: forbes
+    display_name: "Forbes (Innovation)"
+    homepage: "https://www.forbes.com/innovation/"
+    feed_urls:
+      - url: "https://www.forbes.com/innovation/feed2/"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 2
+      overlap: 2
+      volume: 3
+      reachability: 2
+      canonical: 2
+      terms: 1
+    score: 25
+    score_basis: prior
+    recommended: false
+    reason: "contributor network, low and uneven signal"
+  - slug: inverse
+    display_name: "Inverse"
+    homepage: "https://www.inverse.com/"
+    feed_urls:
+      - url: "https://www.inverse.com/rss"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 3
+      overlap: 1
+      volume: 2
+      reachability: 2
+      canonical: 2
+      terms: 1
+    score: 24
+    score_basis: prior
+    recommended: false
+    reason: "pivoted to science, gaming and culture after the BDG changes"
+  - slug: inquisitr
+    display_name: "The Inquisitr"
+    homepage: "https://www.inquisitr.com/"
+    feed_urls:
+      - url: "https://www.inquisitr.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 2
+      overlap: 1
+      volume: 3
+      reachability: 2
+      canonical: 1
+      terms: 1
+    score: 21
+    score_basis: prior
+    recommended: false
+    reason: "celebrity and clickbait aggregation, barely tech at all"
+    note: "still publishing in 2026, which is the only point in its favour"
+  - slug: qz
+    display_name: "Quartz"
+    homepage: "https://qz.com/"
+    feed_urls:
+      - url: "https://qz.com/rss"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 2
+      overlap: 1
+      volume: 2
+      reachability: 3
+      canonical: 2
+      terms: 1
+    score: 21
+    score_basis: prior
+    recommended: false
+    reason: "AI-written articles after the 2025 sale, not a usable baseline"
+    note: "comparing another outlet's claims against generated text is void"
+  - slug: techtimes
+    display_name: "Tech Times"
+    homepage: "https://www.techtimes.com/"
+    feed_urls:
+      - url: "https://www.techtimes.com/rss/sections/tech.xml"
+        kind: section
+        source: documented
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 2
+      overlap: 1
+      volume: 3
+      reachability: 2
+      canonical: 1
+      terms: 1
+    score: 21
+    score_basis: prior
+    recommended: false
+    reason: "rewrites other outlets, adds no independent claim"
+  - slug: inc
+    display_name: "Inc."
+    homepage: "https://www.inc.com/"
+    feed_urls:
+      - url: "https://www.inc.com/rss/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 2
+      overlap: 1
+      volume: 2
+      reachability: 2
+      canonical: 2
+      terms: 1
+    score: 20
+    score_basis: prior
+    recommended: false
+    reason: "small-business advice, not tech news"
+  - slug: technicalhint
+    display_name: "Technical Hint"
+    homepage: "https://www.technicalhint.com/"
+    feed_urls:
+      - url: "https://www.technicalhint.com/feed/"
+        kind: site
+        source: convention
+        verified_by_fetch: false
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 1
+      overlap: 0
+      volume: 1
+      reachability: 1
+      canonical: 1
+      terms: 1
+    score: 9
+    score_basis: prior
+    recommended: false
+    reason: "marginal SEO blog with no newsroom"
+  - slug: recode
+    display_name: "Recode"
+    homepage: "https://www.vox.com/technology"
+    feed_urls: []
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 0
+      overlap: 0
+      volume: 0
+      reachability: 0
+      canonical: 0
+      terms: 0
+    score: 0
+    score_basis: prior
+    recommended: false
+    reason: "brand retired into Vox.com in 2023, no feed of its own"
+    note: "dead candidate; Vox technology is a different outlet, not scored"
+  - slug: reuters
+    display_name: "Reuters (Technology)"
+    homepage: "https://www.reuters.com/technology/"
+    feed_urls: []
+    measurement:
+      measured: false
+      measured_at: null
+      http_status: null
+      reachable: null
+      entries_per_fetch: null
+      has_lede: null
+      lede_words_median: null
+      lede_equals_title: null
+      items_per_day: null
+      newest_entry: null
+      canonical_links_clean: null
+      tracking_params_seen: []
+      terms: not_checked
+    scores:
+      lede: 0
+      overlap: 0
+      volume: 0
+      reachability: 0
+      canonical: 0
+      terms: 0
+    score: 0
+    score_basis: prior
+    recommended: false
+    reason: "public RSS withdrawn around 2020, syndication is a paid product"
+    note: "dead candidate for our purposes; no free feed to ingest"
