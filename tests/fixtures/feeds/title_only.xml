@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Title-Only Feed</title>
+    <link>https://example.com/</link>
+    <description>Every entry repeats its title as the description.</description>
+    <item>
+      <title>Startup raises new funding round for expansion</title>
+      <link>https://example.com/story-1</link>
+      <description>Startup raises new funding round for expansion</description>
+      <pubDate>Mon, 05 Jan 2026 09:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Regulator opens inquiry into platform practices today</title>
+      <link>https://example.com/story-2</link>
+      <description>Regulator opens inquiry into platform practices today</description>
+      <pubDate>Sun, 04 Jan 2026 15:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Chipmaker unveils next generation processor design</title>
+      <link>https://example.com/story-3</link>
+      <description>Chipmaker unveils next generation processor design</description>
+      <pubDate>Sat, 03 Jan 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

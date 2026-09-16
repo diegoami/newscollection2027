@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Tracked Links Feed</title>
+    <link>https://example.com/</link>
+    <description>Entry links carry BBC-shaped tracking parameters, not utm_.</description>
+    <item>
+      <title>Regulator opens inquiry into platform practices</title>
+      <link>https://example.com/story-1?at_campaign=64&amp;at_medium=custom7</link>
+      <description>Officials said the review will examine how the
+      company ranks search results against its own competing products.</description>
+      <pubDate>Mon, 05 Jan 2026 09:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Chipmaker unveils next generation processor</title>
+      <link>https://example.com/story-2?at_campaign=64&amp;at_medium=custom7</link>
+      <description>The new chip promises a large jump in performance
+      per watt compared with the previous generation, the company said.</description>
+      <pubDate>Sun, 04 Jan 2026 15:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Browser update patches critical vulnerability</title>
+      <link>https://example.com/story-3?at_campaign=64&amp;at_medium=custom7</link>
+      <description>Security researchers found the flaw could let an
+      attacker run code remotely, and the fix is rolling out automatically.</description>
+      <pubDate>Sat, 03 Jan 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,22 @@
+# Thresholds for nc.feeds / `nc feeds check`.
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code." These are the gate scripts/probe_feeds.py used for T09's
+# measurement, unchanged, now loaded rather than hardcoded.
+#
+# lede_min_median_words, lede_max_equal_title_share: a feed passes the
+# lede gate when its entries' median lede is at least this many words
+# and fewer than this share of entries have a lede identical to the
+# title. docs/OUTLETS.md: "has_lede: median lede at least 8 words and
+# fewer than half the entries with a lede equal to the title."
+#
+# stale_after_hours: a feed fails when its newest entry is older than
+# this. 168h (one week) comfortably covers the slowest member of the
+# recommended set (BBC Technology, 17.2h median gap between entries at
+# T09's measurement) while still catching a feed that has stopped
+# publishing, such as Inquisitr (newest entry 376.8h old at the same
+# measurement).
+user_agent: "newscollection2027/0.1 (+feed check)"
+lede_min_median_words: 8
+lede_max_equal_title_share: 0.5
+stale_after_hours: 168
