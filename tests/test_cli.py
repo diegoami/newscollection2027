@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from importlib import metadata
 from pathlib import Path
 
@@ -123,3 +124,112 @@ def test_feeds_check_json_output_is_parseable(
     healthy = next(row for row in payload if row["slug"] == "healthy")
     assert healthy["ok"] is True
     assert healthy["measurement"]["entries"] == 5
+
+
+# --- T12: nc ingest / nc db rebuild / nc sync pull|push --------------------
+
+
+def test_db_rebuild_reports_the_item_count(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    outlets_path = tmp_path / "outlets.yaml"
+    outlets_path.write_text(
+        "outlets:\n"
+        "  - slug: healthy\n"
+        "    display_name: Healthy\n"
+        "    homepage: https://example.com/\n"
+        f"    feed_url: {FIXTURES / 'healthy.xml'}\n"
+    )
+    thresholds_path = tmp_path / "feeds.yaml"
+    thresholds_path.write_text(
+        "user_agent: test-agent\n"
+        "lede_min_median_words: 8\n"
+        "lede_max_equal_title_share: 0.5\n"
+        "stale_after_hours: 1000000\n"
+        "lede_word_cap: 60\n"
+    )
+    data_root = tmp_path / "data-root"
+    db_path = tmp_path / "cache" / "nc.sqlite"
+
+    exit_code = main(
+        [
+            "ingest",
+            "--outlets",
+            str(outlets_path),
+            "--thresholds",
+            str(thresholds_path),
+            "--data-root",
+            str(data_root),
+        ]
+    )
+    assert exit_code == 0
+    capsys.readouterr()
+
+    exit_code = main(
+        [
+            "db",
+            "rebuild",
+            "--data-root",
+            str(data_root),
+            "--db",
+            str(db_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert db_path.exists()
+    out = capsys.readouterr().out
+    assert "5 item(s)" in out  # healthy.xml has 5 entries
+
+
+def test_sync_pull_then_push_against_a_local_bare_repo(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    remote = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(remote)],
+        check=True,
+        capture_output=True,
+    )
+    config_path = tmp_path / "sync.yaml"
+    config_path.write_text(f"repo_url: {remote}\nbranch: main\n")
+    data_root = tmp_path / "data-root"
+
+    exit_code = main(
+        [
+            "sync",
+            "pull",
+            "--data-root",
+            str(data_root),
+            "--config",
+            str(config_path),
+        ]
+    )
+    assert exit_code == 0
+    assert (data_root / ".git").exists()
+
+    (data_root / "hello.txt").write_text("hi\n")
+
+    exit_code = main(
+        [
+            "sync",
+            "push",
+            "--data-root",
+            str(data_root),
+            "--config",
+            str(config_path),
+            "--message",
+            "test push",
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "pushed" in out
+
+    log = subprocess.run(
+        ["git", "-C", str(data_root), "log", "--format=%s"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert log.stdout.strip() == "data: test push"

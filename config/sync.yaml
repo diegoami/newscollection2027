@@ -1,0 +1,7 @@
+# The data repository `nc sync pull|push` clones/pulls/commits/pushes.
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code." docs/DECISIONS.md: storage option B, a separate public
+# repository holding the data/** tree.
+repo_url: "https://github.com/diegoami/newscollection2027-data.git"
+branch: "main"
