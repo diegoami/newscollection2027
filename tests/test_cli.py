@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from nc import __version__
+from nc import __version__, embed
 from nc.cli import main
 
 FIXTURES = Path(__file__).parent / "fixtures" / "feeds"
@@ -266,3 +266,95 @@ def test_sync_push_output_strings_are_exact(
 
     assert main(["sync", "push", *argv, "--message", "data: test"]) == 0
     assert capsys.readouterr().out.strip() == "sync push: nothing changed"
+
+
+# --- T20: nc embed -----------------------------------------------------
+#
+# `Model2VecBackend` (the real model) needs Hugging Face egress this
+# sandbox does not have, so these tests monkeypatch `nc.cli.embed.
+# Model2VecBackend` -- the one place production code chooses a backend
+# (see `nc.cli._embed`) -- with a fake that wraps the network-free
+# `HashBackend`. That proves the CLI wiring (arg parsing, exit code,
+# the printed summary, --data-root/--config/--db plumbing) without
+# touching the real model; nc/test_embed.py covers the storage logic
+# this delegates to, and .github/workflows/embed-check.yml covers the
+# real model's determinism.
+
+
+class _FakeModel2VecBackend:
+    def __init__(self, config: embed.EmbedConfig) -> None:
+        self.config = config
+        self._backend = embed.HashBackend()
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return self._backend.embed(texts)
+
+
+def _write_embed_config(tmp_path: Path) -> Path:
+    path = tmp_path / "embed.yaml"
+    path.write_text(
+        f"model_id: fake-model\nmodel_dir: {tmp_path / 'hf-cache'}\nbatch_size: 10\n"
+    )
+    return path
+
+
+def test_embed_reports_embedded_and_already_stored_counts(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("nc.cli.embed.Model2VecBackend", _FakeModel2VecBackend)
+
+    outlets_path = tmp_path / "outlets.yaml"
+    outlets_path.write_text(
+        "outlets:\n"
+        "  - slug: healthy\n"
+        "    display_name: Healthy\n"
+        "    homepage: https://example.com/\n"
+        f"    feed_url: {FIXTURES / 'healthy.xml'}\n"
+    )
+    thresholds_path = tmp_path / "feeds.yaml"
+    thresholds_path.write_text(
+        "user_agent: test-agent\n"
+        "lede_min_median_words: 8\n"
+        "lede_max_equal_title_share: 0.5\n"
+        "stale_after_hours: 1000000\n"
+        "lede_word_cap: 60\n"
+    )
+    data_root = tmp_path / "data-root"
+    ingest_argv = [
+        "ingest",
+        "--outlets",
+        str(outlets_path),
+        "--thresholds",
+        str(thresholds_path),
+        "--data-root",
+        str(data_root),
+    ]
+    assert main(ingest_argv) == 0
+    capsys.readouterr()
+
+    embed_config_path = _write_embed_config(tmp_path)
+    db_path = tmp_path / "cache" / "vectors.sqlite"
+    embed_argv = [
+        "embed",
+        "--data-root",
+        str(data_root),
+        "--config",
+        str(embed_config_path),
+        "--db",
+        str(db_path),
+    ]
+
+    exit_code = main(embed_argv)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "5 item(s) embedded" in out  # healthy.xml has 5 entries
+    assert "0 already had a vector" in out
+
+    # Re-running embeds nothing new -- the items already have vectors.
+    exit_code_2 = main(embed_argv)
+    assert exit_code_2 == 0
+    out_2 = capsys.readouterr().out
+    assert "0 item(s) embedded" in out_2
+    assert "5 already had a vector" in out_2
