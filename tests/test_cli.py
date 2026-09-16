@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from importlib import metadata
+
 import pytest
 
 from nc import __version__
@@ -42,3 +44,8 @@ def test_unknown_command_does_not_crash(
 
     assert excinfo.value.code != 0
     assert excinfo.value.code == 2
+
+
+def test_version_matches_package_metadata() -> None:
+    """__version__ and the version in pyproject.toml must not drift apart."""
+    assert metadata.version("newscollection2027") == __version__
