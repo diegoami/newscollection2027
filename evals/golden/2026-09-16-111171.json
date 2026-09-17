@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "eb1a3b213e0d808fff038cdae98b91272fc2a8a0",
+    "id": "2026-09-16-111171",
+    "items": [
+      {
+        "item_id": "eb1a3b213e0d808fff038cdae98b91272fc2a8a0",
+        "lede": "Fun camera features help make these candy bar iPhones stand out from the dazzle of the folding iPhone Duo.",
+        "outlet": "wired",
+        "published": "2026-09-16T12:00:00Z",
+        "title": "Apple iPhone 18 Pro and iPhone 18 Pro Max Review: For Camera Fiends"
+      },
+      {
+        "item_id": "f937f79832503b340182d85c29f2e5efefd8a1e8",
+        "lede": "Last week, Apple announced an iPhone unlike any it has made in the past. An iPhone that has seemingly already led several other phone manufacturers to pursue entirely different designs for their flagship products. A remarkably distinct device with the kind of \"I can't believe they did that\" software touches that Apple sometimes pulls off [\u2026]",
+        "outlet": "theverge",
+        "published": "2026-09-16T12:00:00Z",
+        "title": "The iPhone 18 Pro\u2019s big camera update is all about the small gains"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "framing",
+      "note": "Wired frames the camera features as standout; The Verge as 'all about the small gains'.",
+      "outlets": [
+        "wired",
+        "theverge"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

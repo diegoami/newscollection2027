@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "1c819a001b237acd3e449763bf4c5f990136a355",
+    "id": "2026-09-15-9abcd4",
+    "items": [
+      {
+        "item_id": "1c819a001b237acd3e449763bf4c5f990136a355",
+        "lede": "Attackers already exploiting the critical flaw, and Cisco warns they may be able to cover their tracks once they're in",
+        "outlet": "theregister",
+        "published": "2026-09-15T16:01:00Z",
+        "title": "Cisco email security boxes can be rooted by... an email"
+      },
+      {
+        "item_id": "7238e34645fcb6eef20727ead814deb036641c47",
+        "lede": "Cisco has released security updates to address a maximum-severity Identity Services Engine vulnerability that attackers are actively exploiting in the wild. [...]",
+        "outlet": "bleepingcomputer",
+        "published": "2026-09-17T07:20:54Z",
+        "title": "Cisco warns of max severity ISE zero-day exploited in attacks"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "The two name different Cisco products -- email security appliances against Identity Services Engine. SEE source note: this cluster may be wrongly grouped.",
+      "outlets": [
+        "theregister",
+        "bleepingcomputer"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

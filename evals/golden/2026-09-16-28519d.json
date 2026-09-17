@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "933ca83973d0dec89de3e3e678727aae6bc9eb03",
+    "id": "2026-09-16-28519d",
+    "items": [
+      {
+        "item_id": "933ca83973d0dec89de3e3e678727aae6bc9eb03",
+        "lede": "According to The Information, Apple is planning to get back into the server game and might just pair up with Nvidia to make it happen. Apple retired its Xserve line in 2011 and has largely left enterprise machines to other manufacturers since. But the growing demand for compute power as the AI industry continues to [\u2026]",
+        "outlet": "theverge",
+        "published": "2026-09-16T17:20:29Z",
+        "title": "Apple might make servers again to cash in on the AI rush"
+      },
+      {
+        "item_id": "00f56e1b1eec192bfadc6ddee9f0ac7e49e49122",
+        "lede": "Planned 2029 debut could make this Apple\u2019s first enterprise server in decades.",
+        "outlet": "arstechnica",
+        "published": "2026-09-16T22:02:46Z",
+        "title": "Apple reportedly building server packed with M-series Ultra chips for AI"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "Ars Technica gives a 2029 debut and M-series Ultra chips; The Verge reports a possible Nvidia pairing.",
+      "outlets": [
+        "arstechnica",
+        "theverge"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

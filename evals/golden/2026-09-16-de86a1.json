@@ -1,0 +1,50 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "26ddd6d19e52f28aa86db66cee94430fd20883c6",
+    "id": "2026-09-16-de86a1",
+    "items": [
+      {
+        "item_id": "26ddd6d19e52f28aa86db66cee94430fd20883c6",
+        "lede": "Anthropic is initially releasing these features to Pro and Max plan subscribers.",
+        "outlet": "techcrunch",
+        "published": "2026-09-16T16:30:00Z",
+        "title": "Anthropic merges Claude chat and Cowork in one interface"
+      },
+      {
+        "item_id": "b10d3b6dd4c6cccd8528d7e489b91f58fbc66496",
+        "lede": "Claude is getting a pair of new tools today: Docs and Slides. They'll let you create documents and presentations through Claude chats, which you can export, edit, and share with other users. As part of the announcement, Anthropic is also simplifying how Claude chats work, merging regular chats and Cowork into \"one Claude,\" with all [\u2026]",
+        "outlet": "theverge",
+        "published": "2026-09-16T16:30:00Z",
+        "title": "Claude comes for Gemini with its own take on Docs and Slides"
+      },
+      {
+        "item_id": "c1c590a699f01e4ecd011d97cd735edd827ff210",
+        "lede": "Anthropic is adding the ability to create docs, slideshow and access Cowork capabilities inside chat. It will roll out to Pro and Max subscribers first.",
+        "outlet": "engadget",
+        "published": "2026-09-16T16:30:00Z",
+        "title": "Anthropic's Claude can now create editable documents for you"
+      },
+      {
+        "item_id": "65d343cb2da2e1a2f425767176d164671d42c3d5",
+        "lede": "From Claude to Cowork and back again \u2013 plus, Anthropic\u2019s all-new Claude Docs.",
+        "outlet": "zdnet",
+        "published": "2026-09-16T16:30:44Z",
+        "title": "Goodbye, Claude Cowork: Anthropic merges its two Claudes into one"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "framing",
+      "note": "The Verge frames it as competing with Gemini; ZDNet as the retirement of Cowork.",
+      "outlets": [
+        "theverge",
+        "zdnet"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

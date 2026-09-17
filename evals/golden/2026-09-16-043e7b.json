@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "0317bab3a39adea2a475622339c6de1589f8dbbe",
+    "id": "2026-09-16-043e7b",
+    "items": [
+      {
+        "item_id": "0317bab3a39adea2a475622339c6de1589f8dbbe",
+        "lede": "It's both a \"Snow Leopard update\" and a major leap for Apple Intelligence.",
+        "outlet": "arstechnica",
+        "published": "2026-09-16T14:50:06Z",
+        "title": "macOS 27 Golden Gate: The Ars Technica review"
+      },
+      {
+        "item_id": "566c9d5fe52b15dfc941b09df040cc7090d97a70",
+        "lede": "Siri\u2019s reintroduction takes center stage as Apple officially rolls out the latest version of macOS to download and install.",
+        "outlet": "wired",
+        "published": "2026-09-16T19:29:15Z",
+        "title": "MacOS 27 Golden Gate: Top New Features"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "framing",
+      "note": "Ars Technica calls it both a 'Snow Leopard update' and a leap for Apple Intelligence; Wired leads on Siri's reintroduction.",
+      "outlets": [
+        "arstechnica",
+        "wired"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

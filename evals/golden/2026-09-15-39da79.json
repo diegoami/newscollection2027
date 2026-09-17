@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "75a28c3dcafa1e78a5081f2ed0c33845543c9aff",
+    "id": "2026-09-15-39da79",
+    "items": [
+      {
+        "item_id": "75a28c3dcafa1e78a5081f2ed0c33845543c9aff",
+        "lede": "Reaching orbit would mark a significant milestone.",
+        "outlet": "arstechnica",
+        "published": "2026-09-15T18:48:08Z",
+        "title": "SpaceX declares Starship ready for orbit, sets launch date next week"
+      },
+      {
+        "item_id": "2bb6e023c6126a54ce140a8d3ae72ff899324804",
+        "lede": "Flight test 14 angling for 10 hours in space and a splashdown in the Pacific",
+        "outlet": "theregister",
+        "published": "2026-09-16T12:46:00Z",
+        "title": "SpaceX aims Starship for orbit on September 22"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "The Register names the date and flight profile; Ars Technica's text says only 'next week'.",
+      "outlets": [
+        "theregister",
+        "arstechnica"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

@@ -5,7 +5,7 @@ added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
 T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
 `judge` and `bench-judge` by T24;
-`validate` by T30; `pending` by T32; `analyze` by T31.
+`validate` by T30; `pending` by T32; `analyze` by T31; `eval` by T33.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from nc import (
     cluster,
     contract,
     embed,
+    evals,
     feeds,
     judge,
     labelling,
@@ -229,6 +230,51 @@ def _analyze(args: argparse.Namespace) -> int:
     report = analyze.run_analyze(data_root, backend, config, args.limit)
     print(analyze.format_analyze_report(report))
     return 1 if report.failed else 0
+
+
+def _eval(args: argparse.Namespace) -> int:
+    """T33: score a backend against the golden set.
+
+    `--backend files` reads analyses already on disk and costs nothing,
+    which is how T32's skill output gets measured. `--backend api` runs
+    T31's backend over the golden clusters first, and **spends money**.
+    The scoring is identical either way: whichever backend produced the
+    analyses is a label on the report, never a branch in the scoring.
+    """
+    data_root = _data_root(args)
+    cases = evals.load_golden(args.golden)
+    if not cases:
+        print(f"eval: no golden cases in {args.golden}")
+        return 1
+
+    if args.materialize:
+        target = DataRoot(args.materialize)
+        count = evals.materialize(cases, target)
+        print(f"eval: wrote {count} golden cluster(s) into {target.path} as pending")
+        print("eval: run a backend over them, then score with --backend files")
+        return 0
+
+    config = analyze.load_analyze_config(args.config)
+    if args.backend == "api":
+        backend = analyze.AnthropicBackend(config)
+        prompt = analyze.load_prompt()
+        schema = analyze.response_schema()
+        produced: dict[str, contract.Analysis | None] = {}
+        for case in cases:
+            analysis, _, _ = analyze.analyze_cluster(
+                case.cluster, backend, config, prompt, schema
+            )
+            produced[case.id] = analysis
+        model = config.model
+    else:
+        produced = evals.load_analyses_from_files(data_root, cases)
+        model = "n/a (scored from files on disk)"
+
+    report = evals.run_eval(cases, produced, args.backend, model)
+    print(evals.format_eval_report(report))
+    path = evals.write_report(report, args.reports)
+    print(f"eval: written to {path}")
+    return 0
 
 
 def _pending(args: argparse.Namespace) -> int:
@@ -526,6 +572,48 @@ def _build_parser() -> argparse.ArgumentParser:
         help="with --batch: write the results of an ended batch",
     )
     analyze_parser.set_defaults(func=_analyze)
+
+    eval_parser = subparsers.add_parser(
+        "eval",
+        help="score a backend against the golden set (T33)",
+    )
+    eval_parser.add_argument(
+        "--backend",
+        choices=["api", "files"],
+        required=True,
+        help="`files` scores analyses already on disk and costs nothing; "
+        "`api` runs T31's backend over the golden clusters first and bills",
+    )
+    eval_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    eval_parser.add_argument(
+        "--golden",
+        type=Path,
+        default=evals.DEFAULT_GOLDEN_DIR,
+        help=f"golden cases (default: {evals.DEFAULT_GOLDEN_DIR})",
+    )
+    eval_parser.add_argument(
+        "--reports",
+        type=Path,
+        default=evals.DEFAULT_REPORTS_DIR,
+        help=f"where the report is written (default: {evals.DEFAULT_REPORTS_DIR})",
+    )
+    eval_parser.add_argument(
+        "--config",
+        type=Path,
+        default=analyze.DEFAULT_ANALYZE_CONFIG_PATH,
+        help=f"analysis config (default: {analyze.DEFAULT_ANALYZE_CONFIG_PATH})",
+    )
+    eval_parser.add_argument(
+        "--materialize",
+        type=Path,
+        default=None,
+        help="write the golden clusters into this data root as pending "
+        "clusters and stop, so a backend can work them like a real queue. "
+        "Use a scratch data root: this writes cluster and pending files",
+    )
+    eval_parser.set_defaults(func=_eval)
 
     pending_parser = subparsers.add_parser(
         "pending",

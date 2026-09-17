@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "047d99bbbc95e2a796ea0cfd2698d20ffdfec65c",
+    "id": "2026-09-15-e63d74",
+    "items": [
+      {
+        "item_id": "047d99bbbc95e2a796ea0cfd2698d20ffdfec65c",
+        "lede": "'Enemies of the regime' on notice",
+        "outlet": "theregister",
+        "published": "2026-09-15T18:01:57Z",
+        "title": "Iranian spies hit Windows machines with Chosen Brick data-stealing malware"
+      },
+      {
+        "item_id": "fdd187455edb9b1d8d3c8db32959faa31c631460",
+        "lede": "Government agencies are warning that Iranian state-linked hackers are using a Windows malware strain named CHOSEN BRICK to target dissidents, activists, and journalists worldwide. [...]",
+        "outlet": "bleepingcomputer",
+        "published": "2026-09-16T20:24:55Z",
+        "title": "Iranian hackers use CHOSEN BRICK Windows malware to spy on targets"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "BleepingComputer names the targets and the government warning; The Register's text does not.",
+      "outlets": [
+        "bleepingcomputer",
+        "theregister"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}
