@@ -20,6 +20,7 @@ from nc.cluster import (
     ClusterConfig,
     ClusterItem,
     PendingPair,
+    load_pending_pairs,
     write_label_sample,
     write_pending_pairs,
 )
@@ -40,6 +41,7 @@ from nc.labelling import (
     run_tune,
     unlabeled_pairs,
 )
+from nc.promo import PromoRules, load_promo_rules
 from nc.store import DataRoot
 
 CONFIG = ClusterConfig(tau_low=0.65, tau_high=0.80, window_days=4, min_outlets=2)
@@ -60,11 +62,17 @@ def _item(seed: str, outlet: str, title: str | None = None) -> Item:
 
 
 def _pair(
-    seed_a: str, outlet_a: str, seed_b: str, outlet_b: str, score: float
+    seed_a: str,
+    outlet_a: str,
+    seed_b: str,
+    outlet_b: str,
+    score: float,
+    title_a: str | None = None,
+    title_b: str | None = None,
 ) -> PendingPair:
     return PendingPair(
-        a=ClusterItem.from_item(_item(seed_a, outlet_a)),
-        b=ClusterItem.from_item(_item(seed_b, outlet_b)),
+        a=ClusterItem.from_item(_item(seed_a, outlet_a, title_a)),
+        b=ClusterItem.from_item(_item(seed_b, outlet_b, title_b)),
         score=score,
     )
 
@@ -156,6 +164,62 @@ def test_labelling_pool_is_the_union_of_both_directories(tmp_path: Path) -> None
     pool = labelling_pool(data_root)
 
     assert {pair.pair_id for pair in pool} == {band_pair.pair_id, negative.pair_id}
+
+
+def test_labelling_pool_drops_same_outlet_pairs(tmp_path: Path) -> None:
+    """A cluster needs two distinct outlets, so what a label has to
+    settle is whether two *outlets* covered one story. They stay in
+    `pending-pairs/` for T24's judge, which can still use one to bridge
+    two components -- the right rule for a machine working a queue and
+    the wrong one for a human working an hour.
+    """
+    data_root = DataRoot(tmp_path / "data")
+    cross = _pair("a0", "theverge", "a1", "tomshardware", 0.72)
+    same = _pair("b0", "techcrunch", "b1", "techcrunch", 0.95)
+    write_pending_pairs(data_root, [cross, same])
+
+    assert {pair.pair_id for pair in labelling_pool(data_root)} == {cross.pair_id}
+    # Still in the judge's queue, which is the point of filtering here
+    # rather than pruning the directory.
+    assert len(load_pending_pairs(data_root)) == 2
+
+
+def test_labelling_pool_drops_promotional_and_buying_advice(tmp_path: Path) -> None:
+    """Read-time, so a pair file written before a rule existed is
+    filtered too -- a cluster-time filter alone cannot reach those, and
+    11 of the 362-pair pool on 2026-09-17 were exactly that."""
+    data_root = DataRoot(tmp_path / "data")
+    real = _pair("a0", "theverge", "a1", "wired", 0.72)
+    coupon = _pair(
+        "b0", "wired", "b1", "theverge", 0.81, title_a="Casetify Promo Codes: 15% Off"
+    )
+    guide = _pair(
+        "c0",
+        "theguardian",
+        "c1",
+        "wired",
+        0.67,
+        title_b="7 Best Android Phones of 2026, Tested and Reviewed",
+    )
+    write_pending_pairs(data_root, [real, coupon, guide])
+
+    pool = labelling_pool(
+        data_root, promo_rules=load_promo_rules(Path("config/promo.yaml"))
+    )
+    assert {pair.pair_id for pair in pool} == {real.pair_id}
+
+
+def test_labelling_pool_keeps_everything_when_rules_are_empty(tmp_path: Path) -> None:
+    """Injected rules, like `run_clustering`'s: empty ones filter
+    nothing, so a data root without config/promo.yaml still labels."""
+    data_root = DataRoot(tmp_path / "data")
+    coupon = _pair(
+        "b0", "wired", "b1", "theverge", 0.81, title_a="Casetify Promo Codes: 15% Off"
+    )
+    write_pending_pairs(data_root, [coupon])
+
+    pool = labelling_pool(data_root, promo_rules=PromoRules(frozenset(), ()))
+    assert [pair.pair_id for pair in pool] == [coupon.pair_id]
 
 
 def test_labelling_pool_dedupes_a_pair_present_in_both_directories(

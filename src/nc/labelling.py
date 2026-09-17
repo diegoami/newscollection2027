@@ -68,6 +68,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nc.cluster import ClusterConfig, PendingPair, load_label_sample, load_pending_pairs
+from nc.promo import DEFAULT_PROMO_CONFIG_PATH, PromoRules, load_promo_rules
 from nc.store import DataRoot
 
 # nc.cluster._TIME_FORMAT is private to that module; labels are a
@@ -183,7 +184,9 @@ def append_label(data_root: DataRoot, label: Label) -> None:
 # --- ordering -----------------------------------------------------------
 
 
-def labelling_pool(data_root: DataRoot) -> list[PendingPair]:
+def labelling_pool(
+    data_root: DataRoot, promo_rules: PromoRules | None = None
+) -> list[PendingPair]:
     """Every pair `nc label` can show: `pending-pairs/` (T24's judge
     queue, exhaustive over `[tau_low, tau_high)`) union `label-sample/`
     (T22's bounded, stratified sample over the wider
@@ -205,13 +208,57 @@ def labelling_pool(data_root: DataRoot) -> list[PendingPair]:
     and the stratified sample also picked it) is shown once: `pair_id`
     is the same key in both, `nc.cluster.PendingPair`'s definition,
     so a plain dict keyed on it dedupes for free.
+
+    **Two kinds of pair are filtered out here, and only here.** The
+    union above is what makes them reachable: `label-sample/` already
+    excludes both (`select_label_sample` skips same-outlet pairs, and
+    `nc cluster` drops promotional items from the window before any
+    pair exists), but `pending-pairs/` is T24's judge queue and keeps
+    same-outlet pairs on purpose -- they cannot form a cluster alone
+    but they can bridge two components. That is the right rule for a
+    machine working a queue and the wrong one for a human working an
+    hour, which is exactly why this function, not that directory, is
+    where the line goes.
+
+    - *Same-outlet pairs.* A cluster needs two distinct outlets, so
+      what a label has to settle is whether two *outlets* covered one
+      story. Measured on the pool of 2026-09-17: 92 of 362.
+    - *Promotional items and buying advice.* Filtered at read time
+      rather than pruned off disk, for the reason `nc.promo` gives
+      about ingest: the files are the record and these rules will be
+      retuned, so editing `config/promo.yaml` changes the next session
+      with no migration. It also catches pair files written before a
+      rule existed, which a cluster-time filter alone cannot: 11 of
+      that same 362 were still reachable after the rules shipped.
+      Only the title rules apply here (`classify_title`) -- a pending
+      pair does not carry the items' tags.
+
+    `rules` is injected so a test passes its own rather than depending
+    on the shipped config, the same contract `run_clustering` uses.
     """
+    rules = (
+        load_promo_rules(DEFAULT_PROMO_CONFIG_PATH)
+        if promo_rules is None
+        else promo_rules
+    )
     merged: dict[str, PendingPair] = {}
     for pair in load_pending_pairs(data_root):
         merged[pair.pair_id] = pair
     for pair in load_label_sample(data_root):
         merged.setdefault(pair.pair_id, pair)
-    return [merged[pair_id] for pair_id in sorted(merged)]
+    return [
+        pair
+        for pair_id in sorted(merged)
+        if _is_labellable(pair := merged[pair_id], rules)
+    ]
+
+
+def _is_labellable(pair: PendingPair, rules: PromoRules) -> bool:
+    if pair.a.outlet == pair.b.outlet:
+        return False
+    return not (
+        rules.classify_title(pair.a.title) or rules.classify_title(pair.b.title)
+    )
 
 
 def unlabeled_pairs(

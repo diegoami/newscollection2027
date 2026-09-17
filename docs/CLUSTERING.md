@@ -672,3 +672,53 @@ against:
 The first two no longer matter for the judge — the filter removes those
 pairs before it sees them — but they still sit in the corpus that
 `tau_low` and every future eval are read from.
+
+### What a labelling session is allowed to see
+
+`labelling_pool` is the union of `pending-pairs/` and `label-sample/`,
+and it now filters two kinds of pair out of that union. Both were
+already excluded from `label-sample/`; both were reachable anyway,
+because `pending-pairs/` is T24's judge queue and is built to different
+rules.
+
+**Same-outlet pairs.** `select_label_sample` has skipped them since #40,
+but the judge queue keeps them deliberately: a same-outlet pair cannot
+form a cluster on its own (a cluster needs two distinct outlets) yet can
+still bridge two components. That is the right rule for a machine
+working a queue and the wrong one for a human working an hour, so the
+line goes in the pool rather than in the directory. On the 2026-09-17
+pool, 92 of 362.
+
+**Promotional items and buying advice.** `nc cluster` drops these from
+the window, so no *new* pair can contain one — but pair files written
+before a rule existed are still on disk, and nothing prunes them
+(`write_pending_pairs` only ever adds). Filtering at read time catches
+those too, and means editing `config/promo.yaml` changes the next
+session with no migration: the same argument `nc.promo` makes for
+filtering at cluster time rather than at ingest. On that same pool, 11
+of 362. Only the title rules apply — a `PendingPair` denormalizes
+outlet, title, lede and published, but not tags, so `classify_title`
+exists to say what it can actually decide rather than fake an `Item`
+with empty tags and quietly claim a check that did not happen.
+
+Together: **362 pairs → 261**, of which 93 are still unlabelled.
+
+### What the existing corpus turned out to contain
+
+Measured before deciding whether to relabel from scratch, and worth
+recording because the answer was not what it looked like:
+
+```
+174 labels, 35 positive
+  same-outlet            0
+  promo / buying advice  6   (2 of them positive)
+  clean                168   (33 positive)
+```
+
+So the corpus was never polluted with same-outlet pairs — the sample
+they were drawn from had excluded those all along, and the pool's 92
+were simply never reached in a session. Discarding all 174 would cost
+168 sound labels, including 33 of the 35 positives, to remove 6. Since
+positives are the scarce class and every threshold and eval in this
+document is read from them, the cheap move is to drop the 6 and keep
+the rest.

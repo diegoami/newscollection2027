@@ -103,6 +103,26 @@ class PromoRules:
     # can undo one without disturbing the other.
     buying_advice_patterns: tuple[re.Pattern[str], ...] = ()
 
+    def classify_title(self, title: str) -> str | None:
+        """The title-only half of `classify`.
+
+        Separate because `nc.labelling` reads `PendingPair`s, which
+        denormalize outlet, title, lede and published but *not* tags
+        (`nc.cluster.ClusterItem`) -- so it can apply these rules and
+        not the tag rule. Faking an `Item` with empty tags to reach
+        `classify` would work and would quietly claim a check that did
+        not happen; this says what it can actually decide.
+
+        The gap only affects pair files written before a rule existed.
+        A current `nc cluster` run drops tagged items from the window,
+        so they never become a pair at all.
+        """
+        if any(pattern.search(title) for pattern in self.title_patterns):
+            return "promo-title"
+        if any(pattern.search(title) for pattern in self.buying_advice_patterns):
+            return "buying-advice"
+        return None
+
     def classify(self, item: Item) -> str | None:
         """Which rule group drops this item, or None to keep it.
 
@@ -113,12 +133,7 @@ class PromoRules:
         for tag in item.tags:
             if _normalize(tag) in self.tags:
                 return "tag"
-        title = item.title
-        if any(pattern.search(title) for pattern in self.title_patterns):
-            return "promo-title"
-        if any(pattern.search(title) for pattern in self.buying_advice_patterns):
-            return "buying-advice"
-        return None
+        return self.classify_title(item.title)
 
     def matches(self, item: Item) -> bool:
         """True when this item is dropped from the window."""
