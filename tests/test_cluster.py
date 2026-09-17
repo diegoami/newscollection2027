@@ -35,6 +35,7 @@ from nc.cluster import (
     ClusterConfig,
     ClusterItem,
     PendingPair,
+    RunReport,
     UnionFind,
     WriteResult,
     _allocate_id,
@@ -625,6 +626,23 @@ class _FixedBackend:
         return [self._by_text[text] for text in texts]
 
 
+# Fixtures embed under their own model ids, never the one in
+# config/embed.yaml, so every call has to name the model whose vectors
+# it means -- which is the point of the (item_id, model_id) key. One
+# wrapper rather than the same keyword on thirty-two call sites.
+_MODEL_ID = "synthetic"
+
+
+def _cluster(
+    data_root: DataRoot,
+    config: ClusterConfig,
+    db_path: Path,
+    **kwargs: object,
+) -> RunReport:
+    kwargs.setdefault("model_id", _MODEL_ID)
+    return run_clustering(data_root, config, db_path, **kwargs)  # type: ignore[arg-type]
+
+
 def _prepare(
     tmp_path: Path, items: Sequence[Item], vectors: dict[str, list[float]]
 ) -> tuple[DataRoot, Path]:
@@ -642,7 +660,7 @@ def _embed(
     vectors: dict[str, list[float]],
 ) -> None:
     by_text = {f"{item.title} {item.lede}": vectors[item.id] for item in items}
-    embed_items(data_root, _FixedBackend(by_text), "synthetic", db_path)
+    embed_items(data_root, _FixedBackend(by_text), _MODEL_ID, db_path)
 
 
 def _snapshot(root: Path) -> dict[str, tuple[str, float]]:
@@ -657,7 +675,7 @@ def test_run_clustering_writes_cluster_and_pending_files(tmp_path: Path) -> None
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
 
-    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    report = _cluster(data_root, CONFIG, db_path, now=NOW)
 
     assert report.run.stats.clusters_new == 3
     assert report.written.clusters_written == 3
@@ -683,10 +701,10 @@ def test_running_twice_with_no_new_items_writes_nothing(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
 
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     before = _snapshot(data_root.path)
     time.sleep(0.01)
-    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    second = _cluster(data_root, CONFIG, db_path, now=NOW)
     after = _snapshot(data_root.path)
 
     assert after == before  # bytes *and* mtimes: nothing was rewritten
@@ -701,12 +719,10 @@ def test_the_window_moving_forward_does_not_rewrite_anything(tmp_path: Path) -> 
     the edge of the window and some have fallen out of it."""
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     before = _snapshot(data_root.path)
 
-    later = run_clustering(
-        data_root, CONFIG, db_path, now=datetime(2026, 9, 30, tzinfo=UTC)
-    )
+    later = _cluster(data_root, CONFIG, db_path, now=datetime(2026, 9, 30, tzinfo=UTC))
     assert _snapshot(data_root.path) == before
     assert later.run.stats.window_items == 0
     assert later.run.stats.clusters_total == 3
@@ -715,7 +731,7 @@ def test_the_window_moving_forward_does_not_rewrite_anything(tmp_path: Path) -> 
 def test_a_new_item_requeues_its_cluster_and_leaves_the_others(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    first = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    first = _cluster(data_root, CONFIG, db_path, now=NOW)
     grown_id = next(c.id for c in first.run.clusters if c.item_ids == _ids("c0", "c1"))
 
     latecomer = _item("c2", "engadget", published="2026-09-16T09:00:00Z")
@@ -723,7 +739,7 @@ def test_a_new_item_requeues_its_cluster_and_leaves_the_others(tmp_path: Path) -
     append_items(data_root, [latecomer])
     _embed(data_root, db_path, [latecomer], vectors)
 
-    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    second = _cluster(data_root, CONFIG, db_path, now=NOW)
     assert second.written.clusters_written == 1  # only the one that changed
     assert second.written.pending_written == 1
     payload = json.loads(
@@ -739,7 +755,7 @@ def test_the_pending_file_mirrors_the_status(tmp_path: Path) -> None:
     pending file. No other step has to know where the queue lives."""
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    first = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    first = _cluster(data_root, CONFIG, db_path, now=NOW)
     target = first.run.clusters[0]
 
     path = data_root.resolve("clusters", target.date, f"{target.id}.json")
@@ -747,25 +763,25 @@ def test_the_pending_file_mirrors_the_status(tmp_path: Path) -> None:
     payload["status"] = "analyzed"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
-    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    second = _cluster(data_root, CONFIG, db_path, now=NOW)
     assert second.written.pending_removed == 1
     assert not data_root.resolve("pending", f"{target.id}.json").exists()
 
-    third = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    third = _cluster(data_root, CONFIG, db_path, now=NOW)
     assert third.written.pending_removed == 0  # and it stays gone
 
 
 def test_a_merge_retires_the_pending_file_of_the_loser(tmp_path: Path) -> None:
     items, vectors, bridge = _merge_fixture()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    first = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    first = _cluster(data_root, CONFIG, db_path, now=NOW)
     loser_id = next(c.id for c in first.run.clusters if items[2].id in c.item_ids)
     assert data_root.resolve("pending", f"{loser_id}.json").exists()
 
     append_items(data_root, [bridge])
     _embed(data_root, db_path, [bridge], vectors)
 
-    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    second = _cluster(data_root, CONFIG, db_path, now=NOW)
     assert second.run.stats.clusters_superseded == 1
     assert not data_root.resolve("pending", f"{loser_id}.json").exists()
     assert second.written.pending_removed == 1
@@ -779,14 +795,14 @@ def test_a_merge_retires_the_pending_file_of_the_loser(tmp_path: Path) -> None:
     reloaded = load_clusters(data_root)
     assert len(reloaded) == 2
     assert sum(1 for c in reloaded if c.superseded_by) == 1
-    third = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    third = _cluster(data_root, CONFIG, db_path, now=NOW)
     assert third.written == WriteResult(0, 0, 0)
 
 
 def test_load_clusters_round_trips_what_render_writes(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    first = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    first = _cluster(data_root, CONFIG, db_path, now=NOW)
     reloaded = load_clusters(data_root)
     assert reloaded == list(first.run.clusters)
     assert all(
@@ -811,7 +827,7 @@ def test_items_without_vectors_are_reported_not_clustered(tmp_path: Path) -> Non
     append_items(partial_root, items[:4])
     _embed(partial_root, db_path, items[:4], vectors)
 
-    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    report = _cluster(data_root, CONFIG, db_path, now=NOW)
     assert report.run.stats.window_items == 30
     assert report.run.stats.items_without_vectors == 26
     assert report.run.stats.clusters_new == 1
@@ -824,7 +840,7 @@ def test_load_vectors_is_the_bulk_form_of_get_vector(tmp_path: Path) -> None:
     append_items(data_root, items)
     embed_items(data_root, HashBackend(dim=4), "hash", db_path)
 
-    loaded = load_vectors([item.id for item in items] + ["missing"], db_path)
+    loaded = load_vectors([item.id for item in items] + ["missing"], "hash", db_path)
     assert set(loaded) == {item.id for item in items}
     assert all(len(vector) == 4 for vector in loaded.values())
 
@@ -832,7 +848,7 @@ def test_load_vectors_is_the_bulk_form_of_get_vector(tmp_path: Path) -> None:
 def test_format_report_mentions_the_dropped_singletons(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    report = _cluster(data_root, CONFIG, db_path, now=NOW)
     text = format_report(report, CONFIG)
     assert "dropped 19 singleton component(s)" in text
     assert "1 single-outlet" in text
@@ -874,7 +890,7 @@ def test_run_clustering_orders_pending_pair_members_by_id(tmp_path: Path) -> Non
     scramble that when it denormalizes the pair for persistence."""
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     pair = load_pending_pairs(data_root)[0]
     assert pair.a.item_id < pair.b.item_id
 
@@ -885,7 +901,7 @@ def test_run_clustering_writes_the_borderline_pair(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
 
-    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    report = _cluster(data_root, CONFIG, db_path, now=NOW)
 
     assert report.pending_pairs_written == 1
     pairs = load_pending_pairs(data_root)
@@ -907,10 +923,10 @@ def test_run_clustering_writes_the_borderline_pair(tmp_path: Path) -> None:
 def test_pending_pairs_are_stable_across_a_no_op_rerun(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     before = _snapshot(data_root.path)
 
-    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    second = _cluster(data_root, CONFIG, db_path, now=NOW)
 
     assert second.pending_pairs_written == 0
     assert _snapshot(data_root.path) == before
@@ -924,13 +940,11 @@ def test_pending_pairs_are_not_deleted_when_the_window_moves_on(
     `write_pending_pairs`'s docstring."""
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     before = load_pending_pairs(data_root)
     assert len(before) == 1
 
-    later = run_clustering(
-        data_root, CONFIG, db_path, now=datetime(2026, 9, 30, tzinfo=UTC)
-    )
+    later = _cluster(data_root, CONFIG, db_path, now=datetime(2026, 9, 30, tzinfo=UTC))
 
     assert later.run.stats.window_items == 0
     assert later.pending_pairs_written == 0
@@ -1031,7 +1045,7 @@ def test_run_clustering_writes_a_labelling_sample_with_clear_pos_and_neg(
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
 
-    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    report = _cluster(data_root, CONFIG, db_path, now=NOW)
 
     # Groups a, b, c, e, f contribute 6 + 3 + 1 + 1 + 1. Group d is
     # three items from one outlet, so its 3 pairs are same-outlet and
@@ -1055,11 +1069,11 @@ def test_run_clustering_writes_a_labelling_sample_with_clear_pos_and_neg(
 def test_labelling_sample_is_stable_across_a_no_op_rerun(tmp_path: Path) -> None:
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     before = _snapshot(data_root.path)
 
     time.sleep(0.01)
-    second = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    second = _cluster(data_root, CONFIG, db_path, now=NOW)
 
     assert second.label_sample_written == 0
     assert _snapshot(data_root.path) == before
@@ -1075,7 +1089,7 @@ def test_labelling_sample_selection_is_stable_when_a_bucket_is_full(
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
     tight_config = replace(CONFIG, sample_bucket_cap=1)
-    run_clustering(data_root, tight_config, db_path, now=NOW)
+    _cluster(data_root, tight_config, db_path, now=NOW)
     before_sample = {p.pair_id: p for p in load_label_sample(data_root)}
     # Four distinct 0.05-wide buckets are touched: F (0.50), E (0.72),
     # {C, D, B} (0.85 and 0.88 both fall in [0.85, 0.90)), and A (0.95).
@@ -1100,7 +1114,7 @@ def test_labelling_sample_selection_is_stable_when_a_bucket_is_full(
     _embed(data_root, db_path, [latecomer], vectors)
     time.sleep(0.01)
 
-    run_clustering(data_root, tight_config, db_path, now=NOW)
+    _cluster(data_root, tight_config, db_path, now=NOW)
     after_sample = {p.pair_id: p for p in load_label_sample(data_root)}
     after_files = {
         path: value
@@ -1120,7 +1134,7 @@ def test_labelling_sample_grows_into_a_new_bucket_without_disturbing_others(
     and nothing already written is touched in the process."""
     items, vectors = _synthetic_set()
     data_root, db_path = _prepare(tmp_path, items, vectors)
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     before_files = {
         path: value
         for path, value in _snapshot(data_root.path).items()
@@ -1137,7 +1151,7 @@ def test_labelling_sample_grows_into_a_new_bucket_without_disturbing_others(
     _embed(data_root, db_path, [g0, g1], vectors)
     time.sleep(0.01)
 
-    run_clustering(data_root, CONFIG, db_path, now=NOW)
+    _cluster(data_root, CONFIG, db_path, now=NOW)
     after_files = {
         path: value
         for path, value in _snapshot(data_root.path).items()
@@ -1190,7 +1204,7 @@ def test_five_thousand_items_in_the_window(tmp_path: Path) -> None:
 
     data_root, db_path = _prepare(tmp_path, items, vectors)
     started = time.perf_counter()
-    report = run_clustering(data_root, CONFIG, db_path, now=NOW)
+    report = _cluster(data_root, CONFIG, db_path, now=NOW)
     end_to_end = time.perf_counter() - started
 
     print(
@@ -1329,8 +1343,8 @@ def test_run_clustering_drops_promotional_items_from_the_window(
 
     rules = load_promo_rules(Path("config/promo.yaml"))
     db_path = tmp_path / "vectors.sqlite"
-    embed_items(data_root, HashBackend(), "hash", db_path, 16)
-    report = run_clustering(
+    embed_items(data_root, HashBackend(), _MODEL_ID, db_path, 16)
+    report = _cluster(
         data_root,
         ClusterConfig(0.65, 0.8, 4, 2),
         db_path,
@@ -1355,9 +1369,9 @@ def test_format_report_names_the_promotional_drop(tmp_path: Path) -> None:
     data_root = DataRoot(tmp_path / "data")
     append_items(data_root, [_tagged("c0", "wired", "Shark Promo Codes", ())])
     db_path = tmp_path / "vectors.sqlite"
-    embed_items(data_root, HashBackend(), "hash", db_path, 16)
+    embed_items(data_root, HashBackend(), _MODEL_ID, db_path, 16)
     config = ClusterConfig(0.65, 0.8, 4, 2)
-    report = run_clustering(
+    report = _cluster(
         data_root,
         config,
         db_path,

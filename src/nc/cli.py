@@ -11,11 +11,12 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import feedparser
 
-from nc import __version__, cluster, embed, feeds, labelling, store, sync
+from nc import __version__, bench, cluster, embed, feeds, labelling, store, sync
 from nc.store import DataRoot
 
 
@@ -112,6 +113,27 @@ def _label(args: argparse.Namespace) -> int:
     data_root = _data_root(args)
     config = cluster.load_cluster_config(args.config)
     labelling.run_label_session(data_root, config, limit=args.limit)
+    return 0
+
+
+def _bench_embed(args: argparse.Namespace) -> int:
+    """Score `labels/pairs.jsonl` with each model in
+    config/embed.yaml's `bench_candidates` and report which gets most
+    of the range right enough to auto-link.
+
+    Needs network: it downloads and runs each candidate. That is why it
+    is a command run on a GitHub Actions runner rather than part of
+    `make check` -- the development sandbox has no route to
+    huggingface.co (nc/embed.py's module docstring).
+    """
+    data_root = _data_root(args)
+    config = embed.load_embed_config(args.config)
+    candidates = bench.load_bench_candidates(args.config)
+    results = []
+    for model_id in candidates:
+        backend = embed.Model2VecBackend(replace(config, model_id=model_id))
+        results.append(bench.bench_model(data_root, model_id, backend))
+    print(bench.format_bench_report(results, config.model_id))
     return 0
 
 
@@ -291,6 +313,21 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"clustering config (default: {cluster.DEFAULT_CLUSTER_CONFIG_PATH})",
     )
     tune_parser.set_defaults(func=_tune)
+
+    bench_parser = subparsers.add_parser(
+        "bench-embed",
+        help="score the labelled pairs with each candidate embedding model",
+    )
+    bench_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    bench_parser.add_argument(
+        "--config",
+        type=Path,
+        default=embed.DEFAULT_EMBED_CONFIG_PATH,
+        help=f"embedding config (default: {embed.DEFAULT_EMBED_CONFIG_PATH})",
+    )
+    bench_parser.set_defaults(func=_bench_embed)
 
     db_parser = subparsers.add_parser(
         "db", help="the SQLite cache built from the data root"

@@ -332,3 +332,42 @@ from the same masthead. It is the human's hour that should not go on
 them.
 
 Net effect on the first corpus: 223 pairs to 121, and 318 items to 290.
+
+## Choosing the embedding model
+
+`nc bench-embed` scores every model in `config/embed.yaml`'s
+`bench_candidates` against `labels/pairs.jsonl` and reports which one
+gets most of the score range right enough to act on. It runs from
+`.github/workflows/embed-bench.yml`, manually — the development sandbox
+has no route to huggingface.co, the same wall that shaped T20.
+
+**Why this became a question.** `nc.embed` accepted on the record that
+"a lower but consistent embedding quality is absorbed by threshold
+tuning". The first labelling session measured that and it does not
+hold. Tuning can only absorb a weak embedding when the two populations
+are separable by some cutoff; on 159 labels they overlap, with a
+different-story pair at 0.7710 and true matches down to 0.5708. No
+threshold gets both ends right, so the model became a variable rather
+than a settled decision.
+
+**The metric is recall at precision 1.0** — of all the genuine matches,
+how many score above the highest-scoring false pair, and could
+therefore be auto-linked with no wrong link at all. For
+`potion-base-8M` on the first label set that is 3/27 = 0.111, which is
+why auto-linking earns so little today: it saves roughly 10 judge calls
+a run while owning the one failure mode that is not recoverable
+downstream. A model that lifts it to 0.7 changes the architecture.
+`roc_auc` sits beside it as a threshold-free summary, because
+recall-at-precision-1.0 turns on a single pair and a model can lose
+there while ranking better everywhere else.
+
+The labels carry over to any candidate: "are these the same story" is a
+fact about the two articles, not about the model that scored them. The
+*scores* stored in `labels/pairs.jsonl` do not — they are whatever
+model ran at labelling time — so `nc.bench` re-embeds both items of
+every pair and recomputes the cosine rather than reading `Label.score`.
+
+**Switching the model is not a config edit.** `model_id` is part of the
+vector cache's key, so a change re-embeds every stored item, and both
+thresholds were tuned against the old model's scale and become
+meaningless with it. The two move together, or not at all.

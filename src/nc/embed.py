@@ -41,6 +41,21 @@ against whichever backend is actually running -- a lower but consistent
 embedding quality is absorbed by threshold tuning, not by reaching for a
 heavier model on a job that runs 8 times a day for free.
 
+**That last sentence was measured at T23 and it is wrong.** Threshold
+tuning can only absorb weak embeddings when the same-story and
+different-story pairs are separable by *some* cutoff. On the first 159
+labelled pairs they are not: a different-story pair
+(TechCrunch/Guardian, both about the AI-safety debate) scored 0.7710
+while true matches ran down to 0.5708, so no threshold links the true
+pairs without also linking that false one. The model conflates topic
+with event, which is what a mean-pooled static vector is expected to do
+and what tuning cannot undo. The cost of being wrong here is bounded --
+`tau_high` can be set where precision is perfect and everything
+ambiguous goes to T24's judge -- but the claim should not be read as
+still standing. `nc.bench` (`nc bench-embed`) now measures candidate
+models against those labels instead of arguing about it; see
+docs/CLUSTERING.md.
+
 **Backend injection.** This sandbox has no egress to huggingface.co (or
 hf.co, or the LFS CDN), so the real model cannot be downloaded or run
 here -- only PyPI is reachable, which is enough to add `model2vec` as a
@@ -218,19 +233,51 @@ class Model2VecBackend:
 # A separate file from nc.sqlite (nc.store.DEFAULT_DB_PATH) on purpose --
 # see the module docstring, "Vectors vs. nc db rebuild".
 
+# The key is (item_id, model_id), not item_id alone. A vector is the
+# output of a *particular* model, so two models' vectors for one item
+# are two different rows, and every read names the model it wants.
+#
+# This is not hypothetical tidiness. With item_id alone as the key,
+# changing `model_id` in config/embed.yaml and running `nc embed` left
+# every existing item on the OLD model's vector (`embed_items` skipped
+# it as already stored) while new items got the new model's, and
+# `load_vectors` returned the mixture unfiltered. `nc.cluster` then
+# computed cosine between vectors from two different models -- a number
+# with no meaning -- and the only thing that could notice was its
+# "stale vector size" count, which fires only when the two models
+# happen to differ in dimensionality. Two same-dimension models blended
+# silently and produced plausible-looking scores.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS vectors (
-    item_id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL,
     model_id TEXT NOT NULL,
     dim INTEGER NOT NULL,
-    vector BLOB NOT NULL
+    vector BLOB NOT NULL,
+    PRIMARY KEY (item_id, model_id)
 )
 """
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
+    """Open the vector cache, recreating it if it predates the
+    (item_id, model_id) key.
+
+    `CREATE TABLE IF NOT EXISTS` cannot widen a primary key, so a
+    database written by an older build would keep the single-column key
+    and the bug above. This file is a rebuildable cache under `.cache/`,
+    never committed and never the record of anything (module docstring,
+    "Vectors vs. nc db rebuild"), so the migration is simply to drop it
+    and let the next `nc embed` refill it. The cost is one re-embed of
+    the window; the alternative is carrying a schema that makes two
+    models' vectors indistinguishable.
+    """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vectors'"
+    ).fetchone()
+    if row is not None and "PRIMARY KEY (item_id, model_id)" not in str(row[0]):
+        conn.execute("DROP TABLE vectors")
     conn.execute(_SCHEMA)
     conn.commit()
     return conn
@@ -251,24 +298,27 @@ def _unpack(dim: int, blob: bytes) -> list[float]:
     return list(struct.unpack(f"{dim}d", blob))
 
 
-def stored_item_ids(db_path: Path = DEFAULT_VECTORS_DB_PATH) -> set[str]:
-    """Every item id that already has a stored vector."""
+def stored_item_ids(model_id: str, db_path: Path = DEFAULT_VECTORS_DB_PATH) -> set[str]:
+    """Every item id that already has a stored vector *from this model*."""
     conn = _connect(db_path)
     try:
-        rows = conn.execute("SELECT item_id FROM vectors").fetchall()
+        rows = conn.execute(
+            "SELECT item_id FROM vectors WHERE model_id = ?", (model_id,)
+        ).fetchall()
     finally:
         conn.close()
     return {row[0] for row in rows}
 
 
 def get_vector(
-    item_id: str, db_path: Path = DEFAULT_VECTORS_DB_PATH
+    item_id: str, model_id: str, db_path: Path = DEFAULT_VECTORS_DB_PATH
 ) -> list[float] | None:
-    """The stored vector for `item_id`, or None if it has none yet."""
+    """The stored vector for `item_id` under `model_id`, or None."""
     conn = _connect(db_path)
     try:
         row = conn.execute(
-            "SELECT dim, vector FROM vectors WHERE item_id = ?", (item_id,)
+            "SELECT dim, vector FROM vectors WHERE item_id = ? AND model_id = ?",
+            (item_id, model_id),
         ).fetchone()
     finally:
         conn.close()
@@ -279,9 +329,16 @@ def get_vector(
 
 
 def load_vectors(
-    item_ids: Sequence[str], db_path: Path = DEFAULT_VECTORS_DB_PATH
+    item_ids: Sequence[str],
+    model_id: str,
+    db_path: Path = DEFAULT_VECTORS_DB_PATH,
 ) -> dict[str, list[float]]:
-    """The stored vectors for `item_ids`, keyed by item id.
+    """The stored vectors for `item_ids` *under `model_id`*, keyed by
+    item id.
+
+    `model_id` is required rather than defaulted because a caller that
+    does not know which model it is comparing is the bug this key
+    exists to prevent: mixing two models' vectors in one cosine.
 
     The bulk form of `get_vector`, added for T21: clustering a four-day
     window asks for thousands of vectors at once, and `get_vector`
@@ -302,8 +359,8 @@ def load_vectors(
             placeholders = ",".join("?" * len(chunk))
             rows = conn.execute(
                 "SELECT item_id, dim, vector FROM vectors "
-                f"WHERE item_id IN ({placeholders})",
-                chunk,
+                f"WHERE model_id = ? AND item_id IN ({placeholders})",
+                [model_id, *chunk],
             ).fetchall()
             for item_id, dim, blob in rows:
                 vectors[str(item_id)] = _unpack(int(dim), bytes(blob))
@@ -337,7 +394,10 @@ def embed_items(
     conn = _connect(db_path)
     try:
         existing_ids = {
-            row[0] for row in conn.execute("SELECT item_id FROM vectors").fetchall()
+            row[0]
+            for row in conn.execute(
+                "SELECT item_id FROM vectors WHERE model_id = ?", (model_id,)
+            ).fetchall()
         }
         items = list(read_items(data_root))
         pending = [item for item in items if item.id not in existing_ids]

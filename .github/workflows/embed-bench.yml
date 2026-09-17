@@ -1,0 +1,77 @@
+name: embed-bench
+
+# Scores the labelled pairs in the data repository with each model in
+# config/embed.yaml's `bench_candidates` and prints how much of the
+# range each one gets right enough to auto-link (src/nc/bench.py).
+#
+# Why a workflow and not `make check`: the development sandbox has no
+# egress to huggingface.co, so no candidate model can be downloaded or
+# run there -- the same wall that shaped T20 and gave this repo
+# embed-check.yml and feeds-check.yml. Everything except the real
+# models' own output is proven locally against a deterministic fake
+# backend in tests/test_embed.py.
+#
+# Manual only. This is an experiment that informs a decision (should
+# config/embed.yaml's model_id change, and is auto-linking worth
+# keeping at all), not a check that guards a branch, and it downloads
+# several hundred MB of model weights when its cache is cold.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  # Not `check`, and not `embed`: T03 registers the bare `check` as the
+  # required status check on main and GitHub matches check runs by
+  # name, so every workflow in this repo that can go red for reasons
+  # unrelated to a PR's diff gets its own job name. embed-check.yml
+  # uses `embed`; this one is `bench`.
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+      - run: uv sync
+
+      # Keyed on config/embed.yaml, like embed-check.yml, so editing
+      # the candidate list busts the cache and the new model downloads.
+      # All candidates share one HF_HOME (config/embed.yaml's
+      # model_dir), so this is one cache for the whole shortlist.
+      - name: Cache the candidate models
+        uses: actions/cache@v5
+        with:
+          path: .cache/hf-models
+          key: embed-bench-${{ hashFiles('config/embed.yaml') }}
+          restore-keys: |
+            embed-bench-
+
+      # The labels live in the data repository, not this one
+      # (CLAUDE.md: pipeline data is never committed here). Read-only:
+      # this job never writes or pushes, so it clones over plain HTTPS
+      # with no token -- the data repo is public, and a benchmark has
+      # no business holding write credentials.
+      - name: Check out the data repository
+        run: git clone --depth 1 https://github.com/diegoami/newscollection2027-data.git /tmp/nc-data
+
+      - name: Fail early if there are no labels to score
+        run: |
+          if [ ! -s /tmp/nc-data/labels/pairs.jsonl ]; then
+            echo "::error::labels/pairs.jsonl is missing or empty in the data repo."
+            echo "Nothing to benchmark: run a labelling session first (T23)."
+            exit 1
+          fi
+          echo "labels: $(wc -l < /tmp/nc-data/labels/pairs.jsonl)"
+
+      - name: Score every candidate
+        run: uv run nc bench-embed --data-root /tmp/nc-data

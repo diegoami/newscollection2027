@@ -261,7 +261,7 @@ import numpy as np
 import numpy.typing as npt
 import yaml
 
-from nc.embed import DEFAULT_VECTORS_DB_PATH, load_vectors
+from nc.embed import DEFAULT_VECTORS_DB_PATH, load_embed_config, load_vectors
 from nc.feeds import Item
 from nc.promo import DEFAULT_PROMO_CONFIG_PATH, PromoRules, load_promo_rules, partition
 from nc.store import DataRoot, read_items_since
@@ -1213,6 +1213,7 @@ def run_clustering(
     now: datetime | None = None,
     extra_links: Iterable[tuple[str, str]] = (),
     promo_rules: PromoRules | None = None,
+    model_id: str | None = None,
 ) -> RunReport:
     """`nc cluster`: window, link, emit, write.
 
@@ -1220,6 +1221,12 @@ def run_clustering(
     algorithm so the window is reproducible in a test and in a backfill.
     `promo_rules` likewise: the default reads `config/promo.yaml`, and
     a test passes its own rather than depending on the shipped file.
+
+    `model_id` names which model's vectors to read. It defaults to
+    `config/embed.yaml`'s, so the pipeline compares vectors from the
+    model that is actually configured and never mixes two models'
+    output into one cosine (see `nc.embed`'s `_SCHEMA`); a test passes
+    whatever id it embedded its fixtures under.
     """
     moment = datetime.now(UTC) if now is None else now
     cutoff = (moment - timedelta(days=config.window_days)).strftime(_TIME_FORMAT)
@@ -1238,7 +1245,8 @@ def run_clustering(
     )
     items, promotional = partition(windowed, rules)
     existing = load_clusters(data_root)
-    vectors = load_vectors([item.id for item in items], db_path)
+    model = load_embed_config().model_id if model_id is None else model_id
+    vectors = load_vectors([item.id for item in items], model, db_path)
     run = cluster_items(items, vectors, existing, config, extra_links)
     written = write_run(data_root, run)
 
