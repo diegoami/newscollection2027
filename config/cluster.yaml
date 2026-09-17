@@ -7,8 +7,16 @@
 # re-tuned.
 #
 # ===========================================================================
-# TUNED AT T23, from 159 labelled cross-outlet pairs. Set by the owner.
+# SET FROM 159 LABELLED PAIRS. T23 IS NOT FINISHED -- REVISIT THESE.
 # ===========================================================================
+#
+# These are measured, not guessed, which is the difference from what
+# stood here before. They are not final. T23 asks for at least 200
+# labelled near-threshold pairs and the first session produced 159, the
+# labelling corpus is still growing with every ingest run, and the one
+# number that prices `tau_low` -- how many pairs a run lands in the
+# widened band -- has not been measured yet. Treat them as the best
+# available reading of real evidence, and expect to move them.
 #
 # These are no longer guesses, but they are also not the numbers T23
 # was expected to produce. The labelling session found that cosine
