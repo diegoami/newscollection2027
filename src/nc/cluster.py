@@ -625,7 +625,21 @@ def scan_pairs(
     in `.cache/vectors.sqlite`. Both are counted, never silently
     dropped.
     """
-    present = [item_id for item_id in item_ids if item_id in vectors]
+    # Deduplicated by id, not just filtered: an id appearing twice would
+    # occupy two rows of the matrix, and the upper-triangle mask below
+    # only excludes an item from *its own index*, so the duplicate would
+    # come back as a pair of an item with itself at cosine 1.0. That is
+    # a real input -- `nc.store` is append-only and an outlet that
+    # re-publishes an article lands it in a second day file (see
+    # `run_clustering`, which dedupes the window for the same reason).
+    # A self-pair links nothing and cannot bridge anything; it is purely
+    # a nonsense question for T24's judge to spend a call on.
+    seen: set[str] = set()
+    present: list[str] = []
+    for item_id in item_ids:
+        if item_id in vectors and item_id not in seen:
+            seen.add(item_id)
+            present.append(item_id)
     dims: dict[int, int] = {}
     for item_id in present:
         dim = len(vectors[item_id])
@@ -1206,6 +1220,32 @@ class RunReport:
     promotional_dropped: int = 0
 
 
+def _latest_by_id(items: Iterable[Item]) -> list[Item]:
+    """One row per item id, the most recently fetched one.
+
+    `nc.store` is append-only and deduplicates within a day file, so an
+    outlet that re-publishes an article -- same id, new `published` --
+    leaves two rows in two different day files, and a four-day window
+    reads both. Found on the live data: BBC's "Why are there concerns AI
+    could threaten humanity" sat in both `2026/09/14.jsonl` and
+    `2026/09/17.jsonl`, and the window produced a pair of that item with
+    itself at cosine 1.0, queued for T24's judge.
+
+    The freshest row wins because that is what the outlet is currently
+    publishing; ties break on `published` then id so the choice never
+    depends on file order.
+    """
+    latest: dict[str, Item] = {}
+    for item in items:
+        current = latest.get(item.id)
+        if current is None or (item.fetched, item.published) >= (
+            current.fetched,
+            current.published,
+        ):
+            latest[item.id] = item
+    return sorted(latest.values(), key=lambda item: (item.published, item.id))
+
+
 def run_clustering(
     data_root: DataRoot,
     config: ClusterConfig,
@@ -1231,11 +1271,11 @@ def run_clustering(
     moment = datetime.now(UTC) if now is None else now
     cutoff = (moment - timedelta(days=config.window_days)).strftime(_TIME_FORMAT)
 
-    windowed = [
+    windowed = _latest_by_id(
         item
         for item in read_items_since(data_root, cutoff[:10])
         if item.published >= cutoff
-    ]
+    )
     # Before anything is compared: a coupon page is not a story, and it
     # is a near duplicate of every other coupon page. See nc/promo.py.
     rules = (

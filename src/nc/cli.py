@@ -3,7 +3,8 @@
 Subcommands (`pending`, `validate`, `analyze`, `build`, `nightly`) are
 added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
-T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22.
+T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
+`judge` and `bench-judge` by T24.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pathlib import Path
 
 import feedparser
 
-from nc import __version__, bench, cluster, embed, feeds, labelling, store, sync
+from nc import __version__, bench, cluster, embed, feeds, judge, labelling, store, sync
 from nc.store import DataRoot
 
 
@@ -95,11 +96,20 @@ def _cluster(args: argparse.Namespace) -> int:
     clustering stays pure numpy and never needs the model to be
     loadable. Items ingested since the last `nc embed` therefore have no
     vector yet; they cannot link, and the summary says how many.
+
+    T24's judgments enter here, and only here: `judge.accepted_links`
+    returns the pairs an LLM backend said were the same story *and* the
+    validator accepted, and they are linked exactly as a `tau_high`
+    pair would be. With `tau_high` at 1.00 this is where essentially
+    every cross-outlet link now comes from (docs/CLUSTERING.md) --
+    `nc cluster` still calls no LLM, it reads files the LLM step wrote.
     """
     data_root = _data_root(args)
     config = cluster.load_cluster_config(args.config)
-    report = cluster.run_clustering(data_root, config, args.db)
+    links = judge.accepted_links(data_root)
+    report = cluster.run_clustering(data_root, config, args.db, extra_links=links)
     print(cluster.format_report(report, config))
+    print(f"cluster: {len(links)} link(s) from accepted judgments")
     return 0
 
 
@@ -134,6 +144,48 @@ def _bench_embed(args: argparse.Namespace) -> int:
         backend = embed.Model2VecBackend(replace(config, model_id=model_id))
         results.append(bench.bench_model(data_root, model_id, backend))
     print(bench.format_bench_report(results, config.model_id))
+    return 0
+
+
+def _judge(args: argparse.Namespace) -> int:
+    """T24: the borderline-pair judge queue and its validator.
+
+    Bare, this prints the pairs still awaiting a yes-or-no, highest
+    score first, in the form a backend answers -- the same role `nc
+    pending` plays for the analysis step. With `--validate` it reports
+    what is on disk instead: how many judgments, how many would link,
+    and every one the validator refuses and why. It never writes a
+    judgment itself; that is the backend's job, and this command is the
+    gate (CLAUDE.md: "Never bypass the validator").
+    """
+    data_root = _data_root(args)
+    if args.validate:
+        report = judge.validate_all(data_root)
+        print(judge.format_judge_report(report))
+        return 1 if report.rejected else 0
+
+    config = judge.load_judge_config(args.config)
+    pending = judge.unjudged_pairs(data_root)
+    limit = config.max_pairs_per_run if args.limit is None else args.limit
+    shown = pending[:limit]
+    print(
+        f"judge: {len(pending)} pair(s) unjudged, showing {len(shown)} (limit {limit})"
+    )
+    for pair in shown:
+        print()
+        print(judge.render_pair_question(pair), end="")
+    return 0
+
+
+def _bench_judge(args: argparse.Namespace) -> int:
+    """T24: score the judgments on disk against T23's human labels.
+
+    No model and no network: it joins `judgments/` to
+    `labels/pairs.jsonl` on pair id and counts agreement, so it runs in
+    `make check` and in this sandbox, unlike `nc bench-embed`.
+    """
+    data_root = _data_root(args)
+    print(judge.format_judge_eval(judge.run_bench_judge(data_root)))
     return 0
 
 
@@ -313,6 +365,42 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"clustering config (default: {cluster.DEFAULT_CLUSTER_CONFIG_PATH})",
     )
     tune_parser.set_defaults(func=_tune)
+
+    judge_parser = subparsers.add_parser(
+        "judge",
+        help="show borderline pairs awaiting a yes/no, or validate answers (T24)",
+    )
+    judge_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    judge_parser.add_argument(
+        "--config",
+        type=Path,
+        default=judge.DEFAULT_JUDGE_CONFIG_PATH,
+        help=f"judge config (default: {judge.DEFAULT_JUDGE_CONFIG_PATH})",
+    )
+    judge_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="how many pairs to show (default: the config's max_pairs_per_run)",
+    )
+    judge_parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="report what is on disk and what the validator refuses, and exit "
+        "non-zero if anything is refused",
+    )
+    judge_parser.set_defaults(func=_judge)
+
+    bench_judge_parser = subparsers.add_parser(
+        "bench-judge",
+        help="score the judgments on disk against the human labels (T24)",
+    )
+    bench_judge_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    bench_judge_parser.set_defaults(func=_bench_judge)
 
     bench_parser = subparsers.add_parser(
         "bench-embed",

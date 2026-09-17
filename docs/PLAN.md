@@ -107,6 +107,14 @@ acceptance criteria are shown in a merged PR.
   clustering run.
   AC: judged pairs change cluster output in a test; validator accepts the
   judge output schema.
+  Done except the `api` backend, which waits on T31 for the SDK:
+  `nc.judge` is the file contract (`judgments/<pair_id>.json`) and its
+  validator, `nc judge` is the queue and the gate, `nc bench-judge`
+  scores judgments against T23's labels, `.claude/skills/judge-pairs/`
+  and `prompts/judge.md` are the `claude_code` backend, and
+  `nc.judge.accepted_links` feeds `cluster_items`' `extra_links`. What
+  T23 measured made this the load-bearing step rather than a top-up:
+  see docs/CLUSTERING.md, "The judge".
 
 ## M3 Analysis contract
 

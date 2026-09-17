@@ -31,6 +31,9 @@ nc sync pull|push   fast-forward or commit and push the data repo
 nc ingest           fetch feeds into the data root
 nc cluster          embed, link, emit clusters and pending files
 nc pending          list clusters awaiting analysis
+nc judge            list borderline pairs awaiting a yes/no
+nc judge --validate check the judgments on disk before they can link
+nc bench-judge      score those judgments against the human labels
 nc validate --new   validate analyses written since the last run
 nc analyze --backend api    fill pending clusters through the SDK backend
 nc build            write the static site to site/
@@ -41,4 +44,6 @@ nc nightly --dry-run        every nightly step except the agent step and the pus
 
 - `.claude/skills/analyze-clusters/SKILL.md`: how an agent turns one
   pending cluster into a valid analysis file.
+- `.claude/skills/judge-pairs/SKILL.md`: how an agent answers one
+  borderline pair, same story or not. Prompt in `prompts/judge.md`.
 - `.claude/skills/nightly/SKILL.md`: the nightly Routine procedure.

@@ -162,7 +162,18 @@ the pipeline that can tell an event from a subject.
 
 `nc label` and `nc tune` remain, with their purpose changed: the
 labelled pairs are now most useful as an evaluation set for the judge
-rather than as tuning data for the thresholds.
+rather than as tuning data for the thresholds. `nc bench-judge` is what
+spends them that way.
+
+The judge is a file contract, like the analysis step:
+`pending-pairs/<pair_id>.json` in, `judgments/<pair_id>.json` out,
+`nc judge --validate` decides what may link, and
+`nc.judge.accepted_links` is the only path from a judgment into
+`cluster_items`. `nc cluster` still calls no LLM -- it reads files the
+LLM step already wrote. Both backends (`claude_code` in the nightly
+Routine, `api` for backfills and evals) write the same files and the
+rest of the system never knows which ran. See docs/CLUSTERING.md, "The
+judge".
 
 ## Site
 

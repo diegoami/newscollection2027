@@ -39,6 +39,7 @@ from nc.cluster import (
     UnionFind,
     WriteResult,
     _allocate_id,
+    _latest_by_id,
     cluster_items,
     format_report,
     label_sample_dir,
@@ -292,6 +293,49 @@ def test_union_find_is_transitive_through_a_chain() -> None:
 
 
 # --- similarity -----------------------------------------------------------
+
+
+def test_a_duplicated_item_id_never_becomes_a_pair_with_itself() -> None:
+    """Found on the live data: BBC re-published an article under the
+    same id, the append-only store kept both rows in two day files, and
+    the window handed `scan_pairs` the id twice. The upper-triangle mask
+    only excludes an item from its own *index*, so the duplicate came
+    back as a pair at cosine 1.0 -- a nonsense question queued for T24's
+    judge, which can neither link nor bridge anything.
+    """
+    items, vectors = _synthetic_set()
+    ids = [item.id for item in items]
+    duplicated = ids + [ids[0]]
+
+    scan = scan_pairs(duplicated, vectors, 0.65, 0.80, sample_floor=0.30)
+
+    assert scan.compared == len(ids)
+    for group in (scan.linked, scan.borderline, scan.sample):
+        assert not [pair for pair in group if pair.a == pair.b]
+    assert scan.linked == scan_pairs(ids, vectors, 0.65, 0.80).linked
+
+
+def test_the_window_keeps_only_the_freshest_row_for_an_item(
+    tmp_path: Path,
+) -> None:
+    """The same defect one layer up: `nc cluster` counts and
+    denormalizes from the window, so the duplicate has to be gone before
+    anything reads it, and the row that survives is the one the outlet
+    most recently published."""
+    from dataclasses import replace as dataclass_replace
+
+    original = _item("a0", "alpha", published="2026-09-14T12:00:00Z")
+    republished = dataclass_replace(
+        original,
+        published="2026-09-17T09:00:00Z",
+        fetched="2026-09-17T12:00:00Z",
+        title="a0 headline, updated",
+    )
+
+    kept = _latest_by_id([original, republished, original])
+
+    assert [item.id for item in kept] == [original.id]
+    assert kept[0].title == "a0 headline, updated"
 
 
 def test_scan_pairs_splits_at_the_thresholds() -> None:

@@ -8,6 +8,31 @@ without reading a single robots.txt or terms page, so whether these feeds
 may be aggregated with attribution is unanswered. It also decides whether
 NYT Technology, which measured well, joins the set.
 
+- 2026-09-17 The judge is a file contract, and a `no` is inert. T24
+  writes `judgments/<pair_id>.json` and validates it before anything
+  links, exactly as the analysis step does -- the alternative, a backend
+  that calls `cluster_items` directly, would put an LLM inside the
+  deterministic path CLAUDE.md forbids and leave no record of why a
+  link exists. A judgment can only *add* a link: `same_story: false` is
+  recorded but changes nothing, because nothing links without a yes in
+  the first place. It is kept only as `nc bench-judge`'s evidence and
+  so a declined pair is not re-asked every night forever. Judgments are
+  written once and never rewritten, for the same idempotence reason
+  `nc cluster` carries: a cron fires at the data repository eight times
+  a day and a rewritten file is a commit with no new information.
+  The production backend is `claude_code`, in the nightly Routine, on
+  the subscription -- docs/ARCHITECTURE.md's cost model puts the
+  nightly LLM step there, so the judge adds no metered spend. The `api`
+  backend is named in `config/judge.yaml` but not built; it waits on
+  T31, which brings the SDK in for the analysis step.
+  `nc bench-judge` spends T23's 174 labels as the judge's test set
+  rather than as tuning data. It reports precision first: a missed pair
+  costs one link and tomorrow's run may catch it, while a wrong link
+  merges two unrelated stories and makes every claim and discrepancy
+  built on top of it wrong -- so both the prompt and the skill say
+  answer no when unsure. Those 174 pairs may never become few-shot
+  examples in `prompts/judge.md`; a judge shown its own answer key
+  measures nothing, and a test pins that.
 - 2026-09-17 Thresholds set by the owner from 174 labelled
   cross-outlet pairs. T23 stays open: its criterion is 200 pairs, the
   corpus is still growing, and the judge-queue size that prices
