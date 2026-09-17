@@ -65,7 +65,15 @@ from typing import Any, Literal
 import jsonschema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from nc.cluster import STATUS_SUPERSEDED, Cluster, ClusterItem, load_clusters
+from nc.cluster import (
+    STATUS_ANALYZED,
+    STATUS_PENDING,
+    STATUS_SUPERSEDED,
+    Cluster,
+    ClusterItem,
+    load_clusters,
+    set_cluster_status,
+)
 from nc.store import DataRoot
 
 DEFAULT_SCHEMA_PATH = Path("contract/analysis.schema.json")
@@ -410,6 +418,8 @@ class ValidateReport:
     valid: int
     rejected: list[tuple[str, list[str]]]
     skipped_unchanged: int = 0
+    marked_analyzed: int = 0
+    requeued: int = 0
 
 
 def find_analyses(data_root: DataRoot) -> list[Path]:
@@ -461,7 +471,7 @@ def run_validate(
     cutoff = _last_run(state_path) if only_new else None
     clusters = {cluster.id: cluster for cluster in load_clusters(data_root)}
 
-    checked = valid = skipped = 0
+    checked = valid = skipped = analyzed = requeued = 0
     rejected: list[tuple[str, list[str]]] = []
 
     for path in find_analyses(data_root):
@@ -483,16 +493,36 @@ def run_validate(
             _, problems = validate_analysis(
                 payload, clusters.get(cluster_id), schema_path
             )
+        cluster = clusters.get(cluster_id)
         if problems:
             write_rejection(data_root, cluster_id, problems, payload)
             path.unlink()
             rejected.append((cluster_id, problems))
+            # Back on the queue: the analysis that was supposed to
+            # answer for this cluster is gone, so leaving it `analyzed`
+            # would retire a story nothing has actually analysed.
+            if cluster is not None and set_cluster_status(
+                data_root, cluster, STATUS_PENDING
+            ):
+                requeued += 1
         else:
             valid += 1
+            # The only thing that takes a cluster off the queue, and it
+            # happens here because only the validator knows the analysis
+            # both exists and holds up.
+            if cluster is not None and set_cluster_status(
+                data_root, cluster, STATUS_ANALYZED
+            ):
+                analyzed += 1
 
     _record_run(state_path, moment)
     return ValidateReport(
-        checked=checked, valid=valid, rejected=rejected, skipped_unchanged=skipped
+        checked=checked,
+        valid=valid,
+        rejected=rejected,
+        skipped_unchanged=skipped,
+        marked_analyzed=analyzed,
+        requeued=requeued,
     )
 
 
@@ -504,6 +534,11 @@ def format_validate_report(report: ValidateReport) -> str:
     if report.skipped_unchanged:
         lines.append(
             f"validate: {report.skipped_unchanged} unchanged since the last run"
+        )
+    if report.marked_analyzed or report.requeued:
+        lines.append(
+            f"validate: {report.marked_analyzed} cluster(s) marked analyzed, "
+            f"{report.requeued} put back on the queue"
         )
     for cluster_id, problems in report.rejected:
         lines.append(f"  {cluster_id} -> rejected/{cluster_id}.json")

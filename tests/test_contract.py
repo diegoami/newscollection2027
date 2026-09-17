@@ -35,11 +35,15 @@ from typing import Any
 import pytest
 
 from nc.cluster import (
+    STATUS_ANALYZED,
     STATUS_PENDING,
     STATUS_SUPERSEDED,
     Cluster,
     ClusterItem,
+    pending_clusters,
+    pending_path,
     render,
+    set_cluster_status,
 )
 from nc.contract import (
     DEFAULT_SCHEMA_PATH,
@@ -63,13 +67,19 @@ OUTSIDER = "d" * 40
 CLUSTER_ID = "2026-09-17-abc123"
 
 
-def _member(item_id: str, outlet: str, title: str, lede: str) -> ClusterItem:
+def _member(
+    item_id: str,
+    outlet: str,
+    title: str,
+    lede: str,
+    published: str = "2026-09-17T10:00:00Z",
+) -> ClusterItem:
     return ClusterItem(
         item_id=item_id,
         outlet=outlet,
         title=title,
         lede=lede,
-        published="2026-09-17T10:00:00Z",
+        published=published,
     )
 
 
@@ -571,3 +581,112 @@ def test_check_against_cluster_refuses_a_mismatched_cluster() -> None:
     other = _cluster(id="2026-09-16-ffffff")
     problems = check_against_cluster(Analysis.model_validate(_analysis()), other)
     assert any("checked against" in problem for problem in problems)
+
+
+# --- the loop: pending -> analysis -> validate -> off the queue -----------
+
+
+def test_a_valid_analysis_takes_the_cluster_off_the_queue(tmp_path: Path) -> None:
+    """T32's loop, end to end: `nc pending` lists it, an analysis
+    validates, and it is gone from both the status and the mirror."""
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    pending_path(data_root, CLUSTER_ID).parent.mkdir(parents=True, exist_ok=True)
+    pending_path(data_root, CLUSTER_ID).write_text(render(_cluster()), "utf-8")
+    _write_analysis(data_root, _analysis())
+
+    assert [c.id for c in pending_clusters(data_root)] == [CLUSTER_ID]
+
+    report = run_validate(data_root, state_path=tmp_path / "state.json")
+
+    assert (report.valid, report.marked_analyzed) == (1, 1)
+    assert pending_clusters(data_root) == []
+    assert not pending_path(data_root, CLUSTER_ID).exists()
+    stored = json.loads(
+        (data_root.resolve("clusters", "2026-09-17", f"{CLUSTER_ID}.json")).read_text()
+    )
+    assert stored["status"] == STATUS_ANALYZED
+
+
+def test_a_rejected_analysis_puts_the_cluster_back_on_the_queue(
+    tmp_path: Path,
+) -> None:
+    """Otherwise a cluster whose analysis was thrown out would sit
+    marked `analyzed` with nothing analysing it."""
+    data_root = DataRoot(tmp_path / "data")
+    analyzed = _cluster(status=STATUS_ANALYZED)
+    _write_cluster(data_root, analyzed)
+    _write_analysis(data_root, _analysis(cluster_version=1))
+
+    assert pending_clusters(data_root) == []
+
+    report = run_validate(data_root, state_path=tmp_path / "state.json")
+
+    assert report.requeued == 1
+    assert [c.id for c in pending_clusters(data_root)] == [CLUSTER_ID]
+    assert pending_path(data_root, CLUSTER_ID).exists()
+
+
+def test_validating_twice_writes_nothing_the_second_time(tmp_path: Path) -> None:
+    """The idempotence obligation every writer in this project carries:
+    a cron fires at the data repo and a re-run with nothing new to say
+    must produce no diff."""
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    _write_analysis(data_root, _analysis())
+    state = tmp_path / "state.json"
+
+    run_validate(data_root, state_path=state)
+    path = data_root.resolve("clusters", "2026-09-17", f"{CLUSTER_ID}.json")
+    before, mtime = path.read_bytes(), path.stat().st_mtime_ns
+
+    second = run_validate(data_root, state_path=state)
+
+    assert second.marked_analyzed == 0
+    assert path.read_bytes() == before
+    assert path.stat().st_mtime_ns == mtime
+
+
+def test_a_superseded_cluster_is_never_marked_analyzed(tmp_path: Path) -> None:
+    """Its analysis is history by definition, so claiming otherwise
+    would make a superseded cluster look current."""
+    data_root = DataRoot(tmp_path / "data")
+    cluster = _cluster(status=STATUS_SUPERSEDED, superseded_by="2026-09-16-ffffff")
+    assert set_cluster_status(data_root, cluster, STATUS_ANALYZED) is None
+
+
+def test_pending_is_oldest_first(tmp_path: Path) -> None:
+    """A story is worth least once it is a day old, so an agent that
+    runs out of budget should have spent it on today's news."""
+    data_root = DataRoot(tmp_path / "data")
+    older = _cluster(
+        id="2026-09-16-aaaaaa",
+        items=(
+            _member(
+                VERGE,
+                "theverge",
+                "Older story",
+                "Filed yesterday.",
+                published="2026-09-16T08:00:00Z",
+            ),
+            _member(
+                ARS,
+                "arstechnica",
+                "Older story too",
+                "Also yesterday.",
+                published="2026-09-16T09:00:00Z",
+            ),
+        ),
+    )
+    _write_cluster(data_root, _cluster())
+    _write_cluster(data_root, older)
+
+    assert [c.id for c in pending_clusters(data_root)] == [older.id, CLUSTER_ID]
+
+
+def test_the_shipped_prompt_states_the_rules_the_validator_enforces() -> None:
+    """The skill and the API backend share this file. If it stops
+    naming a rule, both backends start failing on it at once."""
+    prompt = Path("prompts/analyze.md").read_text(encoding="utf-8")
+    for needle in ("verbatim", "15 WORDS", "80 WORDS", "at least two", "item_id"):
+        assert needle in prompt, needle

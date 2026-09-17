@@ -5,7 +5,7 @@ added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
 T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
 `judge` and `bench-judge` by T24;
-`validate` by T30.
+`validate` by T30; `pending` by T32.
 """
 
 from __future__ import annotations
@@ -186,6 +186,26 @@ def _judge(args: argparse.Namespace) -> int:
     for pair in shown:
         print()
         print(judge.render_pair_question(pair), end="")
+    return 0
+
+
+def _pending(args: argparse.Namespace) -> int:
+    """T32: the clusters awaiting an analysis, oldest first.
+
+    The queue an agent works through, and the input half of the file
+    contract: each line names the file in `pending/` that holds the
+    cluster's id, version and items. `nc validate` is what removes one
+    from this list, by marking the cluster analyzed.
+    """
+    data_root = _data_root(args)
+    queue = cluster.pending_clusters(data_root)
+    print(f"pending: {len(queue)} cluster(s) awaiting analysis")
+    for entry in queue[: args.limit] if args.limit else queue:
+        outlets = ", ".join(sorted(entry.outlets))
+        print(f"  {entry.id}  v{entry.version}  {len(entry.items)} item(s)  {outlets}")
+        if args.verbose:
+            for member in entry.items:
+                print(f"      [{member.outlet}] {member.title}")
     return 0
 
 
@@ -422,6 +442,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "non-zero if anything is refused",
     )
     judge_parser.set_defaults(func=_judge)
+
+    pending_parser = subparsers.add_parser(
+        "pending",
+        help="list clusters awaiting analysis (T32)",
+    )
+    pending_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    pending_parser.add_argument(
+        "--limit", type=int, default=None, help="show at most this many"
+    )
+    pending_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="also print each cluster's outlets and headlines",
+    )
+    pending_parser.set_defaults(func=_pending)
 
     validate_parser = subparsers.add_parser(
         "validate",

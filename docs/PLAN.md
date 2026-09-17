@@ -145,10 +145,19 @@ acceptance criteria are shown in a merged PR.
   Message Batches API.
   AC: runs over the golden clusters with at least 95 percent passing the
   validator on the first try.
-- **T32 (O, size M)** Claude Code backend: finalize
+- **T32 (O, size M)** ~~Claude Code backend: finalize
   `.claude/skills/analyze-clusters/SKILL.md` so an agent can produce valid
   analyses from pending files using the same prompt; `nc pending` and
-  `nc validate --new` support the loop.
+  `nc validate --new` support the loop.~~ **Built; the AC is one cluster
+  short of confirmable.** `prompts/analyze.md` holds the brief, shared
+  with T31's backend, and the skill covers only the loop around it.
+  `nc pending` lists the queue oldest first; `nc validate` closes it by
+  marking clusters `analyzed` -- a third status that was missing, and
+  without which the queue never drained. Exercised on the live queue: 4
+  clusters analysed through the skill, **4 valid on the first pass**,
+  queue to zero. The AC asks for five and the corpus holds only four
+  clusters so far, so confirm it after the next few ingest runs rather
+  than calling it proven.
   AC: a dry run in a Claude Code session over five pending clusters passes
   the validator.
 - **T33 (S, size M)** Golden set and eval: 20 clusters under
