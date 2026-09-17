@@ -8,14 +8,14 @@ without reading a single robots.txt or terms page, so whether these feeds
 may be aggregated with attribution is unanswered. It also decides whether
 NYT Technology, which measured well, joins the set.
 
-- 2026-09-17 Thresholds set by the owner from 159 labelled
+- 2026-09-17 Thresholds set by the owner from 174 labelled
   cross-outlet pairs. T23 stays open: its criterion is 200 pairs, the
   corpus is still growing, and the judge-queue size that prices
   `tau_low` is unmeasured. The values are: `tau_high: 1.00`, `tau_low: 0.57`. Auto-linking is
   off. The labels showed cosine cannot separate the two populations --
-  a different-story pair at 0.7710 sits above true matches running down
+  a different-story pair at 0.7992 sits above true matches running down
   to 0.5708 -- so the highest threshold with no false link reached only
-  3 of 27 true pairs. That bought about ten links a run in exchange for
+  4 of 35 true pairs. That bought about ten links a run in exchange for
   owning the pipeline's one unrecoverable failure mode, a story page
   quoting "discrepancies" between outlets that never covered the same
   event. `nc bench-embed` then measured six embedding models across a

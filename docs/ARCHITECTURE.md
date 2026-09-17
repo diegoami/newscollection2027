@@ -150,7 +150,7 @@ across runs; membership changes bump `version` and re-queue the cluster.
 
 **The embedding is a filter, not a classifier, and the LLM does the
 deciding.** That was not the original plan -- the thresholds were meant
-to be tuned into a decision rule -- but 159 labelled pairs and a
+to be tuned into a decision rule -- but 174 labelled pairs and a
 six-model comparison showed cosine cannot separate "same story" from
 "same topic" at any threshold or any model size (docs/CLUSTERING.md).
 So `tau_high` is 1.00: nothing links on a judgement about similarity,

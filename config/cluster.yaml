@@ -7,21 +7,21 @@
 # re-tuned.
 #
 # ===========================================================================
-# SET FROM 159 LABELLED PAIRS. T23 IS NOT FINISHED -- REVISIT THESE.
+# SET FROM 174 LABELLED PAIRS. T23 IS NOT FINISHED -- REVISIT THESE.
 # ===========================================================================
 #
 # These are measured, not guessed, which is the difference from what
 # stood here before. They are not final. T23 asks for at least 200
-# labelled near-threshold pairs and the first session produced 159, the
-# labelling corpus is still growing with every ingest run, and the one
-# number that prices `tau_low` -- how many pairs a run lands in the
+# labelled near-threshold pairs and the sessions so far produced 174,
+# the labelling corpus is still growing with every ingest run, and the
+# one number that prices `tau_low` -- how many pairs a run lands in the
 # widened band -- has not been measured yet. Treat them as the best
 # available reading of real evidence, and expect to move them.
 #
 # These are no longer guesses, but they are also not the numbers T23
 # was expected to produce. The labelling session found that cosine
 # cannot separate the two populations at all: a different-story pair
-# scored 0.7710 while true matches ran down to 0.5708. No cutoff links
+# scored 0.7992 while true matches ran down to 0.5708. No cutoff links
 # the true pairs without also linking that false one. `nc bench-embed`
 # then measured six embedding models over a 64x parameter range
 # (2M to 128M) and the separability did not move -- see
@@ -43,10 +43,19 @@
 # authoritative, and nothing downstream can recover it. A missed link
 # only costs a story an outlet, and T24's judge is exactly what recovers
 # those. Measured at T23, the highest threshold with no false link at
-# all reached 3 of 27 true pairs (recall 0.111): auto-linking bought
+# all reached 4 of 35 true pairs (recall 0.114): auto-linking bought
 # about 10 links a run while owning the only unrecoverable failure mode
 # in the pipeline. That is a bad trade at any price, and the benchmark
 # showed no model that improves it.
+#
+# It is also an unstable number, which is the stronger argument. A
+# first pass of 159 labels put the highest false pair at 0.7710 and
+# would have justified tau_high around 0.78. Fifteen more labels
+# produced a higher false pair -- two iPhone buying-advice pieces at
+# 0.7992, same subject, no shared event -- and that threshold would
+# already be making a false link. The ceiling on safe auto-linking
+# moved up, not down, with more evidence. A threshold that tracks
+# whichever unlucky pair arrived most recently is not one to ship.
 #
 # What cosine is good at, on the same evidence, is *ranking*: every
 # model measured scored 0.89-0.95 AUC, and the one configured today is
