@@ -286,6 +286,18 @@ STATUS_PENDING = "pending"
 # says a cluster was absorbed and the field says which cluster took
 # it; a reader needs both to follow the chain.
 STATUS_SUPERSEDED = "superseded"
+# T32. What takes a cluster off the analysis queue, set by `nc validate`
+# once an analysis of *this* version passes the contract -- this module
+# never sets it, because only the validator knows whether an analysis
+# exists and holds up (CLAUDE.md: "nc validate decides").
+#
+# The re-queue is already handled above and needs nothing here: an
+# unchanged cluster keeps whatever status it had, so `analyzed` sticks,
+# while any membership change bumps `version` and resets the status to
+# `pending`, which is exactly "membership changes re-queue the cluster"
+# from docs/ARCHITECTURE.md. `write_run` then mirrors that onto
+# `pending/` and the queue drains and refills by itself.
+STATUS_ANALYZED = "analyzed"
 
 
 # --- config ---------------------------------------------------------------
@@ -1367,4 +1379,59 @@ def format_report(report: RunReport, config: ClusterConfig) -> str:
             f"for nc label, sampled from [{config.sample_floor}, 1.0] "
             f"(docs/CLUSTERING.md)",
         )
+    )
+
+
+def set_cluster_status(
+    data_root: DataRoot, cluster: Cluster, status: str
+) -> Cluster | None:
+    """Rewrite one cluster's `status` and mirror `pending/` to match.
+
+    T32's half of the analysis loop, and the only thing that takes a
+    cluster off the queue. `nc validate` calls it, this module never
+    does: whether an analysis exists and holds up is the validator's
+    decision, and CLAUDE.md gives that decision exactly one home.
+
+    Returns the updated cluster, or `None` when the status already said
+    that -- `_write_if_changed` throughout, so a re-validated run with
+    nothing new to say writes no bytes and the data repository stays
+    quiet under a cron (module docstring, section 3).
+
+    A superseded cluster is never touched: its analysis is history by
+    definition (docs/ARCHITECTURE.md, "An analysis is current"), and
+    marking it analyzed would claim something current about a cluster
+    that has been absorbed.
+    """
+    if cluster.status == STATUS_SUPERSEDED or cluster.status == status:
+        return None
+    updated = replace(cluster, status=status)
+    text = render(updated)
+    _write_if_changed(cluster_path(data_root, updated), text)
+    path = pending_path(data_root, updated.id)
+    if status == STATUS_PENDING:
+        _write_if_changed(path, text)
+    elif path.exists():
+        path.unlink()
+    return updated
+
+
+def pending_clusters(data_root: DataRoot) -> list[Cluster]:
+    """`nc pending`: the clusters awaiting an analysis, oldest first.
+
+    Read from `clusters/` filtered on status rather than by listing
+    `pending/`, so the queue and the status can never disagree about
+    what is waiting -- the directory is a mirror for the agent's
+    convenience, and the status in the cluster file is the fact.
+
+    Oldest first because a story is worth least once it is a day old,
+    and an agent that runs out of budget should have spent it on
+    today's news.
+    """
+    return sorted(
+        (
+            cluster
+            for cluster in load_clusters(data_root)
+            if cluster.status == STATUS_PENDING
+        ),
+        key=lambda cluster: (cluster.anchor_published, cluster.id),
     )

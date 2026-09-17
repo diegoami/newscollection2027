@@ -116,6 +116,26 @@ status is not `superseded` and its `cluster_version` equals that
 cluster's current `version`. Anything else is history. The validator,
 the site and the nightly run all decide staleness this way.
 
+**The queue drains and refills by itself.** A cluster's `status` is the
+fact and `pending/` is a mirror of it, so the two can never disagree
+about what is waiting:
+
+```
+nc cluster   new cluster            -> pending
+             membership changed     -> version + 1, back to pending
+             membership unchanged   -> status kept as it was
+nc validate  analysis passes        -> analyzed, pending file removed
+             analysis rejected      -> back to pending
+```
+
+Only `nc validate` ever writes `analyzed`, because only the validator
+knows an analysis both exists and holds up -- CLAUDE.md gives that
+decision one home and this is it. Everything else follows from
+clustering's existing rule that an unchanged cluster is re-emitted
+untouched: `analyzed` sticks until the membership actually changes, and
+a story that gains a fourth outlet is re-queued without anything having
+to track which analyses are stale.
+
 **Analysis** (see `contract/analysis.schema.json`)
 
 ```
