@@ -7,45 +7,64 @@
 # re-tuned.
 #
 # ===========================================================================
-# PROVISIONAL VALUES. NOT TUNED. T23 SETS THE REAL ONES.
+# TUNED AT T23, from 159 labelled cross-outlet pairs. Set by the owner.
 # ===========================================================================
 #
-# docs/PLAN.md T22 builds `nc label` and `nc tune`; T23 is the owner
-# labelling at least 200 near-threshold pairs and setting tau_low and
-# tau_high from the `nc tune` precision/recall report. Until that has
-# happened, the two numbers below are a defensible starting point and
-# nothing more. They have not been measured against a single real pair.
-# Do not quote them as tuned, and do not treat clustering output
-# produced with them as evidence about the thresholds themselves.
+# These are no longer guesses, but they are also not the numbers T23
+# was expected to produce. The labelling session found that cosine
+# cannot separate the two populations at all: a different-story pair
+# scored 0.7710 while true matches ran down to 0.5708. No cutoff links
+# the true pairs without also linking that false one. `nc bench-embed`
+# then measured six embedding models over a 64x parameter range
+# (2M to 128M) and the separability did not move -- see
+# docs/CLUSTERING.md. So the thresholds below do not try to classify.
+# They route.
 
-# Pairs at or above tau_high are linked automatically.
+# Pairs at or above tau_high are linked automatically, with no judge
+# and no second opinion.
 #
-# Chosen high on purpose: the two errors are not symmetric. A false link
-# merges two unrelated stories into one cluster, and the analysis step
-# then dutifully reports "discrepancies" between outlets that were never
-# covering the same event -- a visibly wrong story on the site, with
-# verbatim quotes that make it look authoritative. A missed link only
-# costs a story an outlet, or drops it as a single-outlet component that
-# nobody sees. Recall is also the thing the borderline band and T24's
-# judge exist to recover; precision is not recoverable downstream.
+# 1.0 switches that off, deliberately. It does not mean "never link":
+# two outlets running identical wire copy embed to the same vector and
+# still link at cosine 1.0, which is correct -- identical text is the
+# same story. It means nothing links on a *judgement* about similarity.
 #
-# 0.80 is where near-duplicate short news text (same event, different
-# newsroom's headline and lede) sits for a static embedding model on
-# cosine, comfortably above the same-topic-different-story range. It is
-# a starting point for T23's labelling, not a measurement.
-tau_high: 0.80
+# Why give it up. The two errors are not symmetric. A false link merges
+# unrelated stories into one cluster and the analysis step dutifully
+# reports "discrepancies" between outlets that never covered the same
+# event -- a visibly wrong story, with verbatim quotes that make it look
+# authoritative, and nothing downstream can recover it. A missed link
+# only costs a story an outlet, and T24's judge is exactly what recovers
+# those. Measured at T23, the highest threshold with no false link at
+# all reached 3 of 27 true pairs (recall 0.111): auto-linking bought
+# about 10 links a run while owning the only unrecoverable failure mode
+# in the pipeline. That is a bad trade at any price, and the benchmark
+# showed no model that improves it.
+#
+# What cosine is good at, on the same evidence, is *ranking*: every
+# model measured scored 0.89-0.95 AUC, and the one configured today is
+# the best of them at 0.946. So it stays in the pipeline as a recall
+# filter that keeps the judge from being handed all ~49,000 pairs in a
+# window -- not as a classifier.
+tau_high: 1.00
 
-# Pairs below tau_low never link, and are never shown to anyone: they do
-# not reach T24's judge and they do not reach `nc label`.
+# Pairs below tau_low never link and are never judged. With tau_high at
+# 1.0, tau_low is now the only threshold that decides anything: the
+# band [tau_low, 1.0) is the judge's queue, and this number is the line
+# between "worth an LLM call" and "not a story pair".
 #
-# The band [tau_low, tau_high) is 0.15 wide, which is the real decision
-# here. Too narrow and T23 has almost no near-threshold pairs to label
-# and T24's judge sees nothing; too wide and the judge is asked about
-# thousands of obviously unrelated pairs every run, which costs tokens
-# for nothing. 0.65 keeps the band around the range where "same topic,
-# different story" and "same story" actually overlap for this kind of
-# text, which is the population T22/T23 need to look at.
-tau_low: 0.65
+# 0.57 is where all 27 labelled true pairs sit at or above (the lowest
+# was 0.5708). Set higher and real matches are discarded silently,
+# before anything can recover them -- at the previous 0.65, four
+# labelled true pairs fell below the band, including SpaceX's Starship
+# launch date carried by two outlets at 0.5926.
+#
+# The cost is the judge's bill, and it is the one number here still
+# unmeasured: `pending-pairs/` was only ever exhaustive above 0.65, so
+# how many pairs a run actually lands in [0.57, 0.65) is not known yet.
+# The next `nc cluster` run reports it. If that queue turns out too
+# expensive for T24, raise this number and accept losing the matches
+# below it -- but raise it against a measured count, not a guess.
+tau_low: 0.57
 
 # docs/ARCHITECTURE.md, Clustering: "Window: items from the last 4
 # days." Restated here rather than inlined in the module, per CLAUDE.md.

@@ -371,3 +371,51 @@ every pair and recomputes the cosine rather than reading `Label.score`.
 vector cache's key, so a change re-embeds every stored item, and both
 thresholds were tuned against the old model's scale and become
 meaningless with it. The two move together, or not at all.
+
+## What the model comparison found
+
+`nc bench-embed` was run on 2026-09-17 against the 159 labelled pairs,
+over six model2vec models spanning a 64x parameter range:
+
+```
+model                          recall@p1.0     auc      tau  top false  judge
+potion-retrieval-32M                 0.222   0.923   0.7051     0.6974     21
+potion-base-4M                       0.148   0.935   0.8100     0.8091     23
+potion-base-32M                      0.148   0.925   0.7567     0.7530     23
+potion-base-8M  (configured)         0.111   0.946   0.8175     0.7710     24
+potion-base-2M                       0.111   0.920   0.8487     0.8333     24
+potion-multilingual-128M             0.111   0.889   0.8351     0.8061     24
+```
+
+**The curve is flat.** 2M to 128M is sixty-four times the parameters and
+recall at precision 1.0 goes 0.111, 0.148, 0.111, 0.148, 0.111. There is
+no relationship between capacity and separability on this task. That is
+the answer to "would a better model fix this": within static embeddings,
+no — and the ladder was built to answer exactly that, so the flatness is
+a result rather than a disappointment.
+
+**Every model ranks well and classifies badly.** AUC runs 0.889 to 0.946
+across the six, and the configured model is the best of them. High AUC
+with low recall-at-precision-1.0 means the same thing every time: the
+ordering is broadly right, but a few different-story pairs score at the
+very top, above most true matches. Those are the topic-versus-event
+confusions — two AI-safety pieces, two iOS 27 articles — and capacity
+cannot fix them, because both articles genuinely are about the same
+subject. Only something that reasons about *events* can tell them apart.
+
+**Do not read the top row as a winner.** `potion-retrieval-32M` leads on
+recall@p1.0, but 0.222 against 0.111 is three pairs out of 27, and its
+AUC is lower than the configured model's. Switching costs a re-embed of
+every stored item and re-tuning both thresholds from scratch. Three
+pairs, inside the noise, does not pay for that.
+
+**What it changed.** The thresholds, not the model. Cosine stays as a
+recall filter — its real strength, and what keeps the judge from being
+handed all ~49,000 pairs in a four-day window — and stops being asked to
+classify. `tau_high: 1.00`, `tau_low: 0.57`; see `config/cluster.yaml`
+for the reasoning on each and `docs/DECISIONS.md` for the decision.
+
+The honest caveat, repeated because it matters: 27 positives is a thin
+basis, and recall@p1.0 turns on a single pair — the highest-scoring
+false one. What carries the conclusion is not any single row but six
+independent measurements agreeing that size does not help.
