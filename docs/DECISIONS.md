@@ -8,6 +8,35 @@ without reading a single robots.txt or terms page, so whether these feeds
 may be aggregated with attribution is unanswered. It also decides whether
 NYT Technology, which measured well, joins the set.
 
+- 2026-09-17 T23 closed by the owner at 198 clean labels, not 200.
+  The count was always a proxy for "enough evidence to set two
+  thresholds", and the evidence settled before the count did.
+  `tau_low: 0.57` has held across three independent rounds: the lowest
+  labelled true pair is 0.5708 and has not moved, and the last session
+  added 16 positives, none below it. `tau_high: 1.00` stands on the
+  six-model benchmark rather than on any single pair -- which matters,
+  because the pair it was originally argued from (a false match at
+  0.7992) turned out to be buying advice and was retired. On the clean
+  corpus the ceiling is 0.7710 and has now stopped climbing, but at 8
+  of 49 true pairs it still buys a fraction of the work in exchange for
+  the one unrecoverable failure mode, and the judge answers the band at
+  0.881 agreement.
+  The number T23 explicitly left open was measured before closing:
+  widening `tau_low` from 0.65 to 0.57 is 66% of the judge's queue (168
+  of 253 pairs) and buys back 27% of the labelled true pairs (13 of
+  49). A good trade only because the judge runs on the Claude Code
+  subscription; the first thing to revisit if it ever runs metered.
+  Still unmeasured and now blocked on T13 rather than on labelling:
+  what a single night costs. The 253-pair queue is a catch-up count
+  over every borderline pair since clustering began -- `pending-pairs/`
+  has never been pruned -- not a rate.
+  Also settled in this round: the labelling pool excludes same-outlet
+  pairs, coupon posts and buyer's guides, which raised the positive
+  rate of a session from 1 in 5 to better than 1 in 2. Same-outlet
+  pairs stay in the judge's queue, where measurement showed the
+  bridging case they were kept for occurs 3 times in 92 and would be
+  wrong all three times -- recorded as an open question rather than
+  acted on.
 - 2026-09-17 The judge is a file contract, and a `no` is inert. T24
   writes `judgments/<pair_id>.json` and validates it before anything
   links, exactly as the analysis step does -- the alternative, a backend

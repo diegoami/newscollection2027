@@ -99,8 +99,17 @@ acceptance criteria are shown in a merged PR.
   pairs and records yes or no to `data/labels/pairs.jsonl`; `nc tune`
   prints precision and recall per threshold from the labels.
   AC: both commands work on fixture data; docs in `docs/CLUSTERING.md`.
-- **T23 [owner]** Label at least 200 near-threshold pairs and set
-  `tau_low` and `tau_high` from the `nc tune` report.
+- **T23 [owner]** ~~Label at least 200 near-threshold pairs and set
+  `tau_low` and `tau_high` from the `nc tune` report.~~ **Done** at 198
+  clean labels (49 positive), closed by the owner. Not 200, because the
+  count was a proxy for "enough evidence to set two thresholds" and the
+  evidence settled first: `tau_low: 0.57` held across three independent
+  rounds with no true pair ever below 0.5708, and `tau_high: 1.00`
+  stands because cosine cannot separate the populations at any
+  threshold or model size. The number T23 left open -- what widening
+  `tau_low` costs -- was measured before closing: 66% of the judge's
+  queue for 27% of the true pairs. See docs/CLUSTERING.md, "Closing
+  T23".
 - **T24 (S, size S)** Borderline pair judgments: pairs in
   `[tau_low, tau_high)` written to `data/pending-pairs/`, judged by the
   analysis backend with a yes-or-no schema, results merged into the next

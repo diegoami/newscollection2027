@@ -672,3 +672,193 @@ against:
 The first two no longer matter for the judge — the filter removes those
 pairs before it sees them — but they still sit in the corpus that
 `tau_low` and every future eval are read from.
+
+### What a labelling session is allowed to see
+
+`labelling_pool` is the union of `pending-pairs/` and `label-sample/`,
+and it now filters two kinds of pair out of that union. Both were
+already excluded from `label-sample/`; both were reachable anyway,
+because `pending-pairs/` is T24's judge queue and is built to different
+rules.
+
+**Same-outlet pairs.** `select_label_sample` has skipped them since #40,
+but the judge queue keeps them deliberately: a same-outlet pair cannot
+form a cluster on its own (a cluster needs two distinct outlets) yet can
+still bridge two components. That is the right rule for a machine
+working a queue and the wrong one for a human working an hour, so the
+line goes in the pool rather than in the directory. On the 2026-09-17
+pool, 92 of 362.
+
+**Promotional items and buying advice.** `nc cluster` drops these from
+the window, so no *new* pair can contain one — but pair files written
+before a rule existed are still on disk, and nothing prunes them
+(`write_pending_pairs` only ever adds). Filtering at read time catches
+those too, and means editing `config/promo.yaml` changes the next
+session with no migration: the same argument `nc.promo` makes for
+filtering at cluster time rather than at ingest. On that same pool, 11
+of 362. Only the title rules apply — a `PendingPair` denormalizes
+outlet, title, lede and published, but not tags, so `classify_title`
+exists to say what it can actually decide rather than fake an `Item`
+with empty tags and quietly claim a check that did not happen.
+
+Together: **362 pairs → 261**, of which 93 are still unlabelled.
+
+### What the existing corpus turned out to contain
+
+Measured before deciding whether to relabel from scratch, and worth
+recording because the answer was not what it looked like:
+
+```
+174 labels, 35 positive
+  same-outlet            0
+  promo / buying advice  6   (2 of them positive)
+  clean                168   (33 positive)
+```
+
+So the corpus was never polluted with same-outlet pairs — the sample
+they were drawn from had excluded those all along, and the pool's 92
+were simply never reached in a session. Discarding all 174 would cost
+168 sound labels, including 33 of the 35 positives, to remove 6. Since
+positives are the scarce class and every threshold and eval in this
+document is read from them, the cheap move is to drop the 6 and keep
+the rest — which is what the owner ruled. The six moved to
+`labels/retired-2026-09-17.jsonl`, in the same directory, rather than
+being deleted.
+
+### Retiring those six moved the number `tau_high` was argued from
+
+This is the part worth reading twice. All six were buying advice, and
+one of them was **the 0.7992 ZDNet/Wired pair this document quotes as
+the corpus's highest-scoring false positive** — the single strongest
+piece of evidence for `tau_high: 1.00`. Removing it changes the shape
+of the table:
+
+```
+                              174 labels   168 labels
+highest-scoring false pair        0.7992       0.7710
+true pairs above it                 4/35         6/33
+recall at precision 1.0            0.114        0.182
+lowest true pair                  0.5708       0.5708
+```
+
+The honest reading: the argument recorded above — "the ceiling on safe
+auto-linking rose with more evidence rather than settling" — was made
+from a pair that the buying-advice filter now stops before it ever
+reaches the pipeline. That specific argument no longer stands. On the
+clean corpus the ceiling is back to 0.7710, exactly where the 159-label
+round put it, and a `tau_high` around 0.78 would once again look safe
+on this evidence.
+
+What has not changed, and is why `tau_high: 1.00` stays anyway:
+
+- Even at its best, the threshold reaches 6 of 33 true pairs. The other
+  82% need the judge regardless, so auto-linking buys a fraction of the
+  work while owning the one failure mode nothing downstream can
+  recover.
+- `nc bench-embed` measured six models across a 64x parameter range and
+  separability did not move. That finding is independent of any single
+  pair.
+- The judge now exists, answers the band, and agrees with the owner's
+  labels 0.881 of the time. There was a case for a threshold when
+  nothing else could decide; there is not one now.
+
+If `tau_high` is ever revisited, this table is the place to start, and
+the thing to check first is whether the top false pair has moved again
+— it has now moved twice, in both directions, on corpus changes of
+fewer than twenty labels.
+
+### The clean-pool labelling session, 2026-09-17
+
+The first session run against the filtered pool. 30 new answers, and
+they are worth more per answer than the ones before them: **16 of the 30
+were positive**, against 33 positives in the previous 168. Removing
+same-outlet pairs, coupon posts and buyer's guides did not just save
+time, it raised the hit rate, because what it removed was almost
+entirely pairs whose answer could only ever be "different".
+
+```
+corpus            198 labels, 49 positive
+highest false pair     0.7710   (unmoved by the 30 new labels)
+recall at p=1.0         0.163   (8 of 49)
+lowest true pair       0.5708
+true pairs below tau_low   0 of 49
+```
+
+Two results in that table.
+
+**`tau_low: 0.57` holds, now across three independent rounds.** The
+lowest labelled true pair is still the same TechCrunch/Tom's Hardware
+pair at 0.5708, and not one of the 16 new positives landed below the
+threshold. That is the number that decides what the judge never gets to
+see, so it is the one worth re-checking every round; it has not moved.
+
+**The highest-scoring false pair did not move either, for the first
+time.** It went 0.7710 → 0.7992 (the round that argued for `tau_high:
+1.00`) → 0.7710 (after the buying-advice pair was retired) → 0.7710
+here, through 30 more labels. A ceiling that stops climbing is the
+first evidence that it might be a real ceiling rather than the
+high-water mark of the last unlucky pair. It is still only 8 of 49 true
+pairs, so it does not change the decision — but a fourth round that
+also leaves it at 0.7710 would be worth acting on.
+
+The merge is the db filtered by the current rules, not an append: the
+page's database holds every answer ever given on it, and the corpus is
+whatever of that the rules still allow. So a retired pair stays retired
+without anyone remembering which six they were, and a pair a later rule
+excludes drops out on the next merge. Of the 222 answers in the db, 24
+are excluded — 6 buying advice, 6 same-outlet, and 12 whose pair file
+was deleted in the `label-sample/` cleanup after #40 (11 of those 12
+same-outlet as well). The twelfth is one genuine cross-outlet negative
+at 0.3686 whose pair file no longer exists to verify it against; it is
+lost rather than silently kept.
+
+**T23 is at 198 of 200.**
+
+### Closing T23: what `tau_low` actually costs
+
+T23 was closed at 198 labels rather than 200, and the missing number it
+named — "how many pairs a run lands in the widened band" — was measured
+before closing it, because that is the half of the task that was
+genuinely outstanding.
+
+On the 253-pair queue of 2026-09-17:
+
+```
+                            queue pairs        labelled true pairs
+[0.57, 0.65)  the widening    168  (66%)             13  (27%)
+[0.65, 1.00)  the old band     85  (34%)             36  (73%)
+```
+
+**Two thirds of everything the judge is asked comes from widening
+`tau_low` from 0.65 to 0.57, and it buys back roughly a quarter of the
+true pairs.** That is the trade, stated in the units that matter, and it
+is a good one — but only because the judge runs on the Claude Code
+subscription rather than a metered bill (docs/ARCHITECTURE.md's cost
+model). If the judge ever moves to metered calls, this is the first
+number to revisit, and the 13 pairs above are exactly what would be
+lost: real cross-outlet matches, including the Starship launch date two
+outlets both carried at 0.5926 and the TechCrunch/Tom's Hardware pair at
+0.5708 that has anchored `tau_low` through three rounds.
+
+The queue figure is a catch-up count, not a steady-state rate — the
+pending-pairs directory has never been pruned, so it holds every
+borderline pair since clustering began. What a single night costs is
+still unmeasured, and needs the nightly Routine (T13) running before it
+can be.
+
+**T23 is closed.** Not because 198 reached 200, but because the
+criterion was always a proxy for "enough evidence to set two
+thresholds", and the evidence now says:
+
+- `tau_low: 0.57` — the lowest labelled true pair is 0.5708 and has not
+  moved in three rounds; 16 new positives in the last session, none
+  below it. Its price is measured above.
+- `tau_high: 1.00` — auto-linking stays off. The ceiling has stopped
+  climbing (0.7710 twice in a row), but at 8 of 49 true pairs it is
+  still buying a fraction of the work in exchange for the one
+  unrecoverable failure mode, and the judge now answers the band at
+  0.881 agreement.
+
+Two more labels would not change either number. What would change them
+is a fourth round that leaves the ceiling at 0.7710 again, or a nightly
+run that prices the band for real.

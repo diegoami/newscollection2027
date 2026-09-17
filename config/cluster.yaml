@@ -7,16 +7,29 @@
 # re-tuned.
 #
 # ===========================================================================
-# SET FROM 174 LABELLED PAIRS. T23 IS NOT FINISHED -- REVISIT THESE.
+# SET FROM 198 CLEAN LABELS (49 positive). T23 IS CLOSED -- these are the
+# numbers it produced, not provisional guesses. tau_low held across three
+# independent rounds: no labelled true pair has ever scored below 0.5708,
+# and 16 new positives in the last session all landed above it. The
+# highest-scoring false pair is 0.7710 and has now stopped climbing.
+#
+# What it costs, measured before closing: widening tau_low from 0.65 to
+# 0.57 is 66% of the judge's queue and buys back 27% of the true pairs.
+# Worth it while the judge runs on the subscription; the first number to
+# revisit if it ever runs on a metered bill.
+#
+# History worth knowing before changing anything: 6 of the original 174
+# labels were later retired as buying advice, and one of those six was
+# the 0.7992 pair tau_high was argued from. See docs/CLUSTERING.md,
+# "Closing T23: what tau_low actually costs".
 # ===========================================================================
 #
-# These are measured, not guessed, which is the difference from what
-# stood here before. They are not final. T23 asks for at least 200
-# labelled near-threshold pairs and the sessions so far produced 174,
-# the labelling corpus is still growing with every ingest run, and the
-# one number that prices `tau_low` -- how many pairs a run lands in the
-# widened band -- has not been measured yet. Treat them as the best
-# available reading of real evidence, and expect to move them.
+# These are measured, not guessed. They are also not frozen: the
+# labelling corpus still grows with every ingest run, and what a single
+# night costs is unmeasured until the nightly Routine (T13) runs -- the
+# queue figure above is a catch-up count over every borderline pair
+# since clustering began, not a rate. Treat them as a settled reading of
+# real evidence rather than a final answer.
 #
 # These are no longer guesses, but they are also not the numbers T23
 # was expected to produce. The labelling session found that cosine

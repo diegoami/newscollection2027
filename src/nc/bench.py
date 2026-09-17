@@ -6,7 +6,7 @@ absorbed by threshold tuning, not by reaching for a heavier model on a
 job that runs 8 times a day for free." T23's first labelling session
 measured that claim and it does not hold. Threshold tuning can only
 absorb weak embeddings if the same-story and different-story pairs are
-*separable* by some cutoff, and on the 174 labels gathered so far they
+*separable* by some cutoff, and on the 174 labels gathered by T23 they
 are not: a different-story pair scored 0.7992 while true matches ran
 down to 0.5708, so every threshold either links that false pair or
 misses most of the true ones.
