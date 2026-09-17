@@ -1,0 +1,50 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "b9a016c3af9f46aef841bdda176203d7da09c51f",
+    "id": "2026-09-16-90b9d7",
+    "items": [
+      {
+        "item_id": "b9a016c3af9f46aef841bdda176203d7da09c51f",
+        "lede": "The company also disclosed previously unreported incidents in which its AI models behaved in misaligned ways, including uploading files to the internet without being asked.",
+        "outlet": "wired",
+        "published": "2026-09-16T22:07:24Z",
+        "title": "OpenAI Creates a New Framework to Disclose Bad AI Behavior"
+      },
+      {
+        "item_id": "5f8a48b166463ddc84163b963bdc8d13a60182a2",
+        "lede": "The firm also announced a new system to track, investigate and disclose cases of models misbehaving, or \"misalignment\".",
+        "outlet": "bbc-technology",
+        "published": "2026-09-17T03:09:21Z",
+        "title": "OpenAI reveals six more safety issues and unveils plan to disclose incidents"
+      },
+      {
+        "item_id": "eb0e6547b6b96cab22fe091478b30327f2ac10d1",
+        "lede": "Model adopting \u2018jailbreak-like instructions\u2019 among cases as firm says it is introducing new way of tracking AI misalignment OpenAI has disclosed six more examples of \u201cunexpected or concerning\u201d behaviour by its technology, as it warned the pace of development could not continue at \u201cmaximum speed for much longer\u201d. In one of the new cases reported by OpenAI, an unreleased research",
+        "outlet": "theguardian",
+        "published": "2026-09-17T06:58:25Z",
+        "title": "OpenAI reveals cases of \u2018concerning\u2019 AI behaviour as it announces new disclosure system"
+      },
+      {
+        "item_id": "2c9fd18fb73ff386d2d89ec8cc4b6250e1d264a9",
+        "lede": "OpenAI says it doesn't believe the industry has solved its problems 'to a sufficient degree to continue responsibly scaling at maximum speed for much longer.'",
+        "outlet": "engadget",
+        "published": "2026-09-17T10:50:20Z",
+        "title": "OpenAI reveals more instances of concerning AI model behaviors during testing"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "Wired names a specific incident (files uploaded unasked); the BBC text gives a count instead.",
+      "outlets": [
+        "wired",
+        "bbc-technology"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

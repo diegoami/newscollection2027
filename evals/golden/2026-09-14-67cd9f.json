@@ -1,0 +1,27 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "ecf8223020174538997e2b108f0d98248a8e8780",
+    "id": "2026-09-14-67cd9f",
+    "items": [
+      {
+        "item_id": "ecf8223020174538997e2b108f0d98248a8e8780",
+        "lede": "Attack dealt a 'critical blow' to aging infrastructure, with several weeks of disruption expected",
+        "outlet": "theregister",
+        "published": "2026-09-14T16:00:00Z",
+        "title": "Cyberattack sends International Meteor Organization crashing back to Earth"
+      },
+      {
+        "item_id": "c60fc05e1d0d16b4d074b1228405d7242daa9d1d",
+        "lede": "Group plans to be largely out of commission for several weeks.",
+        "outlet": "arstechnica",
+        "published": "2026-09-16T21:08:14Z",
+        "title": "Nonprofit that tracks meteors taken down by \"critical blow\" from a cyberattack"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

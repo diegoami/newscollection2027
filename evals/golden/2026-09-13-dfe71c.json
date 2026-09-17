@@ -1,0 +1,43 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "ef014f445c6aa01aa5af56ebef2c810d3bf44bcb",
+    "id": "2026-09-13-dfe71c",
+    "items": [
+      {
+        "item_id": "ef014f445c6aa01aa5af56ebef2c810d3bf44bcb",
+        "lede": "From the Trump administration to AI experts, plans by the Anthropic boss to boost safety have spawned a largely negative response OpenAI boss and Elon Musk back slowdown on \u2018reckless\u2019 AI development Editorial: controlling AI \u2013 humanity cannot outsource its survival The safety debate that ignited when whistleblowers last week warned that the most advanced AI poses an existential threat",
+        "outlet": "theguardian",
+        "published": "2026-09-13T16:54:58Z",
+        "title": "\u2018Too little, too late\u2019: critics perplexed and suspicious of AI leaders\u2019 call for a slowdown"
+      },
+      {
+        "item_id": "2ae59aa324a72c9f0457b2f8e9816e709bc12ab9",
+        "lede": "The CEOs of OpenAI and Anthropic, as well as other industry leaders, are calling for a general slowdown in AI development over safety fears. On the flip side, Chinese authorities, the U.S. President, and CEO of Nvidia have dismissed their concerns as fearmongering.",
+        "outlet": "tomshardware",
+        "published": "2026-09-15T17:19:36Z",
+        "title": "AI leaders clash over safety fears after Anthropic whistleblower says AI could 'kill us all' by 2030 \u2014 OpenAI, Anthropic and xAI figureheads call for external governance, while Jensen Huang says worries are 'made up'"
+      },
+      {
+        "item_id": "3808e2aaf93d5d6234dcbd8f7ef9374b1a153161",
+        "lede": "AI isn't some new form of \"alien mind,\" according to Jensen Huang. It's just hardware and software, so safety can be engineered by each AI product maker.",
+        "outlet": "techcrunch",
+        "published": "2026-09-16T00:20:39Z",
+        "title": "We don\u2019t need AI regulation \u2014 leave safety to us, Nvidia\u2019s Jensen Huang says"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "framing",
+      "note": "The Guardian frames the slowdown call as inadequate; TechCrunch carries the argument that no regulation is needed.",
+      "outlets": [
+        "theguardian",
+        "techcrunch"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

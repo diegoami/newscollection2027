@@ -1,0 +1,43 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "9e0edb8207eaf4320dff95eeb2c0b17160117ba1",
+    "id": "2026-09-17-7659f9",
+    "items": [
+      {
+        "item_id": "9e0edb8207eaf4320dff95eeb2c0b17160117ba1",
+        "lede": "Mustafa Suleyman says he believes rival AI firm Anthropic is in effect teaching Claude it \"may be conscious\".",
+        "outlet": "bbc-technology",
+        "published": "2026-09-17T08:22:12Z",
+        "title": "Uncontrolled AI could lead to 'silicon species' rivalling humans, warns Microsoft"
+      },
+      {
+        "item_id": "b1623f4db02395c89378243f481976a07ad14559",
+        "lede": "Mustafa Suleyman claims model welfare language could make future systems harder to control \u2013 while sparing OpenAI the same scrutiny",
+        "outlet": "theregister",
+        "published": "2026-09-17T12:15:00Z",
+        "title": "Microsoft AI chief warns Anthropic not to put ideas in Claude's head"
+      },
+      {
+        "item_id": "4c6f8453bd68143b8b38ced8324ce32ab722598e",
+        "lede": "Today, I\u2019m talking with Mustafa Suleyman, the CEO of Microsoft AI. As you\u2019re no doubt aware, the biggest story in tech right now is the spiraling debate about AI safety and regulation. It should come as no surprise that Mustafa has strong opinions on how AI should be built and regulated. Microsoft just published a [\u2026]",
+        "outlet": "theverge",
+        "published": "2026-09-17T14:00:00Z",
+        "title": "Microsoft AI CEO says AI threats are real, and Anthropic is making it worse"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "framing",
+      "note": "The BBC leads on the 'silicon species' warning; The Verge on the accusation against Anthropic.",
+      "outlets": [
+        "bbc-technology",
+        "theverge"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

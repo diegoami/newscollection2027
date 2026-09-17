@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "c2297ec081db00dc9bd1669cbd3035a737da9163",
+    "id": "2026-09-15-bac31f",
+    "items": [
+      {
+        "item_id": "c2297ec081db00dc9bd1669cbd3035a737da9163",
+        "lede": "Ars previewed Mozilla\u2019s report on how cheap open models caught up on capability.",
+        "outlet": "arstechnica",
+        "published": "2026-09-15T12:00:41Z",
+        "title": "Exclusive: Paying for frontier AI models buys 4-month head start at 5x the cost"
+      },
+      {
+        "item_id": "cf7db3420a71aaf897b97398496238e033440bab",
+        "lede": "Mozilla\u2019s State of Open Source AI report puts Kimi K3 about four months behind closed frontier models at 30% of the price.",
+        "outlet": "tomshardware",
+        "published": "2026-09-16T10:15:00Z",
+        "title": "China's open-weight AI models are now just 4 months behind frontier US offerings, Mozilla report claims \u2014 models still lag in some benchmarks but are drastically cheaper to use"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "number",
+      "note": "Ars Technica says 5x the cost; Tom's Hardware says 30% of the price. Those do not reconcile.",
+      "outlets": [
+        "arstechnica",
+        "tomshardware"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

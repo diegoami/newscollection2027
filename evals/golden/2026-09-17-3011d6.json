@@ -1,0 +1,43 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "64fb7aa646dd2d13619b92341ee214ce121929af",
+    "id": "2026-09-17-3011d6",
+    "items": [
+      {
+        "item_id": "64fb7aa646dd2d13619b92341ee214ce121929af",
+        "lede": "Both new open-ear products go on sale next month.",
+        "outlet": "engadget",
+        "published": "2026-09-17T13:00:00Z",
+        "title": "Bose refreshes its Ultra Open Earbuds and adds a new sport model to the lineup"
+      },
+      {
+        "item_id": "ee76106573a49f9f5da56780a26bff18b3062de5",
+        "lede": "Bose announced a new version of its Ultra Open Earbuds that helped kick off the industry trend of clip-on wireless earbuds nearly two-and-a-half years ago. The new Ultra Open Earbuds (2nd Gen) feature a subtle redesign with improved performance in both sound quality and battery life. They're also joined by a new cheaper alternative called [\u2026]",
+        "outlet": "theverge",
+        "published": "2026-09-17T13:00:00Z",
+        "title": "Bose\u2019s next open earbuds have more bass, more volume, and more battery life"
+      },
+      {
+        "item_id": "f219e5828489cb90779de216a66b89495fba53f8",
+        "lede": "Bose announces the Ultra Open (2nd Gen) and the Sport Open Earbuds, offering more options for aware listeners.",
+        "outlet": "zdnet",
+        "published": "2026-09-17T13:00:19Z",
+        "title": "Bose returns with new open earbuds (and a refreshed favorite)"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "Engadget reports a new sport model joining the lineup; The Verge's text covers the refresh only.",
+      "outlets": [
+        "engadget",
+        "theverge"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

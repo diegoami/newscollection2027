@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "706b05ecb86ed3075776e9ca7192c5459975483d",
+    "id": "2026-09-16-02cc05",
+    "items": [
+      {
+        "item_id": "706b05ecb86ed3075776e9ca7192c5459975483d",
+        "lede": "Google has released the September 2026 security patches to address 110 vulnerabilities affecting its Pixel devices, including one zero-day flaw actively exploited in targeted attacks. [...]",
+        "outlet": "bleepingcomputer",
+        "published": "2026-09-16T07:00:19Z",
+        "title": "Google fixes actively exploited Android zero-day on Pixel devices"
+      },
+      {
+        "item_id": "d7449c53d4f5a87cba284c4b83771b887b81417b",
+        "lede": "The Pixel phone maker said there are indications that a bug in the phone's modem \"may be under limited, targeted exploitation.\"",
+        "outlet": "techcrunch",
+        "published": "2026-09-16T14:47:07Z",
+        "title": "Google says some Pixel phone owners were hacked in zero-day attacks"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "omission",
+      "note": "BleepingComputer gives the patch count (110 vulnerabilities); TechCrunch's text describes the modem bug instead.",
+      "outlets": [
+        "bleepingcomputer",
+        "techcrunch"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}

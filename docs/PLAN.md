@@ -169,11 +169,18 @@ acceptance criteria are shown in a merged PR.
   than calling it proven.
   AC: a dry run in a Claude Code session over five pending clusters passes
   the validator.
-- **T33 (S, size M)** Golden set and eval: 20 clusters under
+- **T33 (S, size M)** ~~Golden set and eval: 20 clusters under
   `evals/golden/` with owner-checked expected discrepancies; `nc eval
   --backend api|files` scores schema pass rate, quote validity, and
   discrepancy precision and recall against the golden labels; report
-  written to `evals/reports/<date>.md`.
+  written to `evals/reports/<date>.md`.~~ **Built; one of the two
+  reports is committed.** The 20 golden clusters are rebuilt from
+  `labels/pairs.jsonl`'s human-confirmed positives rather than from the
+  pipeline's own output, so their membership is the owner's and no
+  threshold or judge had a say in it. `nc eval --backend files` is
+  committed; `--backend api` needs a key and spends money, so it is the
+  owner's call. The expected discrepancies are a proposal until T34 and
+  every report says so next to its numbers.
   AC: report committed for both backends.
 - **T34 [owner]** Check the 20 golden analyses.
 

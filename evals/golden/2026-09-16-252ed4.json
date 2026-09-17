@@ -1,0 +1,36 @@
+{
+  "checked": false,
+  "cluster": {
+    "anchor": "cc26d2086e121c065339cc1fdc30cdbd8a0969ec",
+    "id": "2026-09-16-252ed4",
+    "items": [
+      {
+        "item_id": "cc26d2086e121c065339cc1fdc30cdbd8a0969ec",
+        "lede": "Meta will soon unveil new camera-free smart glasses, according to The Information.",
+        "outlet": "engadget",
+        "published": "2026-09-16T06:49:32Z",
+        "title": "Meta is reportedly gearing up to launch new smart glasses without a camera"
+      },
+      {
+        "item_id": "d7f0ca5ac68200abe54b37eb67f32c918a49d314",
+        "lede": "Meta may be ready to reveal a new pair of smart glasses with no camera at all, amid a PR crisis for the company caused by the video recording capabilities of its flagship smart glasses. A new report from The Information claims the camera-free glasses, codenamed Luna, could be revealed as soon as the Meta [\u2026]",
+        "outlet": "theverge",
+        "published": "2026-09-16T08:54:46Z",
+        "title": "Meta is reportedly ready to launch less pervy smart glasses"
+      }
+    ],
+    "status": "pending",
+    "version": 1
+  },
+  "expected_discrepancies": [
+    {
+      "kind": "framing",
+      "note": "Engadget states the launch as forthcoming ('will soon unveil'); The Verge hedges it ('may be ready').",
+      "outlets": [
+        "engadget",
+        "theverge"
+      ]
+    }
+  ],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+}
