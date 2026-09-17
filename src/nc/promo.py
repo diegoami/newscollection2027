@@ -1,4 +1,4 @@
-"""Promotional items: coupon pages, deals posts, conference marketing.
+"""Items that are not stories: coupon pages, deals posts, buyer's guides.
 
 **The problem this solves.** The eleven outlets do not publish only
 news. Wired runs a coupon desk (measured on the first real corpus: 27
@@ -50,6 +50,19 @@ and dropped three real stories ("May Mobility is going public in a
 $1.4B SPAC deal", "signed reciprocal severance deals", "biggest-ever
 US community benefits deal"), which is why `config/promo.yaml` lists
 "promo code" and "$N off" but not "deal".
+
+**Buying advice is a third kind, added at T24.** "7 Best Android Phones
+of 2026" and "The best iPhones" are real editorial, not advertising, so
+the arguments above do not apply to them -- but they never report an
+event, which means in the judge queue they can only ever be answered
+"different". They were knowingly left in when the tag rules were
+written, on the grounds that a wrong "different" answer in a labelling
+session is cheaper than losing a launch story. T24 changed that price:
+each one is now an LLM call. Measured on the 2026-09-17 window they are
+8 items of 440 and 10 pairs of a 253-pair queue, and removing them took
+the judge's agreement with the owner's labels from 0.861 to 0.881
+(docs/CLUSTERING.md, "Filtering buying advice"). They live in their own
+config list so they can be reverted without touching the coupon rules.
 """
 
 from __future__ import annotations
@@ -81,14 +94,35 @@ class PromoRules:
 
     tags: frozenset[str]
     title_patterns: tuple[re.Pattern[str], ...]
+    # Buying advice is a separate list, not more `title_patterns`, for
+    # one reason: it is dropped for a different reason and may well be
+    # reverted on its own. Coupon copy is advertising; a buyer's guide
+    # is real editorial that simply never reports an event, so it can
+    # only ever be a false pair in the judge queue. Keeping the lists
+    # apart means `classify` can say which rule fired, and the owner
+    # can undo one without disturbing the other.
+    buying_advice_patterns: tuple[re.Pattern[str], ...] = ()
 
-    def matches(self, item: Item) -> bool:
-        """True when this item is promotional under these rules."""
+    def classify(self, item: Item) -> str | None:
+        """Which rule group drops this item, or None to keep it.
+
+        Named rather than boolean so a run can report the split: the
+        `deal` regression (module docstring) was found by reading what
+        a rule dropped, which needs the rule to be identifiable.
+        """
         for tag in item.tags:
             if _normalize(tag) in self.tags:
-                return True
+                return "tag"
         title = item.title
-        return any(pattern.search(title) for pattern in self.title_patterns)
+        if any(pattern.search(title) for pattern in self.title_patterns):
+            return "promo-title"
+        if any(pattern.search(title) for pattern in self.buying_advice_patterns):
+            return "buying-advice"
+        return None
+
+    def matches(self, item: Item) -> bool:
+        """True when this item is dropped from the window."""
+        return self.classify(item) is not None
 
 
 def load_promo_rules(path: Path = DEFAULT_PROMO_CONFIG_PATH) -> PromoRules:
@@ -103,14 +137,17 @@ def load_promo_rules(path: Path = DEFAULT_PROMO_CONFIG_PATH) -> PromoRules:
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: expected a mapping at the top level")
 
+    def compile_all(key: str) -> tuple[re.Pattern[str], ...]:
+        compiled: list[re.Pattern[str]] = []
+        for source in raw.get(key) or ():
+            try:
+                compiled.append(re.compile(str(source), re.IGNORECASE))
+            except re.error as exc:  # a typo in the config, named where it is
+                raise ValueError(f"{path}: bad {key} {source!r}: {exc}") from exc
+        return tuple(compiled)
+
     tags = frozenset(_normalize(str(tag)) for tag in raw.get("tags") or ())
-    patterns: list[re.Pattern[str]] = []
-    for source in raw.get("title_patterns") or ():
-        try:
-            patterns.append(re.compile(str(source), re.IGNORECASE))
-        except re.error as exc:  # a typo in the config, named where it is
-            raise ValueError(f"{path}: bad title pattern {source!r}: {exc}") from exc
-    return PromoRules(tags, tuple(patterns))
+    return PromoRules(tags, compile_all("title_patterns"), compile_all("buying_advice"))
 
 
 def partition(items: list[Item], rules: PromoRules) -> tuple[list[Item], list[Item]]:

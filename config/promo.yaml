@@ -46,3 +46,28 @@ title_patterns:
   - "save \\$[0-9]"
   - "grab a \\$[0-9]"
   - "\\$[0-9][0-9,]* off"
+
+# Buying advice: buyer's guides, "best X" roundups, recommendation
+# posts. Its own list, not more `title_patterns`, because the reason
+# differs -- see nc/promo.py's `PromoRules`. These are real editorial,
+# not advertising; the problem is that they never report an event, so
+# in the judge queue they can only ever be a false pair. They were
+# knowingly left in when the tag rules above were written ("a cheaper
+# mistake than losing a launch story"); T24 changed the price, because
+# each one is now an LLM call that can only be answered "different".
+#
+# Measured against the 440-item window of 2026-09-17: these three
+# patterns drop 8 items and every one is a genuine roundup. Each title
+# they caught was read before the rules shipped, which is the only
+# check that would have caught the `deal` regression above.
+#
+# `^(the )?N? ?best` is anchored deliberately. A bare `\bbest\b` is
+# ordinary headline vocabulary ("Valve's best controller yet"); at the
+# START of a title it is almost always a listicle. The `(?!buy\b)`
+# guard keeps "Best Buy ..." as a company name out of it -- the one
+# such title in the corpus, "Best Buy Discount Codes: 60% Off", is
+# already caught by the `% off` pattern above.
+buying_advice:
+  - "^(the )?[0-9]* ?best (?!buy\\b)"
+  - "\\bbest\\b.*\\bto (buy|avoid)\\b"
+  - "buying (guide|advice)"
