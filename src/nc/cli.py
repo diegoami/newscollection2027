@@ -5,7 +5,7 @@ added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
 T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
 `judge` and `bench-judge` by T24;
-`validate` by T30; `pending` by T32.
+`validate` by T30; `pending` by T32; `analyze` by T31.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import feedparser
 
 from nc import (
     __version__,
+    analyze,
     bench,
     cluster,
     contract,
@@ -187,6 +188,47 @@ def _judge(args: argparse.Namespace) -> int:
         print()
         print(judge.render_pair_question(pair), end="")
     return 0
+
+
+def _analyze(args: argparse.Namespace) -> int:
+    """T31: fill pending analyses through the Anthropic SDK.
+
+    Not the production path -- docs/ARCHITECTURE.md's cost model puts
+    the nightly analysis on the Claude Code subscription, where T32's
+    skill runs it for nothing metered. This is for backfills, local
+    development and T33's eval. **It spends money**, which is why there
+    is no default backend: `--backend api` has to be asked for.
+
+    Writes analyses and nothing else. Marking a cluster analyzed is
+    `nc validate`'s job, so this command never decides a story has been
+    analysed (CLAUDE.md).
+    """
+    data_root = _data_root(args)
+    config = analyze.load_analyze_config(args.config)
+
+    if args.batch:
+        import anthropic
+
+        client = anthropic.Anthropic()
+        if args.collect:
+            report = analyze.collect_batch(data_root, config, client, args.collect)
+            print(analyze.format_analyze_report(report))
+            return 1 if report.failed else 0
+        submission = analyze.submit_batch(data_root, config, client, args.limit)
+        print(
+            f"analyze: submitted {len(submission.cluster_ids)} cluster(s) as "
+            f"batch {submission.batch_id}"
+        )
+        print(
+            "analyze: results are not immediate -- re-run with "
+            f"--batch --collect {submission.batch_id} once it has ended"
+        )
+        return 0
+
+    backend = analyze.AnthropicBackend(config)
+    report = analyze.run_analyze(data_root, backend, config, args.limit)
+    print(analyze.format_analyze_report(report))
+    return 1 if report.failed else 0
 
 
 def _pending(args: argparse.Namespace) -> int:
@@ -442,6 +484,48 @@ def _build_parser() -> argparse.ArgumentParser:
         "non-zero if anything is refused",
     )
     judge_parser.set_defaults(func=_judge)
+
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="fill pending analyses through the Anthropic SDK -- spends money (T31)",
+    )
+    analyze_parser.add_argument(
+        "--backend",
+        choices=["api"],
+        required=True,
+        help="which backend to run. Required and with one choice on purpose: "
+        "the other backend is a Claude Code skill, not a command, and this "
+        "one bills, so it is never the default",
+    )
+    analyze_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    analyze_parser.add_argument(
+        "--config",
+        type=Path,
+        default=analyze.DEFAULT_ANALYZE_CONFIG_PATH,
+        help=f"analysis config (default: {analyze.DEFAULT_ANALYZE_CONFIG_PATH})",
+    )
+    analyze_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="how many clusters to attempt (default: the config's "
+        "max_clusters_per_run)",
+    )
+    analyze_parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="use the Message Batches API: half price, asynchronous, up to 24 "
+        "hours. For backfills and evals, never for a nightly run",
+    )
+    analyze_parser.add_argument(
+        "--collect",
+        metavar="BATCH_ID",
+        default=None,
+        help="with --batch: write the results of an ended batch",
+    )
+    analyze_parser.set_defaults(func=_analyze)
 
     pending_parser = subparsers.add_parser(
         "pending",

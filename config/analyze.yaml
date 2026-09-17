@@ -1,0 +1,35 @@
+# The API analysis backend (src/nc/analyze.py, `nc analyze --backend api`).
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code."
+#
+# This is NOT the production path. docs/ARCHITECTURE.md's cost model puts
+# the nightly analysis on the Claude Code subscription, where T32's skill
+# runs it for nothing metered. This backend exists for local development,
+# backfills and T33's eval -- the places where a scripted, repeatable run
+# is worth more than the bill. Both write the same files and `nc validate`
+# cannot tell them apart.
+
+# docs/PLAN.md T31 names this default. It is the owner's call rather than
+# the library default: the analysis task is bounded -- a handful of short
+# texts in, one structured object out -- and the measurable question is
+# whether the output passes the validator, which T33's eval answers. Raise
+# it here if the eval says the work needs more model.
+model: "claude-sonnet-5"
+
+# A cap, not a spend: an analysis of a few ledes is nowhere near this.
+# Sized so a long cluster can never truncate mid-JSON, which would fail
+# the schema for a reason that has nothing to do with the model's
+# judgement.
+max_tokens: 16000
+
+# low | medium | high | xhigh | max. The judgement here is reading a few
+# short texts and comparing them, not open-ended reasoning, so the middle
+# of the range is the honest starting point -- and T33's eval is what
+# should move it, in either direction, rather than a guess made here.
+effort: "medium"
+
+# How many clusters one `nc analyze` run works through. The queue is
+# oldest-first (nc.cluster.pending_clusters), so a run that stops early
+# has spent itself on the stories that have been waiting longest.
+max_clusters_per_run: 25

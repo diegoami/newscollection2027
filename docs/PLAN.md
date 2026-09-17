@@ -138,11 +138,20 @@ acceptance criteria are shown in a merged PR.
   models still agree.
   AC: tests with at least five valid and ten invalid samples covering
   every rule in `docs/ARCHITECTURE.md`.
-- **T31 (O, size M)** API backend: `nc analyze --backend api` using the
+- **T31 (O, size M)** ~~API backend: `nc analyze --backend api` using the
   Anthropic Python SDK with structured outputs against the same schema,
   model from config (default `claude-sonnet-5`), prompt text in
   `prompts/analyze.md` shared with the skill, optional `--batch` using the
-  Message Batches API.
+  Message Batches API.~~ **Built; the AC cannot be run yet.** `nc.analyze`
+  does structured outputs against a schema *derived* from
+  `contract/analysis.schema.json`, reads `prompts/analyze.md` (the same
+  file the skill reads), and has both the synchronous path and `--batch`.
+  The SDK is an optional extra, not a runtime dependency: the
+  every-three-hours pipeline must keep working with no `anthropic`
+  package and no key. Two things block the AC and neither is code -- the
+  golden set is T33 and does not exist, and running it needs an API key
+  and spends money, so it is the owner's call. Every test runs against a
+  stub.
   AC: runs over the golden clusters with at least 95 percent passing the
   validator on the first try.
 - **T32 (O, size M)** ~~Claude Code backend: finalize
