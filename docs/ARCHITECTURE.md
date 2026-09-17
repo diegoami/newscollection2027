@@ -158,6 +158,15 @@ claim, discrepancy quotes span at least two outlets, and length limits.
 A rejected analysis is moved to `data/rejected/` with the reason so the
 agent or the eval can retry.
 
+**The API backend asks the model for less than the file contains.** Five
+of an analysis's fields -- `cluster_id`, `cluster_version`, `backend`,
+`model`, `generated_at` -- are knowable for certain by the code making
+the request, so `nc.analyze` strips them from the schema it sends and
+stamps them afterwards. A model that guesses `cluster_version` invents
+stale analyses; one that writes its own `model` field fabricates the
+provenance the evals read. The subset is derived from the published
+schema rather than restated, so there is nothing to keep in step.
+
 `nc.contract` does that in three layers, because an analysis can be
 wrong in three ways no single tool catches. *Shape* is
 `contract/analysis.schema.json` checked with `jsonschema` -- that file
