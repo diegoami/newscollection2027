@@ -4,7 +4,8 @@ Subcommands (`pending`, `validate`, `analyze`, `build`, `nightly`) are
 added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
 T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
-`judge` and `bench-judge` by T24.
+`judge` and `bench-judge` by T24;
+`validate` by T30.
 """
 
 from __future__ import annotations
@@ -17,7 +18,18 @@ from pathlib import Path
 
 import feedparser
 
-from nc import __version__, bench, cluster, embed, feeds, judge, labelling, store, sync
+from nc import (
+    __version__,
+    bench,
+    cluster,
+    contract,
+    embed,
+    feeds,
+    judge,
+    labelling,
+    store,
+    sync,
+)
 from nc.store import DataRoot
 
 
@@ -175,6 +187,24 @@ def _judge(args: argparse.Namespace) -> int:
         print()
         print(judge.render_pair_question(pair), end="")
     return 0
+
+
+def _validate(args: argparse.Namespace) -> int:
+    """T30: check every analysis against the contract, move the failures
+    to `rejected/`.
+
+    Exits non-zero when anything was rejected, so the nightly Routine
+    and CI can tell a clean run from one that needs the agent to go
+    back. A rejected analysis is moved out of `analyses/` rather than
+    left there: leaving it would let `nc build` read something the
+    validator refused, which is the bypass CLAUDE.md forbids.
+    """
+    data_root = _data_root(args)
+    report = contract.run_validate(
+        data_root, only_new=args.new, schema_path=args.schema, state_path=args.state
+    )
+    print(contract.format_validate_report(report))
+    return 1 if report.rejected else 0
 
 
 def _bench_judge(args: argparse.Namespace) -> int:
@@ -392,6 +422,34 @@ def _build_parser() -> argparse.ArgumentParser:
         "non-zero if anything is refused",
     )
     judge_parser.set_defaults(func=_judge)
+
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="check analyses against contract/analysis.schema.json (T30)",
+    )
+    validate_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    validate_parser.add_argument(
+        "--new",
+        action="store_true",
+        help="only analyses modified since the last run (a speed option for a "
+        "long session, not a correctness claim -- see nc.contract)",
+    )
+    validate_parser.add_argument(
+        "--schema",
+        type=Path,
+        default=contract.DEFAULT_SCHEMA_PATH,
+        help=f"analysis schema (default: {contract.DEFAULT_SCHEMA_PATH})",
+    )
+    validate_parser.add_argument(
+        "--state",
+        type=Path,
+        default=contract.DEFAULT_VALIDATE_STATE_PATH,
+        help=f"where --new remembers the last run "
+        f"(default: {contract.DEFAULT_VALIDATE_STATE_PATH})",
+    )
+    validate_parser.set_defaults(func=_validate)
 
     bench_judge_parser = subparsers.add_parser(
         "bench-judge",

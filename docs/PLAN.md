@@ -127,10 +127,15 @@ acceptance criteria are shown in a merged PR.
 
 ## M3 Analysis contract
 
-- **T30 (O, size M)** Contract: `contract/analysis.schema.json`, pydantic
+- **T30 (O, size M)** ~~Contract: `contract/analysis.schema.json`, pydantic
   models in `nc.contract`, validator with the verbatim quote check,
   `nc validate` command, rejects moved to `data/rejected/<id>.json` with
-  reasons.
+  reasons.~~ **Done.** `nc.contract` validates in three layers (schema,
+  pydantic models, then the checks against the cluster that neither can
+  do); `nc validate [--new]` moves failures to `rejected/` with every
+  reason at once and exits non-zero. 6 valid and 17 invalid samples, one
+  per rule, plus a test pinning that the schema file and the pydantic
+  models still agree.
   AC: tests with at least five valid and ten invalid samples covering
   every rule in `docs/ARCHITECTURE.md`.
 - **T31 (O, size M)** API backend: `nc analyze --backend api` using the

@@ -12,6 +12,8 @@ dependencies = [
     # src/nc/embed.py's module docstring and config/embed.yaml for the
     # cost reasoning.
     "model2vec>=0.9.0",
+    "pydantic>=2.13.5",
+    "jsonschema>=4.26.0",
 ]
 
 [project.scripts]
@@ -30,6 +32,7 @@ dev = [
     "mypy>=1.11",
     "pytest>=8.3",
     "types-pyyaml>=6.0.12.20260906",
+    "types-jsonschema>=4.26.0.20260518",
 ]
 
 [tool.ruff]

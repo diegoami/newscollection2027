@@ -138,6 +138,27 @@ claim, discrepancy quotes span at least two outlets, and length limits.
 A rejected analysis is moved to `data/rejected/` with the reason so the
 agent or the eval can retry.
 
+`nc.contract` does that in three layers, because an analysis can be
+wrong in three ways no single tool catches. *Shape* is
+`contract/analysis.schema.json` checked with `jsonschema` -- that file
+stays the published contract, read from disk rather than restated in
+code, and it is what T31 hands the SDK as a structured-output schema.
+*Types* are pydantic models, so the rest of the code gets an object
+rather than a dict. *Truth* is the check against the cluster, which is
+the part that matters: a schema can say a quote is a string of 3 to 400
+characters, but only this layer can say the string appears verbatim in
+the item it claims to come from.
+
+Two details that look like details and are not. The word limits live in
+the third layer, not the schema: JSON Schema cannot count words, so the
+schema's 120 and 600 character caps are a guard rail and the 15- and
+80-word limits above are the contract. And a rejected analysis is
+*moved* out of `analyses/`, not copied -- leaving it would let `nc build`
+read something the validator refused, which is the bypass CLAUDE.md
+forbids. Every problem is reported at once rather than the first one
+found, because an agent that learns one fault per round trip makes one
+round trip per fault.
+
 ## Clustering
 
 Window: items from the last 4 days. Similarity: cosine over embeddings of
