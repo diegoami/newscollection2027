@@ -345,15 +345,15 @@ has no route to huggingface.co, the same wall that shaped T20.
 "a lower but consistent embedding quality is absorbed by threshold
 tuning". The first labelling session measured that and it does not
 hold. Tuning can only absorb a weak embedding when the two populations
-are separable by some cutoff; on 159 labels they overlap, with a
-different-story pair at 0.7710 and true matches down to 0.5708. No
+are separable by some cutoff; on 174 labels they overlap, with a
+different-story pair at 0.7992 and true matches down to 0.5708. No
 threshold gets both ends right, so the model became a variable rather
 than a settled decision.
 
 **The metric is recall at precision 1.0** — of all the genuine matches,
 how many score above the highest-scoring false pair, and could
 therefore be auto-linked with no wrong link at all. For
-`potion-base-8M` on the first label set that is 3/27 = 0.111, which is
+`potion-base-8M` that is 4/35 = 0.114, which is
 why auto-linking earns so little today: it saves roughly 10 judge calls
 a run while owning the one failure mode that is not recoverable
 downstream. A model that lifts it to 0.7 changes the architecture.
@@ -374,8 +374,12 @@ meaningless with it. The two move together, or not at all.
 
 ## What the model comparison found
 
-`nc bench-embed` was run on 2026-09-17 against the 159 labelled pairs,
-over six model2vec models spanning a 64x parameter range:
+`nc bench-embed` was run on 2026-09-17 against the 159 labelled pairs
+available at the time, over six model2vec models spanning a 64x
+parameter range. The numbers below are that measurement and have not
+been recomputed since; the label set has grown to 174 (see "What more
+labels changed" below), which moved the configured model's recall@p1.0
+from 0.111 to 0.114 and left the shape of the table alone.
 
 ```
 model                          recall@p1.0     auc      tau  top false  judge
@@ -419,3 +423,38 @@ The honest caveat, repeated because it matters: 27 positives is a thin
 basis, and recall@p1.0 turns on a single pair — the highest-scoring
 false one. What carries the conclusion is not any single row but six
 independent measurements agreeing that size does not help.
+
+## What more labels changed
+
+The first pass produced 159 usable labels with 27 positives; a second
+sitting took it to **174 labels, 35 positives**. The conclusions did not
+move, and one of them got a good deal firmer.
+
+**Recall at precision 1.0 went 0.111 to 0.114** for the configured
+model -- four true pairs above the highest false one instead of three.
+Statistically the same number.
+
+**The highest-scoring false pair moved *up*, from 0.7710 to 0.7992:**
+
+```
+0.7992  zdnet / wired
+   "I've used both iPhone 18 Pro models - here's how my buying advice is changing in 2026"
+   "What's the Best iPhone to Buy or Avoid Right Now? (2026)"
+```
+
+Two iPhone buying-advice pieces: the same subject, no shared event.
+The same failure as the AI-safety pair that topped the first pass,
+from a different corner of the corpus.
+
+That is the useful part. On 159 labels, the highest safe threshold was
+0.78 -- above the 0.7710 false pair, below a true one at 0.8175 -- and
+that is what a tuning exercise would have shipped. Fifteen labels later
+it would be making a false link. **The ceiling on safe auto-linking rose
+with more evidence rather than settling**, which is what a threshold
+tracking the most recent unlucky pair does. It is the strongest single
+argument for `tau_high: 1.00`: the number was not merely buying little,
+it was not stable enough to be worth buying.
+
+**`tau_low: 0.57` held.** The lowest true pair is still 0.5708, the same
+TechCrunch/Tom's Hardware pair, and no new positive landed below it --
+now across two independent rounds of labelling.

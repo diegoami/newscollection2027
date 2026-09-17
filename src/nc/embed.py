@@ -43,11 +43,11 @@ heavier model on a job that runs 8 times a day for free.
 
 **That last sentence was measured at T23 and it is wrong.** Threshold
 tuning can only absorb weak embeddings when the same-story and
-different-story pairs are separable by *some* cutoff. On the first 159
-labelled pairs they are not: a different-story pair
-(TechCrunch/Guardian, both about the AI-safety debate) scored 0.7710
-while true matches ran down to 0.5708, so no threshold links the true
-pairs without also linking that false one. The model conflates topic
+different-story pairs are separable by *some* cutoff. On the 174
+labelled pairs gathered so far they are not: a different-story pair
+(ZDNet/Wired, two iPhone buying-advice pieces) scored 0.7992 while true
+matches ran down to 0.5708, so no threshold links the true pairs
+without also linking that false one. The model conflates topic
 with event, which is what a mean-pooled static vector is expected to do
 and what tuning cannot undo. The cost of being wrong here is bounded --
 `tau_high` can be set where precision is perfect and everything

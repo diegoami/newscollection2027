@@ -6,16 +6,17 @@ absorbed by threshold tuning, not by reaching for a heavier model on a
 job that runs 8 times a day for free." T23's first labelling session
 measured that claim and it does not hold. Threshold tuning can only
 absorb weak embeddings if the same-story and different-story pairs are
-*separable* by some cutoff, and on the first 159 labels they are not:
-a different-story pair scored 0.7710 while true matches ran down to
-0.5708, so every threshold either links that false pair or misses most
-of the true ones.
+*separable* by some cutoff, and on the 174 labels gathered so far they
+are not: a different-story pair scored 0.7992 while true matches ran
+down to 0.5708, so every threshold either links that false pair or
+misses most of the true ones.
 
 That makes the embedding model a variable worth measuring rather than
 a settled decision -- and the labels are what make it measurable. A
 human judgment ("are these two the same story") is a fact about the
-two articles, not about the model that scored them, so the same 159
-judgments can score any candidate.
+two articles, not about the model that scored them, so the same
+judgments can score any candidate, whatever the label set has grown
+to.
 
 **The metric.** Precision and recall at a threshold answer "how good is
 this cutoff", which is the wrong question when choosing a model. The
@@ -27,11 +28,10 @@ act on without asking*, so the headline number is:
         / (all true pairs)
 
 i.e. how many genuine matches you could auto-link before the first
-wrong one. For the model in `config/embed.yaml` on the first labelled
-set that is 3/27 = 0.111, which is why auto-linking barely earns its
-place today. A model that lifts it to, say, 0.7 changes the
-architecture: auto-linking becomes safe and T24's judge queue shrinks
-to genuinely hard pairs.
+wrong one. For the model in `config/embed.yaml` that is 4/35 = 0.114,
+which is why auto-linking barely earns its place today. A model that
+lifts it to, say, 0.7 changes the architecture: auto-linking becomes
+safe and T24's judge queue shrinks to genuinely hard pairs.
 
 `roc_auc` is reported beside it as a threshold-free summary (the
 probability that a random true pair outranks a random false one),
