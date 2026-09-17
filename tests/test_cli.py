@@ -446,3 +446,146 @@ def test_cluster_emits_a_cluster_and_is_a_no_op_the_second_time(
     assert {path: path.read_bytes() for path in sorted(data_root.rglob("*.json"))} == (
         before
     )
+
+
+def _judge_fixture(tmp_path: Path) -> tuple[Path, str]:
+    """A data root holding one borderline pair, as `nc cluster` would
+    have written it. No model: `nc judge` reads pending-pair files
+    straight off disk (nc/judge.py's module docstring)."""
+    from nc.cluster import ClusterItem, PendingPair, write_pending_pairs
+    from nc.feeds import Item
+    from nc.store import DataRoot
+
+    def item(seed: str, outlet: str, title: str) -> Item:
+        return Item(
+            id=f"item-{seed}",
+            outlet=outlet,
+            url=f"https://{outlet}.example/{seed}",
+            title=title,
+            lede=f"{title}, the outlet reported.",
+            author=None,
+            published="2026-09-15T10:00:00Z",
+            fetched="2026-09-16T00:00:00Z",
+            tags=(),
+        )
+
+    data_root = tmp_path / "data-root"
+    pair = PendingPair(
+        a=ClusterItem.from_item(item("a", "theverge", "Acme ships the Widget 4")),
+        b=ClusterItem.from_item(item("b", "arstechnica", "Widget 4 arrives")),
+        score=0.72,
+    )
+    write_pending_pairs(DataRoot(data_root), [pair])
+    return data_root, pair.pair_id
+
+
+def test_judge_lists_the_queue_and_validates_what_is_written(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """T24 through the CLI: the queue, then the gate. `nc judge` never
+    writes a judgment itself -- a backend does, and this command decides
+    what is allowed to reach clustering."""
+    data_root, pair_id = _judge_fixture(tmp_path)
+    argv = ["judge", "--data-root", str(data_root)]
+
+    assert main(argv) == 0
+    out = capsys.readouterr().out
+    assert "1 pair(s) unjudged" in out
+    assert "Acme ships the Widget 4" in out
+
+    judgments = data_root / "judgments"
+    judgments.mkdir()
+    (judgments / f"{pair_id}.json").write_text(
+        json.dumps(
+            {
+                "backend": "claude_code",
+                "item_id_a": "item-a",
+                "item_id_b": "item-b",
+                "judged_at": "2026-09-17T04:00:00Z",
+                "model": "claude-sonnet-5",
+                "pair_id": pair_id,
+                "reason": "both report the Widget 4 launch",
+                "same_story": True,
+            },
+            sort_keys=True,
+        )
+    )
+
+    assert main([*argv, "--validate"]) == 0
+    out = capsys.readouterr().out
+    assert "1 judgment(s) on disk, 0 pair(s) still unjudged" in out
+    assert "1 accepted link(s)" in out
+
+
+def test_judge_validate_exits_non_zero_on_a_rejected_judgment(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The gate has to be usable as one: the nightly Routine checks the
+    exit status, so a refused judgment cannot look like a clean run."""
+    data_root, _ = _judge_fixture(tmp_path)
+    judgments = data_root / "judgments"
+    judgments.mkdir()
+    (judgments / "item-x-item-y.json").write_text(
+        json.dumps(
+            {
+                "backend": "claude_code",
+                "item_id_a": "item-x",
+                "item_id_b": "item-y",
+                "judged_at": "2026-09-17T04:00:00Z",
+                "model": "claude-sonnet-5",
+                "pair_id": "item-x-item-y",
+                "reason": "an answer to a question nobody asked",
+                "same_story": True,
+            },
+            sort_keys=True,
+        )
+    )
+
+    assert main(["judge", "--data-root", str(data_root), "--validate"]) == 1
+    assert "no pending pair with this id" in capsys.readouterr().out
+
+
+def test_bench_judge_scores_the_judgments_against_the_labels(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from nc.labelling import Label, append_label
+    from nc.store import DataRoot
+
+    data_root, pair_id = _judge_fixture(tmp_path)
+    judgments = data_root / "judgments"
+    judgments.mkdir()
+    (judgments / f"{pair_id}.json").write_text(
+        json.dumps(
+            {
+                "backend": "claude_code",
+                "item_id_a": "item-a",
+                "item_id_b": "item-b",
+                "judged_at": "2026-09-17T04:00:00Z",
+                "model": "claude-sonnet-5",
+                "pair_id": pair_id,
+                "reason": "both report the Widget 4 launch",
+                "same_story": True,
+            },
+            sort_keys=True,
+        )
+    )
+    append_label(
+        DataRoot(data_root),
+        Label(
+            item_id_a="item-a",
+            item_id_b="item-b",
+            outlet_a="theverge",
+            outlet_b="arstechnica",
+            score=0.72,
+            same_story=True,
+            labeled_at="2026-09-16T12:00:00Z",
+        ),
+    )
+
+    assert main(["bench-judge", "--data-root", str(data_root)]) == 0
+    out = capsys.readouterr().out
+    assert "1 pair(s) both labelled and judged" in out
+    assert "precision 1.000" in out

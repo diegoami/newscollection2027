@@ -1,0 +1,35 @@
+# T24's borderline-pair judge (src/nc/judge.py).
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code." A file of its own rather than another key in config/cluster.yaml
+# because nothing here changes what links deterministically -- cluster.yaml
+# holds tau_low/tau_high, and this holds who answers the question they
+# leave open.
+#
+# Why this step exists at all, in one line: T23 labelled 174 cross-outlet
+# pairs and found cosine cannot separate "same story" from "same topic" at
+# any threshold or model size (docs/CLUSTERING.md), so tau_high is 1.00 and
+# every link above tau_low is decided here.
+
+# The model the `claude_code` backend records in its judgment files. This
+# is the nightly production path and it runs on the Claude Code
+# subscription, not the metered API: docs/ARCHITECTURE.md's cost model
+# puts the nightly LLM step there. The id is recorded, not dialed -- the
+# Routine runs on whatever model the session is on, and writing it into
+# each judgment is how `nc bench-judge` can later say which model produced
+# which agreement number.
+claude_code_model: "claude-sonnet-5"
+
+# The model `nc judge --backend api` would use. Reserved for evals and
+# backfills (docs/ARCHITECTURE.md: "local development, evals and backfills
+# only"); the backend itself lands with T31, which brings the Anthropic
+# SDK. Listed now so the contract has one place to name it when it does.
+api_model: "claude-sonnet-5"
+
+# How many pairs one judge run works through. A bound, not a threshold:
+# the queue is ordered highest-score-first (nc.judge.unjudged_pairs), so a
+# run that stops early has judged the pairs most likely to be real
+# matches, and the rest are still there tomorrow. Sized for the nightly
+# Routine -- docs/ARCHITECTURE.md's cost model budgets roughly fifty
+# clusters a night, and the borderline band runs at a similar volume.
+max_pairs_per_run: 60

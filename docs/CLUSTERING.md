@@ -458,3 +458,154 @@ it was not stable enough to be worth buying.
 **`tau_low: 0.57` held.** The lowest true pair is still 0.5708, the same
 TechCrunch/Tom's Hardware pair, and no new positive landed below it --
 now across two independent rounds of labelling.
+
+## The judge: `nc judge` and `nc bench-judge` (T24)
+
+Everything above is why this step exists. Cosine sorts the pairs and
+cannot decide them, so `tau_high` is 1.00 and every cross-outlet link
+on the site now comes from an LLM answering one question about one
+pair: **do these two articles report the same event, or merely the same
+subject?**
+
+### The file contract
+
+Like the analysis step, and for the same reason (CLAUDE.md: "The LLM
+step is a file contract ... Never bypass the validator"):
+
+```
+in    <data root>/pending-pairs/<pair_id>.json   written by nc cluster
+out   <data root>/judgments/<pair_id>.json       written by a backend
+gate  nc judge --validate                        decides what may link
+```
+
+One judgment file:
+
+```json
+{"backend":"claude_code","item_id_a":"...","item_id_b":"...",
+ "judged_at":"2026-09-17T04:00:00Z","model":"claude-sonnet-5",
+ "pair_id":"...","reason":"both report Acme's Widget 4 launch",
+ "same_story":true}
+```
+
+`nc judge` prints the pairs still awaiting an answer, highest score
+first, so a run cut short by a limit or an interruption has answered the
+pairs most likely to be real matches. `nc judge --validate` reports what
+is on disk, how many links it would produce, and every judgment the
+validator refuses and why — exiting non-zero if anything is refused, so
+the nightly Routine can check it.
+
+### What the validator refuses, and why each rule is there
+
+- **A pair id with no pending-pair file.** A judgment may only answer a
+  question the pipeline asked; otherwise anything that can write to the
+  data repository can link any two items.
+- **Item ids that do not match the pair's members.** The filename is not
+  trusted; the three ids are checked against each other.
+- **An unknown backend, or an empty model.** Both are recorded so
+  `nc bench-judge` can later say which model produced which agreement
+  number. A judgment that cannot name its author is not evidence.
+- **A reason shorter than 10 or longer than 300 characters.** A backend
+  that links without saying why cannot be reviewed months later; a
+  backend writing 2,000 characters is writing the analysis, which is
+  T30's file with its own quote rules.
+- **`same_story` as a string.** `"false"` is truthy in Python, so the
+  loader rejects it rather than risk reading a no as a yes.
+
+A refused judgment is skipped, not fatal: one malformed file cannot stop
+the night's clustering. It is counted and printed, never swallowed.
+
+### What a judgment can and cannot do
+
+It can only **add** a link. There is no "definitely not the same story"
+instruction that suppresses anything, because nothing links without a
+judgment in the first place: below `tau_low` a pair is never seen, and
+within the band a pair links only if a judgment says yes. `same_story:
+false` is recorded but inert — kept because it is the evidence
+`nc bench-judge` scores, and because re-asking a pair the model already
+declined would waste a call every night forever.
+
+Judgments are written once and never rewritten. A run that re-judges
+nothing writes nothing, which is what keeps the data repository quiet
+under a cron that fires eight times a day.
+
+### Where it enters clustering
+
+`nc cluster` calls no LLM — CLAUDE.md's determinism rule is intact. It
+reads the judgment files that the LLM step already wrote:
+`nc.judge.accepted_links` returns the validated yeses, and
+`cluster_items` unions them exactly as it would a `tau_high` pair. That
+is the only path from a judgment into a cluster.
+
+### Two backends, one set of files
+
+- **`claude_code`** — `.claude/skills/judge-pairs/SKILL.md`, run in the
+  nightly Routine. This is the production path and it costs nothing
+  metered: docs/ARCHITECTURE.md's cost model puts the nightly LLM step
+  on the Claude Code subscription.
+- **`api`** — the Anthropic SDK, for backfills and local evals only.
+  `config/judge.yaml` names its model; the backend itself lands with
+  T31, which brings the SDK in for the analysis step.
+
+Both read `prompts/judge.md`, so the skill and the code ask the same
+question. If they drift, `nc bench-judge`'s number describes neither.
+
+### `nc bench-judge`: checking the judge against the humans
+
+T23's 174 labels stop being tuning data and become the judge's test set.
+`nc bench-judge` joins `judgments/` to `labels/pairs.jsonl` on pair id
+and reports agreement, precision, recall, and every disagreement with
+the judge's own stated reason — the disagreements are the point, since
+a wrong link is readable rather than merely counted.
+
+It is backend-agnostic by construction: it reads judgment files, so it
+measures the skill today and will measure the API backend unchanged. It
+needs no model and no network, so unlike `nc bench-embed` it runs in
+`make check` and in a sandbox.
+
+**Precision is the number that matters.** A false negative costs one
+missed pairing, tomorrow's run may catch it, and nothing on the site is
+wrong. A false positive merges two unrelated stories, and every claim,
+quote and discrepancy built on that merge is then wrong too — the one
+error nothing downstream can recover. Both `prompts/judge.md` and the
+skill therefore say the same thing: **when unsure, answer no.**
+
+One contamination rule, easy to break by accident: **the 174 labelled
+pairs may never appear in `prompts/judge.md` as worked examples.** They
+are the ground truth this command scores against; a judge shown the
+answers is measuring nothing. A test pins it.
+
+### What the first real queue looked like, 2026-09-17
+
+253 pairs, from the first `nc cluster` runs with `tau_low: 0.57`. Two
+things showed up that no test had.
+
+**A pair of an item with itself, at cosine 1.0.** BBC re-published "Why
+are there concerns AI could threaten humanity" under the same item id
+with a new `published`, so the append-only store held it in both
+`items/2026/09/14.jsonl` and `items/2026/09/17.jsonl`, and the four-day
+window read both rows. `scan_pairs`' upper-triangle mask excludes an
+item from its own *index*, not its own *id*, so the duplicate came back
+as a pair. Fixed in two places: the window now keeps one row per id (the
+freshest), and `scan_pairs` deduplicates its input, since a self-pair is
+meaningless there whatever the caller did.
+
+**92 of the 253 pairs — 36% — are same-outlet.** That was a deliberate
+decision (docs/DECISIONS.md, 2026-09-16): same-outlet pairs stay out of
+the labelling sample, because a cluster needs two distinct outlets, but
+stay in `pending-pairs/` because they can still bridge two components.
+T24 changes what that costs: each one is now an LLM call. The queue's
+top same-outlet pairs are mostly not bridges —
+
+```
+0.957  techcrunch   "2 days left to exhibit at TechCrunch Disrupt 2026"
+                    "3 days left to exhibit: Get your brand in front..."
+0.834  zdnet        two Windows 11 update stories
+0.826  tomshardware two Valve Steam Frame interviews
+```
+
+— they are one outlet's serialized coverage, and the Disrupt pair is
+conference marketing that `config/promo.yaml` does not match (its rules
+are tuned for coupon and deal copy). Not changed here: whether to spend
+a third of the judge's calls on pairs that cannot form a cluster by
+themselves is the owner's call, and it is cheap to revisit once
+`nc bench-judge` can say what the judge does with them.
