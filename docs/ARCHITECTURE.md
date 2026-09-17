@@ -145,10 +145,24 @@ Window: items from the last 4 days. Similarity: cosine over embeddings of
 above `tau_high` link automatically; pairs in `[tau_low, tau_high)` are
 written as pending pair judgments for the LLM backend; pairs below
 `tau_low` never link. Connected components form clusters. A cluster is
-emitted only with two or more distinct outlets. Thresholds are tuned with
-`nc label` (human labels a few hundred near-threshold pairs) and
-`nc tune` (precision and recall per threshold). Cluster ids are stable
+emitted only with two or more distinct outlets. Cluster ids are stable
 across runs; membership changes bump `version` and re-queue the cluster.
+
+**The embedding is a filter, not a classifier, and the LLM does the
+deciding.** That was not the original plan -- the thresholds were meant
+to be tuned into a decision rule -- but 159 labelled pairs and a
+six-model comparison showed cosine cannot separate "same story" from
+"same topic" at any threshold or any model size (docs/CLUSTERING.md).
+So `tau_high` is 1.00: nothing links on a judgement about similarity,
+only on identical text. `tau_low` is not a tuned threshold either. It
+is the minimum score worth spending an LLM call on -- a budget dial
+between recall and the judge's bill, not a precision setting. Every
+real yes-or-no is made by the judge (T24), which is the only part of
+the pipeline that can tell an event from a subject.
+
+`nc label` and `nc tune` remain, with their purpose changed: the
+labelled pairs are now most useful as an evaluation set for the judge
+rather than as tuning data for the thresholds.
 
 ## Site
 

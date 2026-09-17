@@ -8,6 +8,27 @@ without reading a single robots.txt or terms page, so whether these feeds
 may be aggregated with attribution is unanswered. It also decides whether
 NYT Technology, which measured well, joins the set.
 
+- 2026-09-17 Thresholds set by the owner from 159 labelled
+  cross-outlet pairs. T23 stays open: its criterion is 200 pairs, the
+  corpus is still growing, and the judge-queue size that prices
+  `tau_low` is unmeasured. The values are: `tau_high: 1.00`, `tau_low: 0.57`. Auto-linking is
+  off. The labels showed cosine cannot separate the two populations --
+  a different-story pair at 0.7710 sits above true matches running down
+  to 0.5708 -- so the highest threshold with no false link reached only
+  3 of 27 true pairs. That bought about ten links a run in exchange for
+  owning the pipeline's one unrecoverable failure mode, a story page
+  quoting "discrepancies" between outlets that never covered the same
+  event. `nc bench-embed` then measured six embedding models across a
+  64x parameter range and separability did not move, while every model
+  scored 0.89-0.95 AUC. The conclusion is that cosine is a good ranker
+  and a bad classifier, so it stays as the filter that keeps T24's
+  judge from seeing all ~49,000 pairs in a window, and the judge
+  decides the band. `config/embed.yaml`'s `model_id` stays: it has the
+  best AUC of the six and every alternative costs a full re-embed for a
+  three-pair difference inside the noise.
+  Unmeasured and deliberately left so: how many pairs a run lands in
+  [0.57, 0.65), since `pending-pairs/` was only ever exhaustive above
+  0.65. That is T24's bill and the next `nc cluster` run prints it.
 - 2026-09-16 Promotional items and same-outlet pairs, raised by the
   owner during the first labelling session. Coupon pages, deals posts
   and conference marketing are dropped from the clustering window by
