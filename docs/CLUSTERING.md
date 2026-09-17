@@ -766,3 +766,50 @@ If `tau_high` is ever revisited, this table is the place to start, and
 the thing to check first is whether the top false pair has moved again
 — it has now moved twice, in both directions, on corpus changes of
 fewer than twenty labels.
+
+### The clean-pool labelling session, 2026-09-17
+
+The first session run against the filtered pool. 30 new answers, and
+they are worth more per answer than the ones before them: **16 of the 30
+were positive**, against 33 positives in the previous 168. Removing
+same-outlet pairs, coupon posts and buyer's guides did not just save
+time, it raised the hit rate, because what it removed was almost
+entirely pairs whose answer could only ever be "different".
+
+```
+corpus            198 labels, 49 positive
+highest false pair     0.7710   (unmoved by the 30 new labels)
+recall at p=1.0         0.163   (8 of 49)
+lowest true pair       0.5708
+true pairs below tau_low   0 of 49
+```
+
+Two results in that table.
+
+**`tau_low: 0.57` holds, now across three independent rounds.** The
+lowest labelled true pair is still the same TechCrunch/Tom's Hardware
+pair at 0.5708, and not one of the 16 new positives landed below the
+threshold. That is the number that decides what the judge never gets to
+see, so it is the one worth re-checking every round; it has not moved.
+
+**The highest-scoring false pair did not move either, for the first
+time.** It went 0.7710 → 0.7992 (the round that argued for `tau_high:
+1.00`) → 0.7710 (after the buying-advice pair was retired) → 0.7710
+here, through 30 more labels. A ceiling that stops climbing is the
+first evidence that it might be a real ceiling rather than the
+high-water mark of the last unlucky pair. It is still only 8 of 49 true
+pairs, so it does not change the decision — but a fourth round that
+also leaves it at 0.7710 would be worth acting on.
+
+The merge is the db filtered by the current rules, not an append: the
+page's database holds every answer ever given on it, and the corpus is
+whatever of that the rules still allow. So a retired pair stays retired
+without anyone remembering which six they were, and a pair a later rule
+excludes drops out on the next merge. Of the 222 answers in the db, 24
+are excluded — 6 buying advice, 6 same-outlet, and 12 whose pair file
+was deleted in the `label-sample/` cleanup after #40 (11 of those 12
+same-outlet as well). The twelfth is one genuine cross-outlet negative
+at 0.3686 whose pair file no longer exists to verify it against; it is
+lost rather than silently kept.
+
+**T23 is at 198 of 200.**
