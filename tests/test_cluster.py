@@ -1353,6 +1353,56 @@ def test_promo_rules_leave_business_news_that_says_deal_alone() -> None:
         assert not rules.matches(_tagged("x", "tomshardware", title, ())), title
 
 
+def test_buying_advice_rules_drop_roundups_and_buyers_guides() -> None:
+    """Every title here is one the rules actually caught in the
+    2026-09-17 window, read before they shipped (config/promo.yaml).
+    They never report an event, so in T24's judge queue they can only
+    be answered "different"."""
+    rules = load_promo_rules(Path("config/promo.yaml"))
+    for title in (
+        "The best iPhones: which Apple smartphone is right for you",
+        "7 Best Android Phones of 2026, Tested and Reviewed",
+        "Best Robot Vacuum of 2026: Shark, Eufy, Roborock",
+        "Best 2-in-1 Laptops (2026): Microsoft, Lenovo, and the iPad",
+        "What’s the Best iPhone to Buy or Avoid Right Now? (2026)",
+        "I’ve used both iPhone 18 Pro models – here’s how my buying advice is changing",
+    ):
+        item = _tagged("x", "wired", title, ())
+        assert rules.classify(item) == "buying-advice", title
+
+
+def test_buying_advice_rules_leave_ordinary_headlines_alone() -> None:
+    """`best` mid-headline is ordinary vocabulary, and "Best Buy" is a
+    shop. Anchoring the pattern and guarding the company name is what
+    keeps these out -- the same lesson as the `deal` regression above."""
+    rules = load_promo_rules(Path("config/promo.yaml"))
+    for title in (
+        "Valve engineers discuss the best controller they have shipped",
+        "AMD’s best gaming CPU is now shipping to reviewers",
+        "Best Buy reports a fall in quarterly revenue",
+        "Apple says it is the best quarter for services yet",
+    ):
+        assert (
+            rules.classify(item := _tagged("x", "tomshardware", title, ())) is None
+        ), f"{title} -> {rules.classify(item)}"
+
+
+def test_classify_names_which_rule_group_fired() -> None:
+    """A filter whose effect cannot be attributed to a rule is one
+    nobody can audit -- reading what a rule dropped is how the `deal`
+    regression was found."""
+    rules = load_promo_rules(Path("config/promo.yaml"))
+    assert rules.classify(_tagged("a", "wired", "Anything", ("Coupons",))) == "tag"
+    assert (
+        rules.classify(_tagged("b", "tomshardware", "Grab a $50 discount code", ()))
+        == "promo-title"
+    )
+    assert (
+        rules.classify(_tagged("c", "wired", "Best Robot Vacuum of 2026", ()))
+        == "buying-advice"
+    )
+
+
 def test_missing_promo_config_filters_nothing() -> None:
     """A data root or a fixture without the file gets no filtering,
     rather than an exception or an empty window."""

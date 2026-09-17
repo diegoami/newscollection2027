@@ -33,8 +33,10 @@ answer the same question.
      rejects it rather than risk reading it as truthy.
    - `reason`: one sentence, 10 to 300 characters, per `prompts/judge.md`.
    - `backend`: `claude_code`.
-   - `model`: the model you are running as, if you know it; otherwise the
-     `claude_code_model` in `config/judge.yaml`.
+   - `model`: the model you are running as, if you know it; otherwise
+     `unknown`. Never substitute the id from `config/judge.yaml` -- that
+     field is what `nc bench-judge` attributes a score to, and a guess
+     there is a fabricated measurement, worse than an absent one.
    - `judged_at`: UTC, `YYYY-MM-DDTHH:MM:SSZ`.
 3. After every ten files, run `nc judge --validate`. It prints every
    rejected judgment and why. Fix each one and validate again. Give up on a

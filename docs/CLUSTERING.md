@@ -609,3 +609,66 @@ are tuned for coupon and deal copy). Not changed here: whether to spend
 a third of the judge's calls on pairs that cannot form a cluster by
 themselves is the owner's call, and it is cheap to revisit once
 `nc bench-judge` can say what the judge does with them.
+
+### Filtering buying advice, and what the first eval measured
+
+The 72 pairs that were both labelled and in the judge queue were judged
+by hand against `prompts/judge.md`, then scored with `nc bench-judge`.
+All 72 passed the validator on the first try, producing 33 accepted
+links. The agreement:
+
+```
+                          72 pairs   67 pairs (buying advice filtered)
+agreement                    0.861   0.881
+precision                    0.879   0.879
+recall                       0.829   0.879
+```
+
+Two caveats that belong next to those numbers. The prompt and the
+judgments came from the same session, so this measures the prompt and
+one judge together, not the prompt alone — a second backend on the same
+prompt is what would separate them, which is what T31's `api` backend is
+for. And 2 of the 72 pairs had been quoted by pair in the working
+session before they were judged, so the uncontaminated figure is 60 of
+70. Both were agreements, so removing them moves the number down, not up.
+
+**What the disagreements showed, and what changed because of them.**
+
+*Buying advice now never reaches the judge.* Three of the ten
+disagreements were buyer's guides — an iPhone guide against an Android
+guide, two iPhone guides against each other. They are real editorial but
+they report no event, so the judge can only ever answer "different" and
+each one costs a call to do it. `config/promo.yaml` grew a
+`buying_advice` list: 8 items of a 440-item window, 10 pairs of a
+253-pair queue, and the agreement above moved 0.861 → 0.881 with
+precision unchanged. Its own list rather than more `title_patterns`
+because the reason differs and it may be reverted on its own.
+
+*A problem and its fix are two stories.* Ruled by the owner, and now
+stated in `prompts/judge.md` rather than left to the judge: "Windows
+update breaks USB audio" and "Microsoft ships an emergency patch" are
+separate events. Two outlets reporting the same patch remain one story.
+
+*Three labels contradict each other and are worth re-checking.* They are
+recorded here rather than quietly corrected, because `labels/pairs.jsonl`
+is the human's file and the ground truth `nc bench-judge` is scored
+against:
+
+- `theguardian` "The best iPhones" ↔ `wired` "7 Best Android Phones of
+  2026" is labelled *same story*: an iPhone guide and an Android guide.
+- `theguardian` "The best iPhones" ↔ `wired` "What's the Best iPhone to
+  Buy" is labelled *same story*, while `zdnet` "I've used both iPhone 18
+  Pro models" ↔ that same Wired guide is labelled *different* — the pair
+  this document quotes as the corpus's highest-scoring false positive.
+  Two guide-against-guide pairs with opposite answers.
+- `theregister` "September's Windows 11 patch needs an emergency patch"
+  ↔ `zdnet` "out-of-band update fixes audio glitch" is labelled
+  *different* (both report the same patch), while the same Register
+  piece against `zdnet` "the update may mess with your audio" is labelled
+  *same* (a fix against the bug it fixes). Under the ruling above, both
+  of those are the wrong way round. They were made nine hours apart, in
+  different sittings.
+
+The first two no longer matter for the judge — the filter removes those
+pairs before it sees them — but they still sit in the corpus that
+`tau_low` and every future eval are read from.

@@ -29,6 +29,12 @@ tell the two cases apart.
 
 - They share a subject but report different events (two separate outages at
   the same company; a launch and a later review of the same product).
+- **One reports a problem and the other reports its fix.** A bug, outage,
+  breach or recall is one event; the patch, restoration or response is
+  another, even when the second text explains the first. This is a ruling
+  from the owner, not a judgement call: "Windows update breaks USB audio"
+  and "Microsoft ships an emergency patch" are two stories. Two outlets
+  both reporting the *same* patch are of course still one story.
 - One is a roundup, listicle, opinion column, deal post or newsletter that
   merely mentions what the other reports.
 - They report the same *kind* of event at different companies.
