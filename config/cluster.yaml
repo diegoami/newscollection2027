@@ -7,7 +7,11 @@
 # re-tuned.
 #
 # ===========================================================================
-# SET FROM 174 LABELLED PAIRS. T23 IS NOT FINISHED -- REVISIT THESE.
+# SET FROM 174 LABELLED PAIRS, 6 SINCE RETIRED. T23 IS NOT FINISHED --
+# REVISIT THESE. The six were buying advice and one was the 0.7992 pair
+# tau_high was argued from; on the clean 168 the top false pair is 0.7710
+# and recall at precision 1.0 is 0.182, not 0.114. See docs/CLUSTERING.md,
+# "Retiring those six moved the number tau_high was argued from".
 # ===========================================================================
 #
 # These are measured, not guessed, which is the difference from what

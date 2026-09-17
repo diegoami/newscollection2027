@@ -721,4 +721,48 @@ were simply never reached in a session. Discarding all 174 would cost
 168 sound labels, including 33 of the 35 positives, to remove 6. Since
 positives are the scarce class and every threshold and eval in this
 document is read from them, the cheap move is to drop the 6 and keep
-the rest.
+the rest — which is what the owner ruled. The six moved to
+`labels/retired-2026-09-17.jsonl`, in the same directory, rather than
+being deleted.
+
+### Retiring those six moved the number `tau_high` was argued from
+
+This is the part worth reading twice. All six were buying advice, and
+one of them was **the 0.7992 ZDNet/Wired pair this document quotes as
+the corpus's highest-scoring false positive** — the single strongest
+piece of evidence for `tau_high: 1.00`. Removing it changes the shape
+of the table:
+
+```
+                              174 labels   168 labels
+highest-scoring false pair        0.7992       0.7710
+true pairs above it                 4/35         6/33
+recall at precision 1.0            0.114        0.182
+lowest true pair                  0.5708       0.5708
+```
+
+The honest reading: the argument recorded above — "the ceiling on safe
+auto-linking rose with more evidence rather than settling" — was made
+from a pair that the buying-advice filter now stops before it ever
+reaches the pipeline. That specific argument no longer stands. On the
+clean corpus the ceiling is back to 0.7710, exactly where the 159-label
+round put it, and a `tau_high` around 0.78 would once again look safe
+on this evidence.
+
+What has not changed, and is why `tau_high: 1.00` stays anyway:
+
+- Even at its best, the threshold reaches 6 of 33 true pairs. The other
+  82% need the judge regardless, so auto-linking buys a fraction of the
+  work while owning the one failure mode nothing downstream can
+  recover.
+- `nc bench-embed` measured six models across a 64x parameter range and
+  separability did not move. That finding is independent of any single
+  pair.
+- The judge now exists, answers the band, and agrees with the owner's
+  labels 0.881 of the time. There was a case for a threshold when
+  nothing else could decide; there is not one now.
+
+If `tau_high` is ever revisited, this table is the place to start, and
+the thing to check first is whether the top false pair has moved again
+— it has now moved twice, in both directions, on corpus changes of
+fewer than twenty labels.
