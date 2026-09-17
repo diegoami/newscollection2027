@@ -813,3 +813,52 @@ at 0.3686 whose pair file no longer exists to verify it against; it is
 lost rather than silently kept.
 
 **T23 is at 198 of 200.**
+
+### Closing T23: what `tau_low` actually costs
+
+T23 was closed at 198 labels rather than 200, and the missing number it
+named — "how many pairs a run lands in the widened band" — was measured
+before closing it, because that is the half of the task that was
+genuinely outstanding.
+
+On the 253-pair queue of 2026-09-17:
+
+```
+                            queue pairs        labelled true pairs
+[0.57, 0.65)  the widening    168  (66%)             13  (27%)
+[0.65, 1.00)  the old band     85  (34%)             36  (73%)
+```
+
+**Two thirds of everything the judge is asked comes from widening
+`tau_low` from 0.65 to 0.57, and it buys back roughly a quarter of the
+true pairs.** That is the trade, stated in the units that matter, and it
+is a good one — but only because the judge runs on the Claude Code
+subscription rather than a metered bill (docs/ARCHITECTURE.md's cost
+model). If the judge ever moves to metered calls, this is the first
+number to revisit, and the 13 pairs above are exactly what would be
+lost: real cross-outlet matches, including the Starship launch date two
+outlets both carried at 0.5926 and the TechCrunch/Tom's Hardware pair at
+0.5708 that has anchored `tau_low` through three rounds.
+
+The queue figure is a catch-up count, not a steady-state rate — the
+pending-pairs directory has never been pruned, so it holds every
+borderline pair since clustering began. What a single night costs is
+still unmeasured, and needs the nightly Routine (T13) running before it
+can be.
+
+**T23 is closed.** Not because 198 reached 200, but because the
+criterion was always a proxy for "enough evidence to set two
+thresholds", and the evidence now says:
+
+- `tau_low: 0.57` — the lowest labelled true pair is 0.5708 and has not
+  moved in three rounds; 16 new positives in the last session, none
+  below it. Its price is measured above.
+- `tau_high: 1.00` — auto-linking stays off. The ceiling has stopped
+  climbing (0.7710 twice in a row), but at 8 of 49 true pairs it is
+  still buying a fraction of the work in exchange for the one
+  unrecoverable failure mode, and the judge now answers the band at
+  0.881 agreement.
+
+Two more labels would not change either number. What would change them
+is a fourth round that leaves the ceiling at 0.7710 again, or a nightly
+run that prices the band for real.
