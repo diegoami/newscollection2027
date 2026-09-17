@@ -371,7 +371,7 @@ def test_cluster_emits_a_cluster_and_is_a_no_op_the_second_time(
     link; the third item is unrelated text and stays a dropped
     singleton.
     """
-    from nc.embed import HashBackend, embed_items
+    from nc.embed import HashBackend, embed_items, load_embed_config
     from nc.feeds import Item, utc_now_iso
     from nc.store import DataRoot, append_items
 
@@ -401,7 +401,15 @@ def test_cluster_emits_a_cluster_and_is_a_no_op_the_second_time(
     data_root = tmp_path / "data-root"
     append_items(DataRoot(data_root), items)
     db_path = tmp_path / "vectors.sqlite"
-    embed_items(DataRoot(data_root), HashBackend(dim=16), "hash", db_path)
+    # `nc cluster` reads vectors for the model config/embed.yaml names,
+    # so an end-to-end CLI test has to store them under that id -- the
+    # fake backend stands in for the model, not for the id.
+    embed_items(
+        DataRoot(data_root),
+        HashBackend(dim=16),
+        load_embed_config().model_id,
+        db_path,
+    )
 
     config_path = tmp_path / "cluster.yaml"
     config_path.write_text(

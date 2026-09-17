@@ -30,3 +30,50 @@ model_dir: ".cache/hf-models"
 # a smaller batch keeps peak memory flat without costing meaningful
 # throughput on that volume.
 batch_size: 64
+
+# Candidate models for `nc bench-embed`, which scores each one against
+# labels/pairs.jsonl and reports how much of the range it gets right
+# enough to auto-link (src/nc/bench.py). Listing a model here does not
+# make it live -- `model_id` above is what runs; this is the shortlist
+# an experiment measures before that changes.
+#
+# Why the list is all model2vec: the constraint that chose this library
+# has not moved. Ingest runs 8 times a day on a free runner
+# (docs/ARCHITECTURE.md's cost model), so a candidate has to stay
+# torch-free and onnxruntime-free. A larger static distillation is the
+# only upgrade that costs nothing architecturally -- same pure-numpy
+# inference, same determinism, just a bigger weights file behind
+# actions/cache. If none of these moves recall@p1.0, that is itself the
+# answer: the ceiling is the task, not the model, and the judge should
+# decide the band rather than a threshold.
+#
+# The list is a size ladder on purpose, not a shortlist of plausible
+# winners. Comparing 8M against 32M alone answers "is this one model
+# better"; 2M -> 4M -> 8M -> 32M -> 128M answers the question that
+# actually decides what to do next -- does capacity help on THIS task
+# at all. A rising curve says a heavier model is worth the cost and
+# justifies looking outside model2vec (where the price is torch or
+# onnxruntime on a runner that fires 8 times a day). A flat curve says
+# the ceiling is the task, not the model: a mean-pooled static vector
+# cannot tell "same topic" from "same event" at any size, and the band
+# should go to T24's judge instead of to a threshold.
+#
+# Excluded deliberately: potion-science-* and potion-code-* (tuned for
+# domains this project does not read), the M2V_base_* generation
+# (superseded by potion), and every *-onnx variant (same weights, but
+# they need the onnxruntime dependency T20 rejected on size).
+bench_candidates:
+  - "minishlab/potion-base-2M"
+  - "minishlab/potion-base-4M"
+  - "minishlab/potion-base-8M"
+  - "minishlab/potion-base-32M"
+  # Fine-tuned for retrieval, which is asymmetric (a short query against
+  # a long document). Headline-against-headline is symmetric, so this
+  # may well do worse than potion-base-32M it was distilled from --
+  # included because that is a measurement, not a guess.
+  - "minishlab/potion-retrieval-32M"
+  # The largest static model MinishLab publishes. Its capacity is spread
+  # over 100+ languages and all eleven outlets are English, so it is
+  # both the best test of "does size help" and the most likely to spend
+  # its parameters on nothing this project uses.
+  - "minishlab/potion-multilingual-128M"
