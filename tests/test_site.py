@@ -554,3 +554,116 @@ def test_a_cluster_with_no_urls_still_builds(tmp_path: Path) -> None:
     page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
     assert 'rel="noopener nofollow"' not in page
     assert older.items[0].title in page
+
+
+# --- the claims table, and the cards --------------------------------------
+
+# A second item from an outlet already in the cluster. This is the case
+# that made the claims table unlinked in the first place: `theverge`
+# appears twice, so the column header maps to two articles and linking
+# it would send half the readers to the wrong one. Every link below is
+# per *item* instead, which has no such ambiguity.
+VERGE_2 = "d" * 40
+
+
+def _two_from_one_outlet() -> tuple[Cluster, dict[str, Any]]:
+    cluster = _cluster(
+        items=(
+            *_cluster().items,
+            ClusterItem(
+                item_id=VERGE_2,
+                outlet="theverge",
+                title="Acme's Widget 4 is up for preorder",
+                lede="Preorders opened an hour after the announcement.",
+                published="2026-09-17T12:00:00Z",
+                url="https://www.theverge.com/acme-widget-4-preorder",
+            ),
+        )
+    )
+    payload = _payload()
+    payload["claims"][0]["sources"].append(
+        {
+            "outlet": "theverge",
+            "item_id": VERGE_2,
+            "quote": "Preorders opened an hour after the announcement",
+        }
+    )
+    return cluster, payload
+
+
+def test_each_quote_in_the_claims_table_links_to_its_own_article(
+    tmp_path: Path,
+) -> None:
+    """The largest surface on a story page, and it had no links at all.
+    The link is keyed on the quote's `item_id`, never on the column's
+    outlet name: both quotes below are theverge's and they came from
+    different articles."""
+    cluster, payload = _two_from_one_outlet()
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path, cluster=cluster, payload=payload), out)
+    page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
+
+    for item in cluster.items:
+        quote = next(
+            source["quote"]
+            for source in payload["claims"][0]["sources"]
+            if source["item_id"] == item.item_id
+        )
+        assert f'<blockquote cite="{item.url}"><a href="{item.url}"' in page
+        assert quote in page
+
+
+def test_a_quote_whose_item_has_no_url_stays_plain_text(tmp_path: Path) -> None:
+    older = _cluster(items=tuple(replace(item, url="") for item in _cluster().items))
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path, cluster=older), out)
+    page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
+
+    assert "<blockquote cite=" not in page
+    assert "it ships in the first quarter" in page
+
+
+def test_a_story_card_links_its_outlets_to_the_articles(tmp_path: Path) -> None:
+    """A card's outlet chips used to point at `/outlet/<slug>/`, our own
+    page about the outlet, which is not the source. They point at the
+    articles now; the outlet pages are still reached from the Outlets
+    table on the front page."""
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path), out)
+    page = (out / "index.html").read_text(encoding="utf-8")
+
+    for item in _cluster().items:
+        assert f'<a href="{item.url}" rel="noopener nofollow"' in page
+    assert '<a href="/newscollection2027/outlet/theverge/">theverge</a>' in page
+
+
+def test_a_card_shows_one_chip_per_item_not_per_outlet(tmp_path: Path) -> None:
+    """Two theverge pieces in one story are two chips, each going to its
+    own article. Collapsing them would mean guessing which one a reader
+    clicking `theverge` wanted."""
+    cluster, payload = _two_from_one_outlet()
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path, cluster=cluster, payload=payload), out)
+    page = (out / "index.html").read_text(encoding="utf-8")
+    card = page.split('<p class="outlets">')[1]
+
+    for item in cluster.items:
+        assert f'href="{item.url}"' in card
+
+
+def test_a_card_does_not_link_an_outlet_whose_url_is_hostile(tmp_path: Path) -> None:
+    """Same guard as the story page: the card is a second template and
+    would otherwise be a second way in."""
+    hostile = _cluster(
+        items=(
+            replace(_cluster().items[0], url="javascript:alert(1)"),
+            _cluster().items[1],
+        )
+    )
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path, cluster=hostile), out)
+    page = (out / "index.html").read_text(encoding="utf-8")
+
+    assert "javascript:" not in page
+    assert '<span class="unlinked"' in page
+    assert "theverge" in page

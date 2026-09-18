@@ -20,7 +20,12 @@
   {% for outlet in story.outlets %}
   <td>
     {% for source in claim.sources if source.outlet == outlet %}
+    {% set href = story.url_by_id.get(source.item_id, '') %}
+    {% if href %}
+    <blockquote cite="{{ href }}"><a href="{{ href }}" rel="noopener nofollow">{{ source.quote }}</a></blockquote>
+    {% else %}
     <blockquote>{{ source.quote }}</blockquote>
+    {% endif %}
     {% endfor %}
   </td>
   {% endfor %}

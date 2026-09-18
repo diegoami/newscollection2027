@@ -119,6 +119,15 @@ def slugify(outlet: str) -> str:
 
 
 @dataclass(frozen=True)
+class SourceLink:
+    """One outlet's article, as a story card renders it."""
+
+    outlet: str
+    url: str
+    title: str
+
+
+@dataclass(frozen=True)
 class Story:
     """One publishable analysis with the cluster it describes."""
 
@@ -161,6 +170,30 @@ class Story:
         thing it was quoted from. Empty for a cluster written before the
         url was carried; the template falls back to plain text."""
         return {item.item_id: external_url(item.url) for item in self.cluster.items}
+
+    @property
+    def source_links(self) -> list[SourceLink]:
+        """Every item in the cluster as an outbound link, outlet order.
+
+        **One entry per item, not per outlet.** A cluster can hold two
+        pieces from the same outlet -- `2026-09-15-b07489` holds zdnet's
+        "may mess with your audio" and zdnet's "out-of-band update fixes
+        audio glitch" -- so an outlet name maps to one article only by
+        luck. Collapsing them to one chip per outlet would send half the
+        readers who click "zdnet" to the wrong zdnet article. Two chips
+        reading `zdnet` is the honest rendering: the story really does
+        have two zdnet pieces in it.
+        """
+        return [
+            SourceLink(
+                outlet=item.outlet,
+                url=external_url(item.url),
+                title=item.title,
+            )
+            for item in sorted(
+                self.cluster.items, key=lambda i: (i.outlet, i.published, i.item_id)
+            )
+        ]
 
 
 @dataclass(frozen=True)

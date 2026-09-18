@@ -10,6 +10,6 @@
     {% endif %}
   </p>
   <p>{{ story.analysis.summary }}</p>
-  <p class="outlets">{% for outlet in story.outlets %}<a href="{{ base }}outlet/{{ outlet | slug }}/">{{ outlet }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
+  <p class="outlets">{% for source in story.source_links %}{% if source.url %}<a href="{{ source.url }}" rel="noopener nofollow" title="{{ source.title }}">{{ source.outlet }}</a>{% else %}<span class="unlinked" title="{{ source.title }}">{{ source.outlet }}</span>{% endif %}{% if not loop.last %} {% endif %}{% endfor %}</p>
 </article>
 {% endmacro %}
