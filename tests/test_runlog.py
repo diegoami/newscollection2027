@@ -400,3 +400,47 @@ def test_without_a_journal_the_count_is_unknown_not_zero(tmp_path: Path) -> None
     assert run.counts.analyses_written is None
     assert run.status == runlog.STATUS_OK
     assert "? analysis file(s)" in runlog.format_run(run)
+
+
+def test_a_record_with_durations_is_not_replaced_by_one_without(tmp_path: Path) -> None:
+    """A `nc runlog` typed by hand, outside a journalled session, knows
+    no start time and no steps. Letting it overwrite a real nightly's
+    record destroys the only measurements of that night, silently --
+    which happened on 2026-09-18 and was recoverable only because the
+    data repo had committed the file."""
+    data_root = DataRoot(tmp_path / "data")
+    journal = tmp_path / "journal.json"
+    runlog.start(journal, now=NOW)
+    runlog.record_step("cluster", 12.0, True, journal)
+    real = runlog.build_run(data_root, now=NOW, journal=journal)
+    assert runlog.write_run(data_root, real) is not None
+
+    bare = runlog.build_run(data_root, now=NOW, journal=tmp_path / "none.json")
+    assert bare.duration_seconds is None
+
+    assert runlog.write_run(data_root, bare) is None
+    kept = runlog.load_runs(data_root)[0]
+    assert kept.duration_seconds == real.duration_seconds
+    assert [s.name for s in kept.steps] == ["cluster"]
+
+
+def test_a_second_journalled_run_still_replaces_the_first(tmp_path: Path) -> None:
+    """The guard is about losing measurements, not about freezing the
+    day: a real second run of the day is still the day's answer."""
+    data_root = DataRoot(tmp_path / "data")
+    first = tmp_path / "a.json"
+    runlog.start(first, now=NOW)
+    runlog.record_step("cluster", 1.0, True, first)
+    runlog.write_run(data_root, runlog.build_run(data_root, now=NOW, journal=first))
+
+    second = tmp_path / "b.json"
+    runlog.start(second, now=NOW)
+    runlog.record_step("build", 99.0, True, second)
+    assert (
+        runlog.write_run(
+            data_root, runlog.build_run(data_root, now=NOW, journal=second)
+        )
+        is not None
+    )
+
+    assert [s.name for s in runlog.load_runs(data_root)[0].steps] == ["build"]

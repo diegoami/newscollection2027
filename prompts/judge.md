@@ -24,17 +24,20 @@ tell the two cases apart.
   same person leaving the same job, the same report being published.
 - A reader who had already read one would learn no new event from the other,
   only a different outlet's angle on it.
+- **A problem and its response are one story.** A bug and the patch that
+  fixes it, an outage and its restoration, a breach and the disclosure that
+  follows: one developing story, covered at different moments. This is a
+  ruling from the owner (2026-09-18), replacing an earlier one that split
+  them. "Windows update breaks USB audio" and "Microsoft ships an emergency
+  patch" are the *same* story, and so is a third outlet saying the patch did
+  not fix it. That last case is the point: the outlets differ on whether the
+  problem is solved, and showing that difference is what this site is for.
+  Splitting them would hide it.
 
 ## Answer no when
 
 - They share a subject but report different events (two separate outages at
   the same company; a launch and a later review of the same product).
-- **One reports a problem and the other reports its fix.** A bug, outage,
-  breach or recall is one event; the patch, restoration or response is
-  another, even when the second text explains the first. This is a ruling
-  from the owner, not a judgement call: "Windows update breaks USB audio"
-  and "Microsoft ships an emergency patch" are two stories. Two outlets
-  both reporting the *same* patch are of course still one story.
 - One is a roundup, listicle, opinion column, deal post or newsletter that
   merely mentions what the other reports.
 - They report the same *kind* of event at different companies.

@@ -56,25 +56,17 @@ from nc.store import DataRoot
 DEFAULT_GOLDEN_DIR = Path("evals/golden")
 DEFAULT_REPORTS_DIR = Path("evals/reports")
 
-# Positive labels the owner's later ruling overturned, excluded when the
-# golden set is built from the corpus.
+# The two positive labels an earlier ruling overturned are back.
 #
-# Both say a Windows 11 bug report and the patch that fixed it are one
-# story. On 2026-09-17 the owner ruled they are two (prompts/analyze.md,
-# "One reports a problem and the other reports its fix"), and a golden
-# set asserting the opposite would grade every backend against a rule
-# its own prompt tells it to break. They are still in
-# `labels/pairs.jsonl` -- correcting the corpus is the owner's call, and
-# docs/CLUSTERING.md records them -- so the exclusion lives here, named
-# and auditable, rather than being silently absent.
-OVERTURNED_POSITIVES = frozenset(
-    {
-        "355367e5b05194a09fd85d4ba7fef706fc77d906-"
-        "b66e9b2e7b75082cb42654d6b83ffa9986860dcf",
-        "b66e9b2e7b75082cb42654d6b83ffa9986860dcf-"
-        "e49aee3e98064b94a42cbdf166abdaa9dcc311f7",
-    }
-)
+# On 2026-09-17 the owner ruled that a Windows 11 bug report and the
+# patch fixing it are two stories, and `OVERTURNED_POSITIVES` excluded
+# the two labels that said otherwise. On 2026-09-18 the owner repealed
+# that rule: a problem and its response are one developing story, and
+# the outlets differing over whether the problem is solved is exactly
+# what the site is for (prompts/judge.md, "A problem and its response
+# are one story"). So the exclusion is gone and the corpus stands as the
+# owner labelled it in the first place -- which is what a golden set
+# built from human labels should have been all along.
 
 
 @dataclass(frozen=True)

@@ -342,12 +342,30 @@ def render_run(run: Run) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
-def write_run(data_root: DataRoot, run: Run) -> Path:
-    """One file per date. A second run on the same day overwrites the
-    first, which is the right shape for a nightly: the record answers
-    "what happened on the 18th", and two answers for one date would
-    leave a status page choosing between them."""
+def write_run(data_root: DataRoot, run: Run) -> Path | None:
+    """One file per date, except when that would lose the day's measurements.
+
+    A second run on the same day overwrites the first, which is the right
+    shape for a nightly: the record answers "what happened on the 18th",
+    and two answers for one date would leave a status page choosing
+    between them.
+
+    But a `nc runlog` typed by hand, outside a journalled session, knows
+    no start time and no steps -- and overwriting a real nightly's record
+    with it destroys the only measurements of that night, silently. That
+    happened on 2026-09-18 and the record was recoverable only because
+    the data repo had committed it. So a record that knows its duration
+    is never replaced by one that does not; the caller is told nothing
+    was written by the `None` return, and the fuller record stands.
+    """
     path = run_path(data_root, run.date)
+    if run.duration_seconds is None and path.exists():
+        try:
+            existing = run_from_dict(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+            existing = None
+        if existing is not None and existing.duration_seconds is not None:
+            return None
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_run(run), encoding="utf-8")
     return path

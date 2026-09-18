@@ -129,3 +129,5 @@ NYT Technology, which measured well, joins the set.
   as the fact-checking scope.
 - 2026-09-15 Deterministic steps run in GitHub Actions every three hours;
   only the agentic analysis step uses the Claude Code Routine.
+- 2026-09-17 A problem and its fix are two stories (judge rule). **Repealed 2026-09-18**: they are one. Telling a patch story from a patch-fix story costs more than it is worth, and the outlets differing over whether the problem is solved is the disagreement the site exists to show. See docs/CLUSTERING.md and prompts/judge.md.
+- 2026-09-18 The golden set fixes membership only. Naming the differing take each cluster must yield is out of scope: articles about one news item are supposed to differ. `nc eval` therefore scores only what the contract can decide without an opinion.

@@ -5,6 +5,14 @@
     "id": "2026-09-15-b07489",
     "items": [
       {
+        "item_id": "b66e9b2e7b75082cb42654d6b83ffa9986860dcf",
+        "lede": "The September Patch Tuesday update is causing audio problems with certain USB devices, but you may be able to resolve it yourself.",
+        "outlet": "zdnet",
+        "published": "2026-09-14T17:27:48Z",
+        "title": "The latest Windows 11 update may mess with your device’s audio – here’s the workaround",
+        "url": "https://www.zdnet.com/business/windows-11-sept-update-audio-glitch-fix/"
+      },
+      {
         "item_id": "e49aee3e98064b94a42cbdf166abdaa9dcc311f7",
         "lede": "Windows September 2026 update brings many long-requested features, but also surfaces fresh bugs — new code crashing AMD, HP, and Lenovo systems and surfaces audio, Explorer, and Remote Desktop problems",
         "outlet": "tomshardware",
@@ -30,5 +38,5 @@
     "version": 1
   },
   "expected_discrepancies": [],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy. Restored 2026-09-18: two positive labels excluded under the repealed problem-and-fix rule are back, which returns the zdnet bug-and-workaround item to this cluster. Membership is the owner's labels, unmodified."
 }
