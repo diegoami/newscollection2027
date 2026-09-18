@@ -5,13 +5,15 @@ added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
 T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
 `judge` and `bench-judge` by T24;
-`validate` by T30; `pending` by T32; `analyze` by T31; `eval` by T33; `build` by T40.
+`validate` by T30; `pending` by T32; `analyze` by T31; `eval` by T33; `build` by T40;
+`runlog` and `nightly` by T50.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import time
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -29,6 +31,8 @@ from nc import (
     feeds,
     judge,
     labelling,
+    nightly,
+    runlog,
     site,
     store,
     sync,
@@ -379,6 +383,71 @@ def _sync_push(args: argparse.Namespace) -> int:
     # the workflow stops firing silently; tests/test_cli.py pins it.
     print("sync push: pushed" if pushed else "sync push: nothing changed")
     return 0
+
+
+def _runlog(args: argparse.Namespace) -> int:
+    """T50: open the run journal, or write the night's record.
+
+    `--start` is the first command of the nightly; every `nc` command
+    after it times itself into the journal (see `main`), so the record's
+    durations are measurements rather than the agent's recollection.
+
+    Bare, this writes `runs/<date>.json` from the data root as it stands
+    -- counts recomputed from the files, never taken on the agent's word
+    -- and closes the journal. `--dry-run` prints the same record and
+    writes nothing, which is what `nc nightly --dry-run` uses: a `runs/`
+    file left behind by a rehearsal would be pushed by the next real run
+    as if a nightly had happened.
+    """
+    if args.start:
+        moment = runlog.start()
+        print(f"runlog: journal opened at {runlog.iso(moment)}")
+        return 0
+
+    data_root = _data_root(args)
+    run = runlog.build_run(data_root, note=args.note, failed=args.failed)
+    if args.dry_run:
+        print(runlog.format_run(run))
+        print(f"runlog: would write {runlog.run_path(data_root, run.date)}")
+        return 0
+
+    path = runlog.write_run(data_root, run)
+    runlog.clear()
+    print(runlog.format_run(run))
+    print(f"runlog: wrote {path}")
+    return 1 if run.status == runlog.STATUS_FAILED else 0
+
+
+def _nightly(args: argparse.Namespace) -> int:
+    """T50: rehearse the night's deterministic steps.
+
+    There is no run without `--dry-run`, and that is not an oversight:
+    two of the nightly's steps are an agent reading a skill, and
+    CLAUDE.md says deterministic code never calls an LLM. A `nc nightly`
+    that ran everything else and exited 0 would report a successful
+    night on which nothing was analysed.
+    """
+    if not args.dry_run:
+        print(
+            "nightly: there is no `nc nightly` without --dry-run.\n"
+            "  Two of the night's steps -- judging borderline pairs and\n"
+            "  analysing pending clusters -- are an agent following\n"
+            "  .claude/skills/nightly/SKILL.md, and CLAUDE.md says\n"
+            "  deterministic code never calls an LLM. Run the skill for a\n"
+            "  real night; run --dry-run to check every other step works."
+        )
+        return 2
+
+    report = nightly.dry_run(
+        _data_root(args),
+        sync_config=args.sync_config,
+        cluster_config=args.config,
+        db_path=args.db,
+        out_dir=args.out,
+        skip_sync=args.skip_sync,
+    )
+    print(nightly.format_dry_run(report))
+    return 0 if report.ok else 1
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -778,7 +847,76 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sync_push_parser.set_defaults(func=_sync_push)
 
+    runlog_parser = subparsers.add_parser(
+        "runlog", help="open the run journal, or write runs/<date>.json (T50)"
+    )
+    runlog_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    runlog_parser.add_argument(
+        "--start",
+        action="store_true",
+        help="open the run journal; run this first, so every command after "
+        "it times itself into the night's record",
+    )
+    runlog_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the record without writing it",
+    )
+    runlog_parser.add_argument(
+        "--note", default="", help="free text stored with the record"
+    )
+    runlog_parser.add_argument(
+        "--failed",
+        default="",
+        help="the run stopped on purpose, and why. The one thing the files "
+        "cannot show: a run that stopped early and a run with nothing to do "
+        "leave the same data root behind",
+    )
+    runlog_parser.set_defaults(func=_runlog)
+
+    nightly_parser = subparsers.add_parser(
+        "nightly",
+        help="rehearse the nightly: every step except the agent's and the push (T50)",
+    )
+    nightly_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    nightly_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="required. `dry` means nothing is published, not that nothing "
+        "is written: the steps it runs are the real ones",
+    )
+    nightly_parser.add_argument(
+        "--skip-sync",
+        action="store_true",
+        help="do not pull the data repo first (for a machine with no network)",
+    )
+    nightly_parser.add_argument(
+        "--config", type=Path, default=cluster.DEFAULT_CLUSTER_CONFIG_PATH
+    )
+    nightly_parser.add_argument(
+        "--sync-config", type=Path, default=sync.DEFAULT_SYNC_CONFIG_PATH
+    )
+    nightly_parser.add_argument(
+        "--db", type=Path, default=embed.DEFAULT_VECTORS_DB_PATH
+    )
+    nightly_parser.add_argument("--out", type=Path, default=site.DEFAULT_SITE_DIR)
+    nightly_parser.set_defaults(func=_nightly)
+
     return parser
+
+
+def _command_name(args: argparse.Namespace) -> str:
+    """What the run journal calls this command, e.g. `sync push`."""
+    parts = [str(args.command)]
+    for attr in ("feeds_command", "sync_command", "db_command"):
+        value = getattr(args, attr, None)
+        if value:
+            parts.append(str(value))
+    return " ".join(parts)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -790,12 +928,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     func = getattr(args, "func", None)
-    if func is not None:
-        return_code: int = func(args)
-        return return_code
+    if func is None:
+        parser.print_help()
+        return 0
 
-    parser.print_help()
-    return 0
+    # T50: while a run journal is open (`nc runlog --start`), every
+    # command times itself into it. The agent running the nightly does
+    # not report durations and cannot get them wrong; it just runs the
+    # commands it was going to run. `record_step` is a no-op when no
+    # journal is open, which is every other use of this CLI, and it
+    # never raises -- see nc/runlog.py.
+    # `nc runlog` itself is the journal's bookkeeping, not a step of
+    # the night: `--start` would otherwise be the first entry in the
+    # journal it just opened, and the reader would be looking at a list
+    # of steps that includes writing the list.
+    journaled = args.command != "runlog"
+    started = time.monotonic()
+    try:
+        return_code: int = func(args)
+    except Exception:
+        if journaled:
+            runlog.record_step(_command_name(args), time.monotonic() - started, False)
+        raise
+    if journaled:
+        runlog.record_step(
+            _command_name(args), time.monotonic() - started, return_code == 0
+        )
+    return return_code
 
 
 if __name__ == "__main__":

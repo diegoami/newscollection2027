@@ -93,17 +93,24 @@ Routine prompt (kept to one line, the detail lives in the repo skill):
 
 The skill procedure:
 
-1. `nc sync pull` brings the data repo to the data root.
-2. `nc pending` lists cluster files awaiting analysis.
-3. For each pending cluster, the agent reads the cluster file and writes
+1. `nc runlog --start` opens the run journal. Every `nc` command after it
+   times itself into tonight's record, so the agent reports no durations
+   and cannot get them wrong.
+2. `nc sync pull` brings the data repo to the data root.
+3. `nc judge`, and the judge skill for any borderline pair, before
+   clustering: judging afterwards would hold every link for a day.
+4. `nc pending` lists cluster files awaiting analysis.
+5. For each pending cluster, the agent reads the cluster file and writes
    `data/analyses/<date>/<cluster_id>.json` following
    `.claude/skills/analyze-clusters/SKILL.md`.
-4. `nc validate` checks every new analysis. Rejects are listed with
+6. `nc validate` checks every new analysis. Rejects are listed with
    reasons; the agent fixes and revalidates each reject at most twice, then
    leaves it in `data/rejected/`.
-5. `nc build` as a smoke test that the site still builds.
-6. `nc runlog` writes `data/runs/<date>.json`.
-7. `nc sync push` commits `data: analyses <date>` to the data repo and
+7. `nc build` as a smoke test that the site still builds.
+8. `nc runlog` writes `data/runs/<date>.json` and closes the journal. Its
+   counts are recomputed from the files, never taken from the agent's
+   account of its own night.
+9. `nc sync push` commits `data: analyses <date>` to the data repo and
    pushes; the data repo's push triggers the deploy workflow in the code
    repo through `repository_dispatch`, which builds the site and publishes
    it to GitHub Pages (later Netlify).
