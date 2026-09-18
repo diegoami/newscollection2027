@@ -17,16 +17,80 @@
 </header>
 <main>
 <h1>Status</h1>
-<p class="lede">0 stories currently published.</p>
+<p class="lede">19 stories currently published.</p>
 
-<p class="empty">No successful run recorded yet. The pipeline writes one record
-per nightly run; this page fills in once that runs unattended.</p>
+<h2>Last successful run</h2>
+<p class="age">
+  <time datetime="2026-09-18T02:35:07Z">2026-09-18T02:35:07Z</time>
+  &middot; 2026-09-18 &middot; ok
+</p>
 
+<h2>Recent runs</h2>
+<table>
+<thead><tr>
+  <th>Date</th><th></th><th>Analysed</th><th>Pending</th><th>Rejected</th>
+  <th>Total</th><th>Agent</th>
+</tr></thead>
+<tbody>
+<tr>
+  <td><time datetime="2026-09-18T02:35:07Z">2026-09-18</time></td>
+  <td>ok</td>
+  <td class="num">19</td>
+  <td class="num">0</td>
+  <td class="num">0</td>
+  <td class="num">11m 38s</td>
+  <td class="num">11m 37s</td>
+</tr>
+</tbody>
+</table>
+<p class="caveat">"Analysed" is the analyses that run wrote, "pending" what was
+still waiting when the run ended &mdash; a run can finish cleanly and leave work
+behind. "Agent" is the run's wall clock minus the time its commands took, which
+is the time the model itself spent. An em dash means the run kept no journal, so
+its duration is unknown rather than zero.</p>
+
+<h2>2026-09-18, step by step</h2>
+<table class="stats">
+<tbody>
+<tr>
+  <th>sync pull</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>judge (failed)</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>judge</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>bench-judge</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>cluster</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>pending</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>validate</th>
+  <td class="num">&lt;1s</td>
+</tr>
+<tr>
+  <th>build</th>
+  <td class="num">&lt;1s</td>
+</tr>
+</tbody>
+</table>
 
 <h2>This build</h2>
 <table class="stats">
 <tbody>
-<tr><th>Stories published</th><td class="num">0</td></tr>
+<tr><th>Stories published</th><td class="num">19</td></tr>
 <tr><th>Skipped as stale</th><td class="num">0</td></tr>
 <tr><th>Skipped as invalid</th><td class="num">0</td></tr>
 </tbody>
