@@ -37,6 +37,8 @@ nc bench-judge      score those judgments against the human labels
 nc validate --new   validate analyses written since the last run
 nc analyze --backend api    fill pending clusters through the SDK backend
 nc build            write the static site to site/
+nc runlog --start   open the run journal; every nc command after it is timed
+nc runlog           write runs/<date>.json from the files, close the journal
 nc nightly --dry-run        every nightly step except the agent step and the push
 ```
 
