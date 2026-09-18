@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Method &middot; newscollection2027</title>
+<link rel="stylesheet" href="/newscollection2027/style.css">
+</head>
+<body>
+<header>
+  <a class="wordmark" href="/newscollection2027/">newscollection<span>2027</span></a>
+  <nav>
+    <a href="/newscollection2027/">Today</a>
+    <a href="/newscollection2027/method/">Method</a>
+    <a href="/newscollection2027/status/">Status</a>
+  </nav>
+</header>
+<main>
+<h1>How this works, and what it cannot do</h1>
+
+<h2>What the pipeline does</h2>
+<ol>
+<li><strong>Ingest.</strong> Every three hours, fetch each outlet's public feed
+and store the new items: outlet, canonical URL, title, opening sentence,
+publication time. Nothing is scraped and no article body is ever fetched.</li>
+<li><strong>Group.</strong> Items from the last four days are compared by
+meaning. Pairs that look close are put in front of a language model, which
+answers one question: do these two report the same event, or merely the same
+subject? Two or more outlets on one event become a story.</li>
+<li><strong>Compare.</strong> A language model reads the headlines and opening
+sentences of one story and writes down what each outlet claims and where they
+differ, quoting each outlet's own words.</li>
+<li><strong>Check.</strong> A validator refuses anything it cannot verify.
+Every quote must appear character for character in the item it is attributed
+to. An analysis that fails is not published.</li>
+</ol>
+
+<h2>What it cannot do</h2>
+<ul>
+<li><strong>It has not read the articles.</strong> Everything here comes from a
+headline and an opening sentence. An outlet may well answer in paragraph four
+something this site records as an omission.</li>
+<li><strong>It does not decide who is right.</strong> Outlets differ because
+they filed at different times, had different sources, or chose different
+details. The site shows the difference and stops.</li>
+<li><strong>Absence is not evidence.</strong> A story here means two outlets
+were matched; a story missing means they were not. That is a limit of the
+matching, not a claim about the news.</li>
+<li><strong>The outlet numbers are not scores.</strong> See any outlet page.</li>
+</ul>
+
+<h2>What it costs</h2>
+<p>Feeds are free. Grouping runs on a small model on a free GitHub Actions
+runner. The comparison runs on a Claude subscription rather than metered API
+calls. The whole thing is designed to run for the price of the subscription
+someone already has.</p>
+
+<h2>Where the data is</h2>
+<p>Every item, story, judgment and analysis is a plain text file in a public
+repository, and every number on this site can be recomputed from them.</p>
+</main>
+<footer>
+  <p>Every claim below is quoted verbatim from an outlet's own headline or
+  opening sentence. This site never has the article bodies, and it does not
+  decide who is right.</p>
+</footer>
+</body>
+</html>
