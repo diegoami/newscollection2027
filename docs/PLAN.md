@@ -12,8 +12,9 @@ issue are done; the Routine itself (T51) is the owner's.
 Remaining owner steps, both of them now blocking an acceptance
 criterion: point GitHub Pages at `gh-pages` (T42 -- the branch already
 exists; the deploy workflow created it on its first run), and create
-`DATA_REPO_TOKEN` so the scheduled ingest can push (T13). T34, reading
-the twenty golden cases, is also waiting.
+`DATA_REPO_TOKEN` so the scheduled ingest can push (T13). T34 is done:
+the owner checked all twenty golden cases and ruled the expected
+discrepancies out of scope.
 
 Milestones are sequential. Tasks inside a milestone marked `[P]` can run
 in parallel with the other `[P]` tasks of the same milestone. Sizes:
@@ -188,10 +189,29 @@ acceptance criteria are shown in a merged PR.
   pipeline's own output, so their membership is the owner's and no
   threshold or judge had a say in it. `nc eval --backend files` is
   committed; `--backend api` needs a key and spends money, so it is the
-  owner's call. The expected discrepancies are a proposal until T34 and
-  every report says so next to its numbers.
+  owner's call. The expected discrepancies were a proposal; T34 removed
+  them, so the eval now scores only what `nc.contract` can decide
+  without an opinion.
   AC: report committed for both backends.
-- **T34 [owner]** Check the 20 golden analyses.
+- **T34 [owner, done]** ~~Check the 20 golden analyses.~~ **Done
+  2026-09-18**, and the answer was the same twenty times: no expected
+  discrepancy. The owner's ruling, in their terms -- articles about one
+  news item are *supposed* to differ, and showing that difference is the
+  reason the site exists; naming in advance which difference each
+  cluster must yield is out of scope. `expected_discrepancies` is
+  therefore empty in every case and `checked: true` in all twenty, and
+  `nc eval` no longer reports discrepancy precision or recall: with
+  nothing expected, both would print 0.000 and read as a backend failing
+  at a job nobody asked it to do.
+
+  The same run surfaced a second distinction worth keeping. The golden
+  clusters are frozen at what the labels give them while the pipeline's
+  keep growing as the judge accepts links, so an analysis written for a
+  live cluster cites items the golden one has never had. That is the
+  fixture lagging, not bad output, and the report now counts it as
+  *stale* rather than failed -- the distinction `nc build` already draws.
+  On 2026-09-18: 15 analyses found, 4 stale, 5 missing, and **every
+  non-stale analysis passes the contract**.
 
 ## M4 Site
 

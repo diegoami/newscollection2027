@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "5b40dc3d0a5424f169f6c45493395bada88da44f",
     "id": "2026-09-16-0acc25",
@@ -23,21 +23,12 @@
         "lede": "Hacking group stegan0gram got its hands on a Flock camera and broke into its systems to see how it worked. It turns out that these devices store thousands of clips and captures millions of images, and could also detect people, aside from cars, motorbikes, and license plates.",
         "outlet": "tomshardware",
         "published": "2026-09-17T11:30:00Z",
-        "title": "Hackers find encryption keys stored on stolen Flock camera despite company's denials \u2014 group extracts more than 27,000 clips, 1.6 million images captured in a span of 21 days from the device"
+        "title": "Hackers find encryption keys stored on stolen Flock camera despite company's denials — group extracts more than 27,000 clips, 1.6 million images captured in a span of 21 days from the device"
       }
     ],
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "omission",
-      "note": "Tom's Hardware reports encryption keys stored on the device despite the company's denials; Wired's text does not.",
-      "outlets": [
-        "tomshardware",
-        "wired"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }

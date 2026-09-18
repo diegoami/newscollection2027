@@ -14,24 +14,24 @@ clusters of two to four outlets whose *membership is human-confirmed* --
 exactly the property a golden set needs, and one no threshold or judge
 had a say in.
 
-**What is golden and what is not.** The membership is the owner's, via
-the labels. The expected discrepancies are a proposal until T34, where
-the owner checks all twenty; `checked: false` says so in every file and
-`nc eval` prints how many are still unchecked next to every number it
-reports. A golden set nobody has read is a set of guesses with a
-confident filename.
+**What is golden, and what the owner ruled is not.** The membership is
+the owner's, via the labels. The *expected discrepancies* were mine, a
+proposal for the owner to check in T34 -- and on 2026-09-18 the owner
+checked all twenty and removed every one of them. The ruling, in the
+owner's terms: articles about one news item are *supposed* to differ,
+and showing that difference is the reason the site exists; naming in
+advance which difference each cluster must yield is out of scope. So
+`expected_discrepancies` is empty in every case and stays that way.
 
-**The three metrics, and why the third is different.**
-
-- *Schema pass rate* and *quote validity* are objective: `nc.contract`
-  decides them, there is nothing to disagree with, and a backend either
-  produces files that pass or it does not.
-- *Discrepancy precision and recall* are graded against the golden
-  labels, and the labels are a human's opinion about what two ledes
-  disagree on. They are matched on `(kind, outlets)` rather than on the
-  explanation text, because two correct descriptions of the same
-  disagreement never match as strings and scoring them as though they
-  should would measure phrasing, not judgement.
+**What the eval measures now.** Only what `nc.contract` can decide
+without an opinion: whether an analysis exists for each golden cluster,
+whether it passes the validator, and whether its quotes are verbatim in
+the items they cite. A backend's discrepancies are *counted and shown*
+per case, never scored -- there is no expected answer to score against,
+and reporting precision and recall against nothing would print 0.000
+for a backend doing exactly what was asked. That failure mode has bitten
+this report once already, when a missing analysis was scored the same as
+a failed one.
 
 **Two backends, one scorer** (docs/PLAN.md T33: `--backend api|files`).
 `files` scores analyses already on disk, which is how T32's skill output
@@ -264,16 +264,70 @@ class EvalReport:
         )
 
     @property
+    def stale(self) -> int:
+        """Cases whose only problem is that the analysis describes a
+        different version of the cluster.
+
+        The golden clusters are frozen at the membership the labels give
+        them; the pipeline's clusters keep growing as the judge accepts
+        links, so an analysis written for the live cluster cites items
+        the golden one does not have. That is the fixture being a
+        fixture, not a backend producing bad output, and counting it as
+        a schema failure makes a clean backend look broken -- the same
+        distinction `nc.site.publishable` draws between stale and
+        invalid, for the same reason.
+
+        Score the golden set properly by materializing it into its own
+        data root (`nc eval --materialize`) and analysing *those*
+        clusters.
+        """
+        return sum(1 for s in self.scores if _is_stale(s.problems))
+
+    @property
+    def scores_discrepancies(self) -> bool:
+        """Whether any golden case expects a particular discrepancy.
+
+        False since the owner's 2026-09-18 ruling, and the report drops
+        the two rates rather than printing them. Precision over nothing
+        expected is 0.000 and recall is 0/0, and both would read as a
+        backend failing badly at a job nobody asked it to do.
+        """
+        return any(s.expected for s in self.scores)
+
+    @property
+    def discrepancies_produced(self) -> int:
+        """How many discrepancies the backend claimed, across the set.
+        Reported as a count, never as a score: there is nothing to score
+        it against."""
+        return sum(s.produced for s in self.scores)
+
+    @property
     def discrepancy_precision(self) -> float:
+        """Only meaningful while `scores_discrepancies` is true."""
         return _rate(
             sum(s.matched for s in self.scores), sum(s.produced for s in self.scores)
         )
 
     @property
     def discrepancy_recall(self) -> float:
+        """Only meaningful while `scores_discrepancies` is true."""
         return _rate(
             sum(s.matched for s in self.scores), sum(s.expected for s in self.scores)
         )
+
+
+def _is_stale(problems: list[str]) -> bool:
+    """Every problem is explained by the cluster having moved on.
+
+    Two shapes count, and only these two: the version mismatch itself,
+    and a quote citing an item this version of the cluster does not
+    have -- which is the same staleness seen from the quote checker.
+    A `not verbatim` quote is never stale; it is a backend quoting text
+    nobody published, which is the failure this eval exists to catch.
+    """
+    if not problems:
+        return False
+    return all(p.startswith("cluster:") or "is not in cluster" in p for p in problems)
 
 
 def _rate(numerator: int, denominator: int) -> float:
@@ -334,8 +388,10 @@ def format_eval_report(report: EvalReport) -> str:
         f"- golden cases: {len(report.scores)}",
         f"- analyses found: {report.found} "
         f"({len(report.scores) - report.found} golden cluster(s) have none)",
-        f"- **unchecked by the owner: {report.unchecked}** "
-        f"(T34; discrepancy scores are against a proposal until it is done)",
+        f"- of those, stale: {report.stale} "
+        "(the analysis is for a later version of the cluster; the golden "
+        "membership is frozen, the pipeline's is not)",
+        f"- unchecked by the owner: {report.unchecked}",
         "",
         "| metric | value | what it measures |",
         "| --- | --- | --- |",
@@ -345,28 +401,57 @@ def format_eval_report(report: EvalReport) -> str:
         "of the cases an analysis exists for |",
         f"| quote validity | {report.quote_validity:.3f} | "
         "quotes that are verbatim in the item they cite |",
-        f"| discrepancy precision | {report.discrepancy_precision:.3f} | "
-        "of the discrepancies produced, how many the golden case expects |",
-        f"| discrepancy recall | {report.discrepancy_recall:.3f} | "
-        "of the discrepancies expected, how many were produced |",
-        "",
-        "Discrepancies are matched on `(kind, outlets)`, never on the",
-        "explanation text: two correct descriptions of one disagreement never",
-        "match as strings, and scoring them that way would measure phrasing",
-        "rather than judgement.",
-        "",
-        "## Per case",
-        "",
-        "| cluster | schema | quotes | discrepancies (matched/expected/produced) |",
-        "| --- | --- | --- | --- |",
     ]
+    if report.scores_discrepancies:
+        lines.extend(
+            [
+                f"| discrepancy precision | {report.discrepancy_precision:.3f} | "
+                "of the discrepancies produced, how many the golden case expects |",
+                f"| discrepancy recall | {report.discrepancy_recall:.3f} | "
+                "of the discrepancies expected, how many were produced |",
+                "",
+                "Discrepancies are matched on `(kind, outlets)`, never on the",
+                "explanation text: two correct descriptions of one disagreement never",
+                "match as strings, and scoring them that way would measure phrasing",
+                "rather than judgement.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                f"| discrepancies produced | {report.discrepancies_produced} | "
+                "a count, not a score -- see below |",
+                "",
+                "**Discrepancies are not scored.** The owner ruled on 2026-09-18 that",
+                "naming the differing take each cluster must yield is out of scope for",
+                "the golden set: articles about one news item are supposed to differ,",
+                "and showing that difference is what the site is for. No case",
+                "expects a particular discrepancy, so there is nothing to compute",
+                "precision or recall against, and printing 0.000 for each would",
+                "read as a backend failing at a job nobody asked it to do.",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Per case",
+            "",
+            "| cluster | schema | quotes | discrepancies produced |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
     for score in report.scores:
         quotes = (
             f"{score.quotes_valid}/{score.quotes_total}" if score.quotes_total else "-"
         )
         lines.append(
             f"| `{score.case_id}` | {'pass' if score.schema_ok else 'FAIL'} | "
-            f"{quotes} | {score.matched}/{score.expected}/{score.produced} |"
+            f"{quotes} | "
+            + (
+                f"{score.matched}/{score.expected}/{score.produced} |"
+                if report.scores_discrepancies
+                else f"{score.produced} |"
+            )
         )
     failures = [s for s in report.scores if s.problems]
     if failures:

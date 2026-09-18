@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "0317bab3a39adea2a475622339c6de1589f8dbbe",
     "id": "2026-09-16-043e7b",
@@ -13,7 +13,7 @@
       },
       {
         "item_id": "566c9d5fe52b15dfc941b09df040cc7090d97a70",
-        "lede": "Siri\u2019s reintroduction takes center stage as Apple officially rolls out the latest version of macOS to download and install.",
+        "lede": "Siri’s reintroduction takes center stage as Apple officially rolls out the latest version of macOS to download and install.",
         "outlet": "wired",
         "published": "2026-09-16T19:29:15Z",
         "title": "MacOS 27 Golden Gate: Top New Features"
@@ -22,15 +22,6 @@
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "framing",
-      "note": "Ars Technica calls it both a 'Snow Leopard update' and a leap for Apple Intelligence; Wired leads on Siri's reintroduction.",
-      "outlets": [
-        "arstechnica",
-        "wired"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }

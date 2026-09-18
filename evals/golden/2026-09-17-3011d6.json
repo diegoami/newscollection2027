@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "64fb7aa646dd2d13619b92341ee214ce121929af",
     "id": "2026-09-17-3011d6",
@@ -13,10 +13,10 @@
       },
       {
         "item_id": "ee76106573a49f9f5da56780a26bff18b3062de5",
-        "lede": "Bose announced a new version of its Ultra Open Earbuds that helped kick off the industry trend of clip-on wireless earbuds nearly two-and-a-half years ago. The new Ultra Open Earbuds (2nd Gen) feature a subtle redesign with improved performance in both sound quality and battery life. They're also joined by a new cheaper alternative called [\u2026]",
+        "lede": "Bose announced a new version of its Ultra Open Earbuds that helped kick off the industry trend of clip-on wireless earbuds nearly two-and-a-half years ago. The new Ultra Open Earbuds (2nd Gen) feature a subtle redesign with improved performance in both sound quality and battery life. They're also joined by a new cheaper alternative called […]",
         "outlet": "theverge",
         "published": "2026-09-17T13:00:00Z",
-        "title": "Bose\u2019s next open earbuds have more bass, more volume, and more battery life"
+        "title": "Bose’s next open earbuds have more bass, more volume, and more battery life"
       },
       {
         "item_id": "f219e5828489cb90779de216a66b89495fba53f8",
@@ -29,15 +29,6 @@
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "omission",
-      "note": "Engadget reports a new sport model joining the lineup; The Verge's text covers the refresh only.",
-      "outlets": [
-        "engadget",
-        "theverge"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }
