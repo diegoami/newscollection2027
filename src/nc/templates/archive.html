@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_story_card.html" import card %}
+{% block title %}{{ date }} &middot; newscollection2027{% endblock %}
+{% block content %}
+<h1>{{ date }}</h1>
+{% for story in stories %}
+{{ card(story) }}
+{% endfor %}
+<h2>Other days</h2>
+<p class="outlets">{% for other in dates %}{% if other != date %}<a href="/newscollection2027/archive/{{ other }}/">{{ other }}</a> {% endif %}{% endfor %}</p>
+{% endblock %}

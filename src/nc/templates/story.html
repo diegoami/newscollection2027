@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ story.analysis.headline }} &middot; newscollection2027{% endblock %}
+{% block content %}
+<article>
+<h1>{{ story.analysis.headline }}</h1>
+<p class="meta">
+  <time datetime="{{ story.date }}">{{ story.date }}</time>
+  &middot; {{ story.outlets | length }} outlets
+  &middot; <span class="agreement {{ story.analysis.agreement }}">{{ story.analysis.agreement }}</span>
+</p>
+<p class="lede">{{ story.analysis.summary }}</p>
+
+<h2>Claims</h2>
+<table class="claims">
+<thead><tr><th>Claim</th>{% for outlet in story.outlets %}<th>{{ outlet }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for claim in story.analysis.claims %}
+<tr>
+  <th scope="row">{{ claim.statement }}</th>
+  {% for outlet in story.outlets %}
+  <td>
+    {% for source in claim.sources if source.outlet == outlet %}
+    <blockquote>{{ source.quote }}</blockquote>
+    {% endfor %}
+  </td>
+  {% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+{% if story.analysis.discrepancies %}
+<h2>Where they differ</h2>
+{% for discrepancy in story.analysis.discrepancies %}
+<section class="discrepancy sev-{{ discrepancy.severity }}">
+  <h3>{{ discrepancy.kind }} <span class="sev">{{ discrepancy.severity }}</span></h3>
+  <p>{{ discrepancy.explanation }}</p>
+  <dl>
+  {% for quote in discrepancy.quotes %}
+    <dt>{{ quote.outlet }}</dt>
+    <dd><blockquote>{{ quote.quote }}</blockquote></dd>
+  {% endfor %}
+  </dl>
+</section>
+{% endfor %}
+{% else %}
+<h2>Where they differ</h2>
+<p class="empty">Nowhere the given text shows. The outlets agree on everything
+their headlines and ledes state.</p>
+{% endif %}
+
+<h2>Sources</h2>
+<ul class="sources">
+{% for item in story.cluster.items %}
+  <li><strong>{{ item.outlet }}</strong> &middot; <time datetime="{{ item.published }}">{{ item.published }}</time><br>{{ item.title }}</li>
+{% endfor %}
+</ul>
+<p class="caveat">Analysed by <code>{{ story.analysis.backend }}</code> using
+<code>{{ story.analysis.model }}</code> from headlines and opening sentences only.</p>
+</article>
+{% endblock %}

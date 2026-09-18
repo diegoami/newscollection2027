@@ -5,7 +5,7 @@ added by the tasks in `docs/PLAN.md` that implement them. `feeds check`
 is wired here by T10; `ingest`, `db rebuild` and `sync pull|push` by
 T12; `embed` by T20; `cluster` by T21; `label` and `tune` by T22;
 `judge` and `bench-judge` by T24;
-`validate` by T30; `pending` by T32; `analyze` by T31; `eval` by T33.
+`validate` by T30; `pending` by T32; `analyze` by T31; `eval` by T33; `build` by T40.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from nc import (
     feeds,
     judge,
     labelling,
+    site,
     store,
     sync,
 )
@@ -230,6 +231,22 @@ def _analyze(args: argparse.Namespace) -> int:
     report = analyze.run_analyze(data_root, backend, config, args.limit)
     print(analyze.format_analyze_report(report))
     return 1 if report.failed else 0
+
+
+def _build(args: argparse.Namespace) -> int:
+    """T40: render the static site into `site/`.
+
+    Publishes only *current* analyses -- the cluster not superseded and
+    the version matching -- and re-runs the validator at build time
+    against the cluster as it is now. An analysis that was valid when
+    written but whose cluster has since changed does not reach the site.
+    """
+    data_root = _data_root(args)
+    if args.clean:
+        site.clean(args.out)
+    report = site.build_site(data_root, args.out, args.templates)
+    print(site.format_build_report(report, args.out))
+    return 1 if report.skipped_invalid else 0
 
 
 def _eval(args: argparse.Namespace) -> int:
@@ -572,6 +589,32 @@ def _build_parser() -> argparse.ArgumentParser:
         help="with --batch: write the results of an ended batch",
     )
     analyze_parser.set_defaults(func=_analyze)
+
+    build_parser = subparsers.add_parser(
+        "build", help="write the static site to site/ (T40)"
+    )
+    build_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    build_parser.add_argument(
+        "--out",
+        type=Path,
+        default=site.DEFAULT_SITE_DIR,
+        help=f"output directory (default: {site.DEFAULT_SITE_DIR})",
+    )
+    build_parser.add_argument(
+        "--templates",
+        type=Path,
+        default=site.DEFAULT_TEMPLATE_DIR,
+        help=f"template directory (default: {site.DEFAULT_TEMPLATE_DIR})",
+    )
+    build_parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="remove the output directory first. Not the default: a build "
+        "that deleted pages and then failed would publish a half-empty site",
+    )
+    build_parser.set_defaults(func=_build)
 
     eval_parser = subparsers.add_parser(
         "eval",

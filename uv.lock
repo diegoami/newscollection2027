@@ -737,6 +737,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "feedparser" },
+    { name = "jinja2" },
     { name = "jsonschema" },
     { name = "model2vec" },
     { name = "pydantic" },
@@ -762,6 +763,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", marker = "extra == 'api'", specifier = ">=0.40" },
     { name = "feedparser", specifier = ">=6.0.14" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "model2vec", specifier = ">=0.9.0" },
     { name = "pydantic", specifier = ">=2.13.5" },
