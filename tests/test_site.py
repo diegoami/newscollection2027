@@ -8,10 +8,12 @@ along with the rules that decide what may reach the site at all.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
 
+from nc import runlog
 from nc.cluster import (
     STATUS_ANALYZED,
     STATUS_SUPERSEDED,
@@ -302,3 +304,129 @@ def test_the_outlet_page_refuses_to_interpret_its_numbers(tmp_path: Path) -> Non
 def test_slugify_handles_an_awkward_outlet_name() -> None:
     assert slugify("BBC Technology") == "bbc-technology"
     assert slugify("Ars Technica.") == "ars-technica"
+
+
+# --- T43: the status page reads the run log -------------------------------
+
+
+def _run(
+    date: str,
+    status: str = "ok",
+    analyses: int = 3,
+    pending: int = 2,
+    rejected: int = 1,
+    duration: float | None = 612.0,
+    note: str = "",
+) -> runlog.Run:
+    return runlog.Run(
+        date=date,
+        finished_at=f"{date}T02:10:00Z",
+        status=status,
+        counts=runlog.RunCounts(
+            analyses_today=analyses, pending=pending, rejected=rejected
+        ),
+        started_at=f"{date}T02:00:00Z",
+        duration_seconds=duration,
+        agent_seconds=(None if duration is None else duration - 12.0),
+        steps=(runlog.Step(name="cluster", seconds=4.5, ok=True),),
+        note=note,
+    )
+
+
+def _status_page(tmp_path: Path, runs: list[runlog.Run]) -> str:
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path), out, runs=runs)
+    return (out / "status" / "index.html").read_text(encoding="utf-8")
+
+
+def test_the_status_page_shows_the_last_runs_counts_rejects_and_durations(
+    tmp_path: Path,
+) -> None:
+    """T43's acceptance criterion, item by item."""
+    page = _status_page(tmp_path, [_run("2026-09-18")])
+    row = page[page.index("<tbody>") : page.index("</tbody>")]
+
+    # counts: analysed, still pending, rejected on disk
+    assert re.findall(r'class="num">(\d+)</td>', row)[:3] == ["3", "2", "1"]
+    # durations: total, and the model's own time
+    assert "10m 12s" in row
+    assert "10m 00s" in row
+    # and the per-step breakdown of the newest run
+    assert "<h2>2026-09-18, step by step</h2>" in page
+    assert "cluster" in page
+
+
+def test_the_status_page_shows_when_the_last_successful_run_finished(
+    tmp_path: Path,
+) -> None:
+    """T52. The age is rendered by the browser from this timestamp, not
+    computed at build time -- see the next test for why."""
+    page = _status_page(tmp_path, [_run("2026-09-18")])
+    assert '<time datetime="2026-09-18T02:10:00Z">' in page
+
+
+def test_a_failed_run_does_not_become_the_last_successful_one(
+    tmp_path: Path,
+) -> None:
+    runs = [
+        _run("2026-09-18", status="failed", note="nc build broke"),
+        _run("2026-09-17"),
+    ]
+    page = _status_page(tmp_path, runs)
+
+    assert '<time datetime="2026-09-17T02:10:00Z">' in page
+    assert "stopped on purpose" in page
+    assert "nc build broke" in page
+
+
+def test_an_empty_night_still_counts_as_successful(tmp_path: Path) -> None:
+    """`empty` means the pipeline ran and found no work, which is what
+    most nights look like once the backlog is clear. Treating it as a
+    failure would light the page up every quiet night."""
+    page = _status_page(tmp_path, [_run("2026-09-18", status="empty", analyses=0)])
+    assert "No successful run recorded yet" not in page
+    assert '<time datetime="2026-09-18T02:10:00Z">' in page
+
+
+def test_the_status_page_is_byte_stable_with_a_run_log(tmp_path: Path) -> None:
+    """The reason the age is not rendered server-side. `nc build` runs on
+    every data change, and a page carrying "6 hours ago" would differ on
+    every build -- one gh-pages commit per deploy, for no change (T42).
+    """
+    out = tmp_path / "site"
+    data_root = _prepare(tmp_path)
+    runs = [_run("2026-09-18")]
+    build_site(data_root, out, runs=runs)
+    first = (out / "status" / "index.html").read_text(encoding="utf-8")
+    time.sleep(0.05)
+    report = build_site(data_root, out, runs=runs)
+
+    assert (out / "status" / "index.html").read_text(encoding="utf-8") == first
+    assert report.pages == 0
+
+
+def test_an_unknown_duration_is_a_dash_not_a_zero(tmp_path: Path) -> None:
+    """A run that kept no journal has an unknown duration. Zero is a
+    claim, and the wrong one."""
+    page = _status_page(tmp_path, [_run("2026-09-18", duration=None)])
+    assert "&mdash;" in page or "—" in page
+
+
+def test_no_run_log_is_a_correct_page_not_a_broken_one(tmp_path: Path) -> None:
+    page = _status_page(tmp_path, [])
+    assert "No successful run recorded yet" in page
+
+
+def test_the_status_page_reads_the_data_root_when_no_runs_are_passed(
+    tmp_path: Path,
+) -> None:
+    """`nc build` takes no `--runs` flag: the records are in the data
+    root, next to everything else the build reads."""
+    data_root = _prepare(tmp_path)
+    runlog.write_run(data_root, _run("2026-09-18"))
+
+    out = tmp_path / "site"
+    build_site(data_root, out)
+
+    page = (out / "status" / "index.html").read_text(encoding="utf-8")
+    assert '<time datetime="2026-09-18T02:10:00Z">' in page

@@ -4,25 +4,61 @@
 <h1>Status</h1>
 <p class="lede">{{ total }} stor{{ 'y' if total == 1 else 'ies' }} currently published.</p>
 
+{% if last_success %}
+<h2>Last successful run</h2>
+<p class="age">
+  <time datetime="{{ last_success.finished_at }}">{{ last_success.finished_at }}</time>
+  &middot; {{ last_success.date }} &middot; {{ last_success.status }}
+</p>
+{% if runs and runs[0].status == 'failed' %}
+<p class="caveat">The most recent run, {{ runs[0].date }}, stopped on purpose:
+{{ runs[0].note }}</p>
+{% endif %}
+{% else %}
+<p class="empty">No successful run recorded yet. The pipeline writes one record
+per nightly run; this page fills in once that runs unattended.</p>
+{% endif %}
+
 {% if runs %}
 <h2>Recent runs</h2>
 <table>
-<thead><tr><th>Date</th><th>Clusters</th><th>Analysed</th><th>Rejected</th><th>Duration</th></tr></thead>
+<thead><tr>
+  <th>Date</th><th></th><th>Analysed</th><th>Pending</th><th>Rejected</th>
+  <th>Total</th><th>Agent</th>
+</tr></thead>
 <tbody>
-{% for run in runs %}
+{% for run in runs[:14] %}
 <tr>
-  <td>{{ run.date }}</td>
-  <td class="num">{{ run.clusters }}</td>
-  <td class="num">{{ run.analyzed }}</td>
-  <td class="num">{{ run.rejected }}</td>
-  <td class="num">{{ run.duration_seconds }}s</td>
+  <td><time datetime="{{ run.finished_at }}">{{ run.date }}</time></td>
+  <td>{{ run.status }}</td>
+  <td class="num">{{ run.counts.analyses_today }}</td>
+  <td class="num">{{ run.counts.pending }}</td>
+  <td class="num">{{ run.counts.rejected }}</td>
+  <td class="num">{{ run.duration_seconds | duration }}</td>
+  <td class="num">{{ run.agent_seconds | duration }}</td>
 </tr>
 {% endfor %}
 </tbody>
 </table>
-{% else %}
-<p class="empty">No run log yet. The pipeline records one per nightly run; this
-page fills in once that runs unattended.</p>
+<p class="caveat">"Analysed" is the analyses written that day, "pending" what was
+still waiting when the run ended &mdash; a run can finish cleanly and leave work
+behind. "Agent" is the run's wall clock minus the time its commands took, which
+is the time the model itself spent. An em dash means the run kept no journal, so
+its duration is unknown rather than zero.</p>
+
+{% if runs[0].steps %}
+<h2>{{ runs[0].date }}, step by step</h2>
+<table class="stats">
+<tbody>
+{% for step in runs[0].steps %}
+<tr>
+  <th>{{ step.name }}{% if not step.ok %} (failed){% endif %}</th>
+  <td class="num">{{ step.seconds | duration }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
 {% endif %}
 
 <h2>This build</h2>
@@ -44,4 +80,31 @@ analysis failed the validator at build time and was refused.</p>
 {% endfor %}
 </ul>
 {% endif %}
+
+{# The one script on this site, and it adds nothing the page does not
+   already say: every timestamp above is rendered as an absolute UTC
+   string, and this rewrites it to "6 hours ago" where a browser is
+   willing. It must stay progressive enhancement, because the page is
+   built once and then served for hours -- an age computed at build time
+   would be wrong within the minute, and, worse, would make every build
+   produce different bytes and so a gh-pages commit per deploy (T42). #}
+<script>
+(function () {
+  var minute = 60, hour = 3600, day = 86400;
+  function ago(seconds) {
+    if (seconds < minute) { return "just now"; }
+    if (seconds < hour) { return Math.floor(seconds / minute) + " min ago"; }
+    if (seconds < day) { return Math.floor(seconds / hour) + "h ago"; }
+    return Math.floor(seconds / day) + "d ago";
+  }
+  var now = Date.now();
+  var stamps = document.querySelectorAll("time[datetime]");
+  for (var i = 0; i < stamps.length; i++) {
+    var when = Date.parse(stamps[i].getAttribute("datetime"));
+    if (isNaN(when) || when > now) { continue; }
+    stamps[i].title = stamps[i].textContent;
+    stamps[i].textContent = ago((now - when) / 1000);
+  }
+})();
+</script>
 {% endblock %}

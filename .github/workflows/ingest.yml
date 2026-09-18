@@ -15,6 +15,16 @@ on:
   schedule:
     - cron: "0 */3 * * *" # every three hours, on the hour, UTC
   workflow_dispatch:
+    inputs:
+      force_failure:
+        description: >-
+          Fail on purpose, to exercise the failure issue (T52). Only
+          reachable from a manual run, and the whole point of it is that
+          the failure path can be demonstrated without waiting for a real
+          outage or committing a broken workflow -- an alerting path that
+          has never fired once is a guess.
+        type: boolean
+        default: false
 
 # `contents: write` is for the `repository_dispatch` call at the end
 # (POST /repos/{owner}/{repo}/dispatches requires the Contents: write
@@ -53,6 +63,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # T52. Deliberately first: a forced failure should exercise the
+      # reporting path, not half an ingest.
+      - name: Fail on purpose (T52)
+        if: inputs.force_failure
+        run: |
+          echo "ingest: failing on purpose to exercise T52's failure issue"
+          exit 1
+
       - uses: actions/checkout@v5
 
       - uses: astral-sh/setup-uv@v7
@@ -192,3 +210,59 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ github.repository }}/dispatches" \
             -d '{"event_type":"data-updated"}'
+
+  # T52. A scheduled workflow that fails quietly is a pipeline that stops
+  # and does not say so: GitHub emails the owner on the first failure of a
+  # cron run and then goes quiet, and the next sign would be a site three
+  # days stale. An issue is the opposite -- it stays open and visible until
+  # someone closes it.
+  #
+  # One issue, not one per run. The first failure opens it; every failure
+  # after that adds a comment, so a week of failures is one thread with a
+  # week of evidence rather than fifty-six issues. It is found by exact
+  # title rather than by a label, because a label has to exist first and a
+  # missing one fails the create.
+  report-failure:
+    needs: ingest
+    if: failure()
+    runs-on: ubuntu-latest
+    # Replaces the workflow-level `contents: write` for this job: it opens
+    # an issue and does nothing else. It must never be able to push.
+    permissions:
+      issues: write
+    steps:
+      # `gh` rather than curl (which ingest uses for the dispatch): this
+      # needs to search, then branch, then create or comment, and the same
+      # thing in curl is thirty lines of jq for no gain. It is preinstalled
+      # on the runner.
+      - name: Open or update the failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Ingest workflow is failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --state open --limit 100 \
+            --json number,title \
+            --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")"
+
+          body="The ingest workflow failed.
+
+          Run: $RUN_URL
+          Commit: \`$GITHUB_SHA\`
+          Triggered by: \`$GITHUB_EVENT_NAME\`
+
+          The next scheduled run will try again in at most three hours, and
+          feeds overlap, so a single failure does not lose items. Repeated
+          failures do: feeds only expose the last 10 to 30 entries.
+
+          Close this issue once the run is green again."
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "report-failure: commented on #$existing"
+          else
+            number="$(gh issue create --title "$TITLE" --body "$body" | tail -1)"
+            echo "report-failure: opened $number"
+          fi

@@ -398,3 +398,36 @@ def format_run(run: Run) -> str:
     if run.note:
         lines.append(f"runlog: note: {run.note}")
     return "\n".join(lines)
+
+
+def last_successful(runs: list[Run]) -> Run | None:
+    """The newest run that was not a deliberate stop.
+
+    A night with nothing to do is a successful night -- `empty` means the
+    pipeline ran and found no work, which is exactly what most nights
+    look like once the backlog is clear. Only `failed`, which an agent
+    sets by hand with `--failed`, is not success.
+    """
+    for run in runs:
+        if run.status != STATUS_FAILED:
+            return run
+    return None
+
+
+def format_duration(seconds: float | None) -> str:
+    """`4m 12s`, for a page a person reads. `None` renders as an em dash
+    rather than `0s`: a run with no journal has an unknown duration, and
+    zero is a claim."""
+    if seconds is None:
+        return "\u2014"
+    # Under a second, "0s" reads as "this step did not happen". It did;
+    # it was just fast.
+    if seconds < 1:
+        return "<1s"
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes, rest = divmod(int(seconds), 60)
+    if minutes < 60:
+        return f"{minutes}m {rest:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}m"

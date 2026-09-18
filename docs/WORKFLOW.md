@@ -149,12 +149,20 @@ be thrown away and rebuilt with one `nc build`.
 
 ### Failure handling
 
-- Ingest workflow failure: GitHub notifies the owner; the next run catches
-  up because feeds overlap.
+- Ingest workflow failure: the workflow opens an issue titled "Ingest
+  workflow is failing", or comments on the open one, so an outage stays
+  visible until someone closes it -- GitHub's own email goes out on the
+  first failure of a cron run and then goes quiet, and the next sign
+  would be a site three days stale. The next run catches up because feeds
+  overlap; repeated failures do lose items, since feeds only expose the
+  last 10 to 30 entries.
 - Routine failure: the Routine's notifications reach the owner; pending
   files stay pending and are picked up the next night.
 - Persistent validator rejects: visible on `/status/` and in
   `data/rejected/`; they feed the golden set and prompt tuning.
+- A nightly that stops running at all: `/status/` shows when the last
+  successful run finished, so a page reading "3d ago" is the symptom
+  even when nothing failed loudly enough to open an issue.
 - Deploy failure: the published site stays as it was -- the branch is
   only ever updated by a successful run -- so the site goes stale rather
   than broken, and the next data change retries the whole build.

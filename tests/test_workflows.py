@@ -91,3 +91,53 @@ def test_no_other_job_is_named_check(name: str) -> None:
     would let an unrelated failure block every pull request."""
     jobs = _load(name)["jobs"]
     assert "check" not in jobs
+
+
+# --- T52: the ingest workflow says when it is failing ----------------------
+
+
+def _report_failure() -> dict[str, Any]:
+    job = _load("ingest.yml")["jobs"]["report-failure"]
+    assert isinstance(job, dict)
+    return job
+
+
+def test_the_failure_job_runs_only_when_the_ingest_failed() -> None:
+    job = _report_failure()
+    assert job["needs"] == "ingest"
+    assert job["if"] == "failure()"
+
+
+def test_the_failure_job_can_open_an_issue_and_nothing_else() -> None:
+    """Job-level permissions replace the workflow's `contents: write`.
+    This job reports; it must never be able to push."""
+    assert _report_failure()["permissions"] == {"issues": "write"}
+
+
+def test_one_issue_per_outage_not_one_per_run() -> None:
+    """A cron that fails every three hours would otherwise open
+    fifty-six issues in a week. The first failure opens one, the rest
+    comment on it, so an outage is one thread with a week of evidence."""
+    run = "\n".join(
+        step.get("run", "") for step in _report_failure()["steps"] if "run" in step
+    )
+    assert "gh issue list" in run
+    assert "gh issue comment" in run
+    assert "gh issue create" in run
+    # Found by exact title: a label would have to exist first, and a
+    # missing label fails the create.
+    assert "select(.title ==" in run
+
+
+def test_the_forced_failure_is_opt_in_and_stops_before_any_work() -> None:
+    """T52's acceptance criterion is "a forced failure creates the
+    issue", which needs a way to force one. It is reachable only from a
+    manual run, and it is the first step so that forcing a failure
+    exercises the reporting path rather than half an ingest.
+    """
+    triggers = _triggers("ingest.yml")
+    assert triggers["workflow_dispatch"]["inputs"]["force_failure"]["default"] is False
+
+    steps = _load("ingest.yml")["jobs"]["ingest"]["steps"]
+    assert steps[0]["if"] == "inputs.force_failure"
+    assert "exit 1" in steps[0]["run"]
