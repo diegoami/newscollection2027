@@ -2,13 +2,15 @@
 
 ## Status
 
-Bootstrap documents merged. Storage decided (separate data repo, see
-`docs/DECISIONS.md`). Owner has applied the `main` ruleset and created
-the empty `newscollection2027-data` repository. Next session starts with
-T01 (repo skeleton with CI) and, in the same PR or the next, adds the
-`check` status check name to the ruleset. Remaining owner steps: enable
-GitHub Pages once `gh-pages` exists (T42) and create `DATA_REPO_TOKEN`
-before T13. Nothing else is in progress.
+M0 through M4 are merged, except T42's activation and T43. The pipeline
+ingests and clusters on a schedule, the contract and both analysis
+backends exist, and `nc build` writes the site.
+
+Remaining owner steps, both of them now blocking an acceptance
+criterion: enable GitHub Pages from `gh-pages` (T42, two steps -- run
+the `deploy` workflow once by hand to create the branch, then point
+Pages at it), and create `DATA_REPO_TOKEN` so the scheduled ingest can
+push (T13). T34, reading the twenty golden cases, is also waiting.
 
 Milestones are sequential. Tasks inside a milestone marked `[P]` can run
 in parallel with the other `[P]` tasks of the same milestone. Sizes:
@@ -32,11 +34,17 @@ acceptance criteria are shown in a merged PR.
 - **T00 [owner, done]** Storage backend decided: separate data repository.
 - **T03 [owner, in progress]** Ruleset on `main` (done): PR required,
   required approvals zero, block force pushes, restrict deletions. Data
-  repository `newscollection2027-data` created (done). Still to do: add
-  the required status check `check` once T01's CI workflow exists; enable
-  GitHub Pages from the `gh-pages` branch after T42; create a fine-grained
-  token with contents write on the data repository and store it as the
-  secret `DATA_REPO_TOKEN` before T13.
+  repository `newscollection2027-data` created (done). Still to do, if
+  not already: add the required status check `check` (T01's CI workflow
+  has been green on every PR since M0). Still to do: enable GitHub
+  Pages. That is
+  two steps, in this order, because Pages cannot be pointed at a branch
+  that does not exist yet -- run the `deploy` workflow once from the
+  Actions tab (`Run workflow`), which creates `gh-pages`, then set
+  Settings -> Pages -> Source to "Deploy from a branch", branch
+  `gh-pages`, folder `/`. Also still to do: create a fine-grained token
+  with contents write on the data repository and store it as the secret
+  `DATA_REPO_TOKEN`, which T13's scheduled runs need to push.
 - **T04 (S, size S)** Create one GitHub issue per task below with labels
   `milestone:Mx`, `size:x`, `model:S|O`.
 
@@ -206,10 +214,13 @@ acceptance criteria are shown in a merged PR.
   counted, because deciding who is wrong needs the article bodies. Ties
   for first are shared, not broken.
   AC: unit test with fixture analyses reproduces hand-computed numbers.
-- **T42 (S, size S)** Deploy workflow: on push to `main`, on
-  `repository_dispatch` `data-updated`, and manually; checks out both
-  repos, `nc build`, publishes `site/` to the `gh-pages` branch.
+- **T42 (S, size S, workflow merged; AC waits on the owner)** Deploy
+  workflow: on push to `main`, on `repository_dispatch` `data-updated`,
+  and manually; checks out both repos, `nc build`, publishes `site/` to
+  the `gh-pages` branch.
   AC: site reachable at `https://diegoami.github.io/newscollection2027/`.
+  `.github/workflows/deploy.yml` exists and does this; the AC is met
+  once the owner completes the two Pages steps in T03.
 - **T43 (S, size S)** Status page from `data/runs/`.
   AC: last run's counts, rejects and durations visible on `/status/`.
 
