@@ -40,6 +40,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from nc import runlog
@@ -50,12 +51,45 @@ from nc.store import DataRoot
 
 DEFAULT_SITE_DIR = Path("site")
 DEFAULT_TEMPLATE_DIR = Path("src/nc/templates")
+DEFAULT_SITE_CONFIG_PATH = Path("config/site.yaml")
 
 # How many days the front page shows before a story is archive-only.
 # Not a threshold in CLAUDE.md's sense (it decides nothing about the
 # data), a presentation choice: the clustering window is four days, so
 # a front page covering less would hide stories still gaining outlets.
 FRONT_PAGE_DAYS = 4
+
+
+@dataclass(frozen=True)
+class SiteConfig:
+    """Deployment facts the templates need. Currently one.
+
+    `base_path` is the URL prefix every internal link carries. A GitHub
+    Pages project site serves from `/newscollection2027/`; Netlify and
+    any root domain serve from `/`. Hard-coding it in the templates made
+    the site correct for exactly one host and silently broken on the
+    other -- every link a 404 -- so it moved to `config/site.yaml`.
+    """
+
+    base_path: str = "/"
+
+
+def normalize_base_path(raw: str) -> str:
+    """Always exactly one leading and one trailing slash.
+
+    A base path that is `/nc` or `nc/` or `` all mean the same thing to
+    whoever wrote it, and all produce different, mostly broken, hrefs.
+    This is the one place that is decided.
+    """
+    trimmed = raw.strip().strip("/")
+    return f"/{trimmed}/" if trimmed else "/"
+
+
+def load_site_config(path: Path = DEFAULT_SITE_CONFIG_PATH) -> SiteConfig:
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: expected a mapping")
+    return SiteConfig(base_path=normalize_base_path(str(raw.get("base_path", "/"))))
 
 
 def slugify(outlet: str) -> str:
@@ -205,6 +239,7 @@ def build_site(
     out_dir: Path = DEFAULT_SITE_DIR,
     template_dir: Path = DEFAULT_TEMPLATE_DIR,
     runs: list[runlog.Run] | None = None,
+    config: SiteConfig | None = None,
 ) -> BuildReport:
     """Render the whole site into `out_dir`.
 
@@ -214,6 +249,8 @@ def build_site(
     logged a run yet, and both cases need covering.
     """
     env = environment(template_dir)
+    settings = load_site_config() if config is None else config
+    env.globals["base"] = settings.base_path
     history = runlog.load_runs(data_root) if runs is None else runs
     stories, stale, invalid = publishable(data_root)
     stats = compute_outlet_stats([(s.analysis, s.cluster) for s in stories])
@@ -320,8 +357,14 @@ def internal_links(out_dir: Path = DEFAULT_SITE_DIR) -> list[tuple[Path, str]]:
     return found
 
 
-def resolve_link(page: Path, href: str, out_dir: Path) -> Path:
-    """Where a site-relative href points on disk."""
+def resolve_link(page: Path, href: str, out_dir: Path, base_path: str = "/") -> Path:
+    """Where a site-relative href points on disk.
+
+    `base_path` is stripped first: the site is written with the prefix it
+    will be served under, which is not a directory inside `out_dir`.
+    """
+    if base_path != "/" and href.startswith(base_path):
+        href = "/" + href[len(base_path) :]
     target = (
         (out_dir / href.lstrip("/")) if href.startswith("/") else (page.parent / href)
     )

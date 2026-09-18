@@ -17,6 +17,7 @@ weeks:
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -78,7 +79,9 @@ def test_the_counts_are_read_off_the_disk(tmp_path: Path) -> None:
 
     counts = runlog.count(data_root, "2026-09-18")
 
-    assert counts.analyses_today == 1
+    # No `since`, so how many were written *this run* is unknown -- see
+    # test_analyses_are_counted_by_when_they_were_written.
+    assert counts.analyses_written is None
     assert counts.analyses_total == 2
     assert counts.rejected == 1
     assert counts.pending == 1
@@ -99,14 +102,17 @@ def test_the_note_cannot_move_a_number(tmp_path: Path) -> None:
         journal=tmp_path / "journal.json",
     )
 
-    assert run.counts.analyses_today == 0
+    assert run.counts.analyses_written is None
+    assert run.counts.analyses_total == 0
     assert run.counts.pending == 1
     assert run.note == "analysed all 40 clusters, nothing left pending"
 
 
 def test_an_empty_night_is_not_a_failed_one(tmp_path: Path) -> None:
     data_root = DataRoot(tmp_path / "data")
-    run = runlog.build_run(data_root, now=NOW, journal=tmp_path / "journal.json")
+    journal = tmp_path / "journal.json"
+    runlog.start(journal, now=NOW)
+    run = runlog.build_run(data_root, now=NOW, journal=journal)
     assert run.status == runlog.STATUS_EMPTY
 
 
@@ -115,9 +121,11 @@ def test_a_night_that_left_work_behind_is_not_empty(tmp_path: Path) -> None:
     different thing, and the record has to be able to tell them apart --
     it is the shape of a nightly that silently stopped analysing."""
     data_root = DataRoot(tmp_path / "data")
+    journal = tmp_path / "journal.json"
+    runlog.start(journal, now=NOW)
     _write_cluster(data_root, _cluster("2026-09-18-aaaaaa"))
 
-    run = runlog.build_run(data_root, now=NOW, journal=tmp_path / "journal.json")
+    run = runlog.build_run(data_root, now=NOW, journal=journal)
 
     assert run.status == runlog.STATUS_OK
     assert run.counts.pending == 1
@@ -293,7 +301,7 @@ def test_a_record_from_an_older_version_still_loads(tmp_path: Path) -> None:
                 "date": "2026-09-18",
                 "finished_at": "2026-09-18T04:30:00Z",
                 "status": "ok",
-                "counts": {"analyses_today": 3, "invented_by_a_later_version": 9},
+                "counts": {"analyses_today": 3, "clusters": 7},
             }
         ),
     )
@@ -301,8 +309,11 @@ def test_a_record_from_an_older_version_still_loads(tmp_path: Path) -> None:
     runs = runlog.load_runs(data_root)
 
     assert len(runs) == 1
-    assert runs[0].counts.analyses_today == 3
-    assert runs[0].counts.pending == 0
+    # `analyses_today` was this field's name before the first real run
+    # showed it counted the wrong directory. An old record still loads;
+    # the field it no longer has falls back to "unknown".
+    assert runs[0].counts.clusters == 7
+    assert runs[0].counts.analyses_written is None
 
 
 # --- how a duration reads -------------------------------------------------
@@ -342,3 +353,50 @@ def test_a_failed_run_is_skipped_for_the_last_successful_one() -> None:
     found = runlog.last_successful(runs)
     assert found is not None and found.date == "2026-09-17"
     assert runlog.last_successful([]) is None
+
+
+# --- the bug the first real run found -------------------------------------
+
+
+def test_analyses_are_counted_by_when_they_were_written(tmp_path: Path) -> None:
+    """Not by the directory they are filed under.
+
+    An analysis is filed under its *cluster's* date, which is the date of
+    the story's earliest item, so a night that analyses a three-day-old
+    cluster writes nothing under today's date. Counting by directory
+    reported the first real nightly -- nineteen analyses -- as having
+    produced none, and the record called that night `empty`.
+    """
+    data_root = DataRoot(tmp_path / "data")
+    journal = tmp_path / "journal.json"
+    # An analysis from an earlier night, filed under an older date.
+    old = data_root.resolve("analyses", "2026-09-14", "2026-09-14-aaaaaa.json")
+    _touch(old)
+    os.utime(old, (1000.0, 1000.0))
+
+    runlog.start(journal, now=NOW)
+    # Tonight's work, also filed under an older date because the cluster
+    # is older than the run.
+    fresh = data_root.resolve("analyses", "2026-09-16", "2026-09-16-bbbbbb.json")
+    _touch(fresh)
+    os.utime(fresh, (NOW.timestamp() + 10, NOW.timestamp() + 10))
+
+    run = runlog.build_run(data_root, now=NOW, journal=journal)
+
+    assert run.counts.analyses_written == 1
+    assert run.counts.analyses_total == 2
+    assert run.status == runlog.STATUS_OK
+
+
+def test_without_a_journal_the_count_is_unknown_not_zero(tmp_path: Path) -> None:
+    """With no start time there is no way to tell this run's files from
+    last week's, and zero is a claim. A night cannot be called empty on
+    no evidence either."""
+    data_root = DataRoot(tmp_path / "data")
+    _touch(data_root.resolve("analyses", "2026-09-16", "2026-09-16-bbbbbb.json"))
+
+    run = runlog.build_run(data_root, now=NOW, journal=tmp_path / "none.json")
+
+    assert run.counts.analyses_written is None
+    assert run.status == runlog.STATUS_OK
+    assert "? analysis file(s)" in runlog.format_run(run)

@@ -250,7 +250,12 @@ Static pages, no JavaScript framework, minimal CSS, works on a phone.
   day would be in the region of $8 to $15 a month if it were the only
   backend.
 - Hosting: GitHub Pages during prototyping, Netlify afterwards. Both free
-  at this size.
+  at this size. Moving between them is one line: `config/site.yaml`'s
+  `base_path` is `/newscollection2027/` for a GitHub Pages project site
+  and `/` for a root domain, and `nc build` rewrites every internal link
+  from it. Getting it wrong makes every link on the site a 404 while
+  nothing else about the build looks wrong, so the link-check test runs
+  against both values.
 
 ## Non-goals for v1
 

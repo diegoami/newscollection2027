@@ -23,8 +23,11 @@ from nc.cluster import (
 )
 from nc.contract import Analysis, analysis_path, render_analysis
 from nc.site import (
+    SiteConfig,
     build_site,
     internal_links,
+    load_site_config,
+    normalize_base_path,
     publishable,
     resolve_link,
     slugify,
@@ -236,14 +239,13 @@ def test_every_internal_link_resolves(tmp_path: Path) -> None:
     out = tmp_path / "site"
     build_site(data_root, out)
 
+    base = load_site_config().base_path
     links = internal_links(out)
     assert links, "expected some internal links"
     missing = [
         (str(page), href)
         for page, href in links
-        if not resolve_link(
-            page, href.replace("/newscollection2027/", "/"), out
-        ).exists()
+        if not resolve_link(page, href, out, base).exists()
     ]
     assert missing == []
 
@@ -323,7 +325,7 @@ def _run(
         finished_at=f"{date}T02:10:00Z",
         status=status,
         counts=runlog.RunCounts(
-            analyses_today=analyses, pending=pending, rejected=rejected
+            analyses_written=analyses, pending=pending, rejected=rejected
         ),
         started_at=f"{date}T02:00:00Z",
         duration_seconds=duration,
@@ -430,3 +432,48 @@ def test_the_status_page_reads_the_data_root_when_no_runs_are_passed(
 
     page = (out / "status" / "index.html").read_text(encoding="utf-8")
     assert '<time datetime="2026-09-18T02:10:00Z">' in page
+
+
+# --- the base path (Netlify, or any root domain) ---------------------------
+
+
+def test_the_base_path_is_normalized_however_it_is_written() -> None:
+    """`/nc`, `nc/` and ` /nc/ ` all mean one thing to whoever wrote them
+    and produce three different, mostly broken, sets of hrefs. This is
+    the one place that is decided."""
+    for raw in ("/newscollection2027/", "newscollection2027", "/newscollection2027"):
+        assert normalize_base_path(raw) == "/newscollection2027/"
+    for raw in ("", "/", "   "):
+        assert normalize_base_path(raw) == "/"
+
+
+def test_a_root_domain_build_writes_root_links(tmp_path: Path) -> None:
+    """The Netlify case. docs/ARCHITECTURE.md names Netlify as the host
+    after prototyping, and the whole move is this one config line."""
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path), out, config=SiteConfig(base_path="/"))
+
+    page = (out / "index.html").read_text(encoding="utf-8")
+    assert 'href="/style.css"' in page or 'href="/"' in page
+    assert "/newscollection2027/" not in page
+
+
+def test_every_internal_link_resolves_on_a_root_domain_too(tmp_path: Path) -> None:
+    """The link check is what would have caught the hard-coded prefix:
+    with the wrong base every link on the site is a 404, and nothing else
+    about the build looks wrong."""
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path), out, config=SiteConfig(base_path="/"))
+
+    missing = [
+        (str(page), href)
+        for page, href in internal_links(out)
+        if not resolve_link(page, href, out, "/").exists()
+    ]
+    assert missing == []
+
+
+def test_the_shipped_config_is_the_github_pages_prefix() -> None:
+    """Changing this is the deploy step, not a code change -- but it has
+    to match where T42's workflow publishes, or the live site 404s."""
+    assert load_site_config().base_path == "/newscollection2027/"

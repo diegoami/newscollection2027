@@ -97,13 +97,17 @@ class Step:
 class RunCounts:
     """What the data root holds when the run ends.
 
-    `analyses_today` is the night's output; `analyses_total` and
-    `stories` are the standing state. `pending` is what is still waiting
-    -- a run can finish `ok` and leave work behind, and a status page
-    that showed only the first number would call that a clean night.
+    `analyses_written` is the night's output; `analyses_total` is the
+    standing state. `pending` is what is still waiting -- a run can
+    finish `ok` and leave work behind, and a status page that showed
+    only the first number would call that a clean night.
+
+    `analyses_written` is `None` when the run kept no journal, because
+    without a start time there is no way to tell this run's files from
+    last week's, and zero is a claim.
     """
 
-    analyses_today: int = 0
+    analyses_written: int | None = None
     analyses_total: int = 0
     rejected: int = 0
     pending: int = 0
@@ -231,11 +235,30 @@ def _count_json(directory: Path) -> int:
     return sum(1 for _ in directory.rglob("*.json")) if directory.exists() else 0
 
 
-def count(data_root: DataRoot, date: str) -> RunCounts:
+def _written_since(data_root: DataRoot, since: float | None) -> int | None:
+    """Analyses written during this run, by file mtime.
+
+    Not "analyses filed under today's date": an analysis is filed under
+    its *cluster's* date, which is the date of the story's earliest item
+    (`.claude/skills/analyze-clusters/SKILL.md`), so a night that
+    analysed a three-day-old cluster writes nothing under today. Counting
+    by directory reported a night that produced nineteen analyses as
+    having produced none, and the record called it `empty`. Found on the
+    first real run; mtime is the same signal `nc validate --new` uses.
+    """
+    if since is None:
+        return None
+    directory = analyses_dir(data_root)
+    if not directory.exists():
+        return 0
+    return sum(1 for path in directory.rglob("*.json") if path.stat().st_mtime >= since)
+
+
+def count(data_root: DataRoot, date: str, since: float | None = None) -> RunCounts:
     """Recompute every number from the data root. See the module
     docstring: nothing here is taken on the agent's word."""
     return RunCounts(
-        analyses_today=_count_json(analyses_dir(data_root) / date),
+        analyses_written=_written_since(data_root, since),
         analyses_total=_count_json(analyses_dir(data_root)),
         rejected=_count_json(rejected_dir(data_root)),
         pending=len(pending_clusters(data_root)),
@@ -265,7 +288,6 @@ def build_run(
     """
     moment = datetime.now(UTC) if now is None else now
     date = iso(moment)[:10]
-    counts = count(data_root, date)
 
     entries = _read_journal(journal_path() if journal is None else journal) or {}
     steps = _steps_from(entries.get("steps"))
@@ -273,6 +295,7 @@ def build_run(
     started_raw = entries.get("started_at")
     started_at = started_raw if isinstance(started_raw, str) else None
     epoch = entries.get("started_epoch")
+    counts = count(data_root, date, epoch if isinstance(epoch, int | float) else None)
     duration = (
         round(moment.timestamp() - float(epoch), 3)
         if isinstance(epoch, int | float)
@@ -290,9 +313,11 @@ def build_run(
 
     if failed:
         status = STATUS_FAILED
-    elif counts.analyses_today == 0 and counts.pending == 0:
+    elif counts.analyses_written == 0 and counts.pending == 0:
         status = STATUS_EMPTY
     else:
+        # Includes the unknown case: with no journal, `analyses_written`
+        # is None and a night cannot be called empty on no evidence.
         status = STATUS_OK
 
     return Run(
@@ -339,7 +364,7 @@ def run_from_dict(payload: dict[str, object]) -> Run:
         for key, value in raw_counts.items():
             if key in RunCounts.__dataclass_fields__ and isinstance(value, int):
                 fields[str(key)] = value
-    counts = RunCounts(**fields)
+    counts = RunCounts(**fields)  # a null analyses_written falls back to None
 
     raw_steps = payload.get("steps")
     steps = _steps_from(raw_steps)
@@ -383,7 +408,8 @@ def load_runs(data_root: DataRoot) -> list[Run]:
 def format_run(run: Run) -> str:
     lines = [
         f"runlog: {run.date} {run.status} -- "
-        f"{run.counts.analyses_today} analysis file(s) written today, "
+        f"{'?' if run.counts.analyses_written is None else run.counts.analyses_written}"
+        " analysis file(s) written this run, "
         f"{run.counts.pending} cluster(s) still pending, "
         f"{run.counts.rejected} reject(s) on disk"
     ]

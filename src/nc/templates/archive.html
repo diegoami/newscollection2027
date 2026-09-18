@@ -7,5 +7,5 @@
 {{ card(story) }}
 {% endfor %}
 <h2>Other days</h2>
-<p class="outlets">{% for other in dates %}{% if other != date %}<a href="/newscollection2027/archive/{{ other }}/">{{ other }}</a> {% endif %}{% endfor %}</p>
+<p class="outlets">{% for other in dates %}{% if other != date %}<a href="{{ base }}archive/{{ other }}/">{{ other }}</a> {% endif %}{% endfor %}</p>
 {% endblock %}
