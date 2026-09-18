@@ -417,7 +417,14 @@ def _runlog(args: argparse.Namespace) -> int:
     path = runlog.write_run(data_root, run)
     runlog.clear()
     print(runlog.format_run(run))
-    print(f"runlog: wrote {path}")
+    if path is None:
+        print(
+            f"runlog: kept the existing {runlog.run_path(data_root, run.date)} "
+            "-- it has the day's durations and this run has none "
+            "(no journal; `nc runlog --start` opens one)"
+        )
+    else:
+        print(f"runlog: wrote {path}")
     return 1 if run.status == runlog.STATUS_FAILED else 0
 
 

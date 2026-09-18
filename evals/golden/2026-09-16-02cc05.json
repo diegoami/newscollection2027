@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "706b05ecb86ed3075776e9ca7192c5459975483d",
     "id": "2026-09-16-02cc05",
@@ -22,15 +22,6 @@
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "omission",
-      "note": "BleepingComputer gives the patch count (110 vulnerabilities); TechCrunch's text describes the modem bug instead.",
-      "outlets": [
-        "bleepingcomputer",
-        "techcrunch"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }

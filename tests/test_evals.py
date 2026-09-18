@@ -12,6 +12,8 @@ from typing import Any
 from nc.cluster import STATUS_PENDING, Cluster, ClusterItem, pending_path
 from nc.contract import Analysis, analysis_path
 from nc.evals import (
+    CaseScore,
+    EvalReport,
     ExpectedDiscrepancy,
     GoldenCase,
     clusters_from_positive_labels,
@@ -281,11 +283,132 @@ def test_the_shipped_golden_set_has_twenty_cases() -> None:
     assert all(len({i.outlet for i in c.cluster.items}) >= 2 for c in cases)
 
 
-def test_the_shipped_set_has_a_case_with_no_expected_discrepancy() -> None:
-    """The control that catches a backend inventing disagreements, which
-    is the worst thing this site can publish."""
-    assert any(not case.expected for case in load_golden())
+def test_the_shipped_set_expects_no_particular_discrepancy() -> None:
+    """The owner's ruling of 2026-09-18, after checking all twenty:
+    naming the differing take each cluster must yield is out of scope for
+    the golden set. Articles about one news item are supposed to differ,
+    and showing that difference is what the site is for -- it is not
+    something to enumerate in advance."""
+    assert all(not case.expected for case in load_golden())
 
 
-def test_the_shipped_set_is_honest_about_not_being_checked() -> None:
-    assert all(not case.checked for case in load_golden())
+def test_the_shipped_set_has_been_checked() -> None:
+    assert all(case.checked for case in load_golden())
+
+
+def test_a_set_that_expects_nothing_is_not_scored_on_discrepancies() -> None:
+    """Precision over nothing expected is 0.000 and recall is 0/0. Both
+    would print as a backend failing badly at a job nobody asked it to
+    do -- the same shape as the bug where a missing analysis scored the
+    same as a failed one."""
+    report = EvalReport(
+        backend="files",
+        model="unknown",
+        generated_at="2026-09-18T09:00:00Z",
+        unchecked=0,
+        scores=[
+            CaseScore("a", True, 2, 2, 0, 0, 3, []),
+            CaseScore("b", True, 2, 2, 0, 0, 1, []),
+        ],
+    )
+
+    assert report.scores_discrepancies is False
+    assert report.discrepancies_produced == 4
+
+    text = format_eval_report(report)
+    assert "discrepancy precision" not in text
+    assert "discrepancy recall" not in text
+    assert "Discrepancies are not scored" in text
+    assert "| discrepancies produced | 4 |" in text
+
+
+def test_a_set_that_does_expect_them_is_still_scored() -> None:
+    """The scoring is dormant, not deleted: restore an expectation to a
+    golden case and the rates come back."""
+    report = EvalReport(
+        backend="files",
+        model="unknown",
+        generated_at="2026-09-18T09:00:00Z",
+        unchecked=0,
+        scores=[CaseScore("a", True, 2, 2, 1, 1, 1, [])],
+    )
+
+    assert report.scores_discrepancies is True
+    assert report.discrepancy_precision == 1.0
+    assert report.discrepancy_recall == 1.0
+    assert "discrepancy precision" in format_eval_report(report)
+
+
+def test_a_stale_case_is_not_counted_as_a_contract_failure() -> None:
+    """The golden clusters are frozen at what the labels give them; the
+    pipeline's keep growing as the judge accepts links. An analysis for
+    the live cluster then cites items the golden one lacks -- the fixture
+    being a fixture, not a backend producing bad output. Same distinction
+    `nc build` draws between stale and invalid."""
+    report = EvalReport(
+        backend="files",
+        model="unknown",
+        generated_at="2026-09-18T09:00:00Z",
+        unchecked=0,
+        scores=[
+            CaseScore(
+                "stale",
+                False,
+                0,
+                0,
+                0,
+                0,
+                0,
+                ["cluster: analysis is for version 2, cluster is at version 1"],
+            ),
+            CaseScore(
+                "broken", False, 2, 1, 0, 0, 0, ["quote: not verbatim in item aaa"]
+            ),
+            CaseScore("clean", True, 2, 2, 0, 0, 1, []),
+        ],
+    )
+
+    assert report.stale == 1
+    assert "of those, stale: 1" in format_eval_report(report)
+
+
+def test_a_quote_the_frozen_cluster_lacks_is_stale_but_a_made_up_one_is_not() -> None:
+    """Staleness reaches the quote checker too: an analysis for a grown
+    cluster cites items the golden one has never had. That is the fixture
+    lagging. A `not verbatim` quote is the opposite -- text nobody
+    published -- and must never be excused as staleness."""
+    grown = CaseScore(
+        "grown",
+        False,
+        4,
+        4,
+        0,
+        0,
+        1,
+        [
+            "cluster: analysis is for version 2, cluster is at version 1",
+            "quote: item bbb is not in cluster grown",
+        ],
+    )
+    invented = CaseScore(
+        "invented",
+        False,
+        2,
+        1,
+        0,
+        0,
+        1,
+        [
+            "cluster: analysis is for version 2, cluster is at version 1",
+            "quote: not verbatim in wired ccc's title",
+        ],
+    )
+    report = EvalReport(
+        backend="files",
+        model="unknown",
+        generated_at="2026-09-18T09:00:00Z",
+        unchecked=0,
+        scores=[grown, invented],
+    )
+
+    assert report.stale == 1

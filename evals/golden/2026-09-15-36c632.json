@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "38b9f7ef8f868b77b5ff68b413967df8bc4afb7b",
     "id": "2026-09-15-36c632",
@@ -22,15 +22,6 @@
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "omission",
-      "note": "The Register cites a forum claim of 7.49 million files; BleepingComputer's text gives no figure.",
-      "outlets": [
-        "theregister",
-        "bleepingcomputer"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }

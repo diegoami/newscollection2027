@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "e096d09d38f08800c81ee04c39e54fb04c5e4325",
     "id": "2026-09-15-1fa82f",
@@ -9,7 +9,7 @@
         "lede": "Data centers in the U.S. are projected to use up more natural gas than most of the rest of the world to generate the electricity they need. Estimates suggest that 15 billion cubic feet per day are needed to keep data centers running by 2035.",
         "outlet": "tomshardware",
         "published": "2026-09-15T13:57:36Z",
-        "title": "US AI data centers projected to become the fifth-largest natural gas consumer in the world by 2035 \u2014 consumption to grow by 15 billion cubic feet per day as demand for compute increases"
+        "title": "US AI data centers projected to become the fifth-largest natural gas consumer in the world by 2035 — consumption to grow by 15 billion cubic feet per day as demand for compute increases"
       },
       {
         "item_id": "e85d74505523ed5aa07b51e491266862f512a838",
@@ -29,15 +29,6 @@
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "number",
-      "note": "15 billion cubic feet per day by 2035 against $110 billion in generation through 2030 -- different figures on different horizons.",
-      "outlets": [
-        "tomshardware",
-        "theregister"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }

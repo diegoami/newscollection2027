@@ -644,10 +644,21 @@ each one costs a call to do it. `config/promo.yaml` grew a
 precision unchanged. Its own list rather than more `title_patterns`
 because the reason differs and it may be reverted on its own.
 
-*A problem and its fix are two stories.* Ruled by the owner, and now
-stated in `prompts/judge.md` rather than left to the judge: "Windows
-update breaks USB audio" and "Microsoft ships an emergency patch" are
-separate events. Two outlets reporting the same patch remain one story.
+*A problem and its fix are two stories.* Ruled by the owner on
+2026-09-17 and stated in `prompts/judge.md` rather than left to the
+judge: "Windows update breaks USB audio" and "Microsoft ships an
+emergency patch" were separate events.
+
+**Repealed on 2026-09-18.** The owner's judgement was that telling a
+patch story from a patch-fix story is more effort than it is worth, and
+that the rule cut against the point of the site: a problem and its
+response are one developing story, and the outlets differing over
+whether the problem is *solved* is exactly the disagreement worth
+publishing. `prompts/judge.md` now says so under "Answer yes when". The
+live consequence was five judgments decided by the old rule, re-judged
+on the day the rule changed rather than left to contradict it, and two
+positive labels that the old rule had excluded from the golden set,
+restored.
 
 *Three labels contradict each other and are worth re-checking.* They are
 recorded here rather than quietly corrected, because `labels/pairs.jsonl`
@@ -665,9 +676,10 @@ against:
   ↔ `zdnet` "out-of-band update fixes audio glitch" is labelled
   *different* (both report the same patch), while the same Register
   piece against `zdnet` "the update may mess with your audio" is labelled
-  *same* (a fix against the bug it fixes). Under the ruling above, both
-  of those are the wrong way round. They were made nine hours apart, in
-  different sittings.
+  *same* (a fix against the bug it fixes). Under the 2026-09-17 ruling
+  both were the wrong way round; under its 2026-09-18 repeal the second
+  is right and only the first is still contradictory. They were made
+  nine hours apart, in different sittings.
 
 The first two no longer matter for the judge — the filter removes those
 pairs before it sees them — but they still sit in the corpus that

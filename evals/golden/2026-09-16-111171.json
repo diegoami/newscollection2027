@@ -1,5 +1,5 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "eb1a3b213e0d808fff038cdae98b91272fc2a8a0",
     "id": "2026-09-16-111171",
@@ -13,24 +13,15 @@
       },
       {
         "item_id": "f937f79832503b340182d85c29f2e5efefd8a1e8",
-        "lede": "Last week, Apple announced an iPhone unlike any it has made in the past. An iPhone that has seemingly already led several other phone manufacturers to pursue entirely different designs for their flagship products. A remarkably distinct device with the kind of \"I can't believe they did that\" software touches that Apple sometimes pulls off [\u2026]",
+        "lede": "Last week, Apple announced an iPhone unlike any it has made in the past. An iPhone that has seemingly already led several other phone manufacturers to pursue entirely different designs for their flagship products. A remarkably distinct device with the kind of \"I can't believe they did that\" software touches that Apple sometimes pulls off […]",
         "outlet": "theverge",
         "published": "2026-09-16T12:00:00Z",
-        "title": "The iPhone 18 Pro\u2019s big camera update is all about the small gains"
+        "title": "The iPhone 18 Pro’s big camera update is all about the small gains"
       }
     ],
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "framing",
-      "note": "Wired frames the camera features as standout; The Verge as 'all about the small gains'.",
-      "outlets": [
-        "wired",
-        "theverge"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy."
 }

@@ -1,15 +1,23 @@
 {
-  "checked": false,
+  "checked": true,
   "cluster": {
     "anchor": "e49aee3e98064b94a42cbdf166abdaa9dcc311f7",
     "id": "2026-09-15-b07489",
     "items": [
       {
+        "item_id": "b66e9b2e7b75082cb42654d6b83ffa9986860dcf",
+        "lede": "The September Patch Tuesday update is causing audio problems with certain USB devices, but you may be able to resolve it yourself.",
+        "outlet": "zdnet",
+        "published": "2026-09-14T17:27:48Z",
+        "title": "The latest Windows 11 update may mess with your device’s audio – here’s the workaround",
+        "url": "https://www.zdnet.com/business/windows-11-sept-update-audio-glitch-fix/"
+      },
+      {
         "item_id": "e49aee3e98064b94a42cbdf166abdaa9dcc311f7",
-        "lede": "Windows September 2026 update brings many long-requested features, but also surfaces fresh bugs \u2014 new code crashing AMD, HP, and Lenovo systems and surfaces audio, Explorer, and Remote Desktop problems",
+        "lede": "Windows September 2026 update brings many long-requested features, but also surfaces fresh bugs — new code crashing AMD, HP, and Lenovo systems and surfaces audio, Explorer, and Remote Desktop problems",
         "outlet": "tomshardware",
         "published": "2026-09-15T11:00:00Z",
-        "title": "Microsoft rolls out emergency update for Windows 11's latest patch \u2014 recent update causes crashes on AMD graphics, Explorer hang-ups, and broken third-party integrations"
+        "title": "Microsoft rolls out emergency update for Windows 11's latest patch — recent update causes crashes on AMD graphics, Explorer hang-ups, and broken third-party integrations"
       },
       {
         "item_id": "355367e5b05194a09fd85d4ba7fef706fc77d906",
@@ -23,21 +31,12 @@
         "lede": "The latest out-of-band update resolves a few problems in Windows 11, including one that cut off the sound for certain USB audio devices.",
         "outlet": "zdnet",
         "published": "2026-09-16T09:04:02Z",
-        "title": "Windows 11 out-of-band update fixes audio glitch and other bugs \u2013 grab it now"
+        "title": "Windows 11 out-of-band update fixes audio glitch and other bugs – grab it now"
       }
     ],
     "status": "pending",
     "version": 1
   },
-  "expected_discrepancies": [
-    {
-      "kind": "omission",
-      "note": "Tom's Hardware lists AMD crashes and Explorer hang-ups; ZDNet's text covers the audio fix only.",
-      "outlets": [
-        "tomshardware",
-        "zdnet"
-      ]
-    }
-  ],
-  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Membership is the owner's; the expected discrepancies are a proposal until T34. CONTESTED: transitive closure united 1 member pair(s) the owner labelled DIFFERENT (355367e5b05194a09fd85d4ba7fef706fc77d906-881fd806032c16c8d82e9beaba40c6ded10d7525). Check this one first."
+  "expected_discrepancies": [],
+  "source": "Built from labels/pairs.jsonl positives (human-confirmed same-story pairs), union-found into components. Checked by the owner on 2026-09-18: no expected discrepancy. The owner's ruling is that naming the differing take in each cluster is out of scope for the golden set -- articles about one news item are supposed to differ, and that difference is what the site exists to show, not something to enumerate in advance. Membership is the owner's, via labels/pairs.jsonl; nothing here expects a particular discrepancy. Restored 2026-09-18: two positive labels excluded under the repealed problem-and-fix rule are back, which returns the zdnet bug-and-workaround item to this cluster. Membership is the owner's labels, unmodified."
 }
