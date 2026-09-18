@@ -62,6 +62,10 @@ table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; display: b
 th, td { border: 1px solid var(--rule); padding: .45rem .6rem; text-align: left; vertical-align: top; font-size: .9rem; }
 thead th { background: var(--panel); font-family: ui-sans-serif, system-ui, sans-serif; font-size: .8rem; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* T43. `time[title]` is a timestamp the script rewrote to an age; the
+   dotted underline says the exact time is still there, on hover. */
+.age { font-size: 1.1rem; margin: .2rem 0 1rem; }
+time[title] { border-bottom: 1px dotted var(--rule); cursor: help; }
 .claims th[scope="row"] { font-weight: 400; min-width: 12rem; }
 blockquote { margin: 0; font-size: .88rem; color: var(--ink); }
 blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }

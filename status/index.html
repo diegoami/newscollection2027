@@ -19,8 +19,9 @@
 <h1>Status</h1>
 <p class="lede">0 stories currently published.</p>
 
-<p class="empty">No run log yet. The pipeline records one per nightly run; this
-page fills in once that runs unattended.</p>
+<p class="empty">No successful run recorded yet. The pipeline writes one record
+per nightly run; this page fills in once that runs unattended.</p>
+
 
 <h2>This build</h2>
 <table class="stats">
@@ -34,6 +35,26 @@ page fills in once that runs unattended.</p>
 analysed, so the analysis no longer describes it and the story is queued to be
 analysed again. That is the pipeline working, not a failure. "Invalid" means an
 analysis failed the validator at build time and was refused.</p>
+
+<script>
+(function () {
+  var minute = 60, hour = 3600, day = 86400;
+  function ago(seconds) {
+    if (seconds < minute) { return "just now"; }
+    if (seconds < hour) { return Math.floor(seconds / minute) + " min ago"; }
+    if (seconds < day) { return Math.floor(seconds / hour) + "h ago"; }
+    return Math.floor(seconds / day) + "d ago";
+  }
+  var now = Date.now();
+  var stamps = document.querySelectorAll("time[datetime]");
+  for (var i = 0; i < stamps.length; i++) {
+    var when = Date.parse(stamps[i].getAttribute("datetime"));
+    if (isNaN(when) || when > now) { continue; }
+    stamps[i].title = stamps[i].textContent;
+    stamps[i].textContent = ago((now - when) / 1000);
+  }
+})();
+</script>
 </main>
 <footer>
   <p>Every claim below is quoted verbatim from an outlet's own headline or
