@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Status &middot; newscollection2027{% endblock %}
+{% block content %}
+<h1>Status</h1>
+<p class="lede">{{ total }} stor{{ 'y' if total == 1 else 'ies' }} currently published.</p>
+
+{% if runs %}
+<h2>Recent runs</h2>
+<table>
+<thead><tr><th>Date</th><th>Clusters</th><th>Analysed</th><th>Rejected</th><th>Duration</th></tr></thead>
+<tbody>
+{% for run in runs %}
+<tr>
+  <td>{{ run.date }}</td>
+  <td class="num">{{ run.clusters }}</td>
+  <td class="num">{{ run.analyzed }}</td>
+  <td class="num">{{ run.rejected }}</td>
+  <td class="num">{{ run.duration_seconds }}s</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p class="empty">No run log yet. The pipeline records one per nightly run; this
+page fills in once that runs unattended.</p>
+{% endif %}
+
+<h2>This build</h2>
+<table class="stats">
+<tbody>
+<tr><th>Stories published</th><td class="num">{{ total }}</td></tr>
+<tr><th>Skipped as stale</th><td class="num">{{ stale }}</td></tr>
+<tr><th>Skipped as invalid</th><td class="num">{{ invalid | length }}</td></tr>
+</tbody>
+</table>
+<p class="caveat">"Stale" means the story gained or lost an outlet since it was
+analysed, so the analysis no longer describes it and the story is queued to be
+analysed again. That is the pipeline working, not a failure. "Invalid" means an
+analysis failed the validator at build time and was refused.</p>
+{% if invalid %}
+<ul>
+{% for cluster_id, problems in invalid %}
+<li><code>{{ cluster_id }}</code>: {{ problems | join('; ') }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

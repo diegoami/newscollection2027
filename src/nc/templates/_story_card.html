@@ -1,0 +1,15 @@
+{% macro card(story) %}
+<article class="card">
+  <h3><a href="/newscollection2027/story/{{ story.id }}/">{{ story.analysis.headline }}</a></h3>
+  <p class="meta">
+    <time datetime="{{ story.date }}">{{ story.date }}</time>
+    &middot; {{ story.outlets | length }} outlets
+    &middot; <span class="agreement {{ story.analysis.agreement }}">{{ story.analysis.agreement }}</span>
+    {% if story.analysis.discrepancies %}
+    &middot; {{ story.analysis.discrepancies | length }} discrepanc{{ 'y' if story.analysis.discrepancies | length == 1 else 'ies' }}
+    {% endif %}
+  </p>
+  <p>{{ story.analysis.summary }}</p>
+  <p class="outlets">{% for outlet in story.outlets %}<a href="/newscollection2027/outlet/{{ outlet | slug }}/">{{ outlet }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
+</article>
+{% endmacro %}

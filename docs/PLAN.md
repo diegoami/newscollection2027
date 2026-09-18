@@ -186,14 +186,25 @@ acceptance criteria are shown in a merged PR.
 
 ## M4 Site
 
-- **T40 (S, size M) [P]** Site builder: Jinja2 templates, pages listed in
+- **T40 (S, size M) [P]** ~~Site builder: Jinja2 templates, pages listed in
   `docs/ARCHITECTURE.md`, no JS framework, minimal CSS, readable on a
-  phone, `nc build` writes `site/`.
+  phone, `nc build` writes `site/`.~~ **Done.** All six page kinds, no
+  JavaScript at all, one stylesheet, serif body text and a single column
+  that reads on a phone. Publishes only *current* analyses and re-runs
+  the validator at build time against the cluster as it is now. Build is
+  byte-stable: a run with nothing new writes no files, since T42 pushes
+  `site/` to a branch.
   AC: builds from fixture data in under ten seconds; an internal link
-  check test passes.
-- **T41 (S, size S) [P]** Outlet statistics: discrepancy involvement rate,
+  check test passes. **Both met** -- 0.56s on the real data root, and the
+  link check is a test.
+- **T41 (S, size S) [P]** ~~Outlet statistics: discrepancy involvement rate,
   first-to-report rate, story count, computed by one function from the
-  analyses and used by the outlet pages and the front page.
+  analyses and used by the outlet pages and the front page.~~ **Done.**
+  `nc.stats.compute_outlet_stats` is the one function; the front page and
+  the outlet pages both read it, so they cannot disagree. Involvement,
+  never fault: a discrepancy names two or more outlets and every one is
+  counted, because deciding who is wrong needs the article bodies. Ties
+  for first are shared, not broken.
   AC: unit test with fixture analyses reproduces hand-computed numbers.
 - **T42 (S, size S)** Deploy workflow: on push to `main`, on
   `repository_dispatch` `data-updated`, and manually; checks out both

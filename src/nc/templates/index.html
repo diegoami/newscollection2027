@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_story_card.html" import card %}
+{% block title %}Today &middot; newscollection2027{% endblock %}
+{% block content %}
+<h1>What the tech press is reporting, and where it disagrees</h1>
+<p class="lede">Feed items from eleven outlets, grouped into stories, with each
+outlet's own words side by side. {{ total }} stor{{ 'y' if total == 1 else 'ies' }} published.</p>
+
+{% if stories %}
+{% for story in stories %}
+{{ card(story) }}
+{% endfor %}
+{% else %}
+<p class="empty">No current stories. That is a real state, not an error: a story
+needs two outlets covering the same event, and an analysis that passes the
+validator.</p>
+{% endif %}
+
+{% if dates %}
+<h2>Archive</h2>
+<p class="outlets">{% for date in dates %}<a href="/newscollection2027/archive/{{ date }}/">{{ date }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
+{% endif %}
+
+{% if stats %}
+<h2>Outlets</h2>
+<table>
+<thead><tr><th>Outlet</th><th>Stories</th><th>In a discrepancy</th><th>First to report</th></tr></thead>
+<tbody>
+{% for entry in stats %}
+<tr>
+  <td><a href="/newscollection2027/outlet/{{ entry.outlet | slug }}/">{{ entry.outlet }}</a></td>
+  <td class="num">{{ entry.stories }}</td>
+  <td class="num">{{ entry.discrepancy_rate | pct }}</td>
+  <td class="num">{{ entry.first_rate | pct }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<p class="caveat">None of these is a quality score. See <a href="/newscollection2027/method/">Method</a>.</p>
+{% endif %}
+{% endblock %}
