@@ -1,0 +1,155 @@
+name: deploy
+
+# T42. Build the site and publish it to the `gh-pages` branch, which
+# GitHub Pages serves at https://diegoami.github.io/newscollection2027/.
+#
+# Three triggers, for three different things that can change the site:
+#
+#   push to main            the builder or the templates changed, so the
+#                           same data renders differently.
+#   repository_dispatch     the data changed. ingest.yml fires
+#     `data-updated`        `data-updated` after a data-repo push, and
+#                           only then (see its last step), so a no-op
+#                           ingest never rebuilds anything. The nightly
+#                           Routine's `nc sync push` reaches this the
+#                           same way.
+#   workflow_dispatch       on demand: the first run has to be started by
+#                           hand, because `gh-pages` does not exist yet
+#                           and the owner cannot enable Pages from a
+#                           branch that is not there (T03).
+#
+# The build itself is `nc build` -- the same command a developer runs
+# locally and the same one the nightly skill uses as a smoke test. This
+# workflow adds no rendering logic of its own; if the site is wrong here
+# it is wrong locally too.
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [data-updated]
+  workflow_dispatch:
+
+# `contents: write` is to push the built site to `gh-pages`, and to
+# nothing else. CLAUDE.md's "automation pushes only to the data
+# repository" is a rule about source: no workflow may push a commit that
+# a human did not review, and `main` stays PR-only and protected (T03).
+# `gh-pages` carries no source -- it is generated output, rewritten from
+# `site/` on every run and reproducible by running `nc build` -- and
+# docs/ARCHITECTURE.md names it as where the site is published. Nothing
+# here may ever push to `main`.
+permissions:
+  contents: write
+
+# Two deploys must not interleave: both rewrite the same branch, and the
+# loser of the race would publish an older site over a newer one. Unlike
+# ingest.yml this one does cancel: a superseded build has nothing worth
+# finishing, and cancelling it costs at most a rebuild, never a
+# half-pushed branch (the push is a single atomic step at the end).
+# A separate group from ingest.yml's `data`: a deploy does not touch the
+# data repo and must not queue behind an ingest.
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  # Not `check`: T03 registers the bare `check` as main's required status
+  # check and GitHub matches check runs by name, so a deploy failure must
+  # never be able to post a red `check` and block an unrelated PR.
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      # Same URL rewrite as ingest.yml, and the same reasoning: it keeps
+      # every bit of git knowledge about the data repo inside `nc.sync`,
+      # it is scoped to that one repo URL so it cannot affect this
+      # checkout or the `gh-pages` push below, and it is written to the
+      # runner's own $HOME/.gitconfig, which is discarded with the runner.
+      #
+      # Read-only would be enough here -- this job never calls `nc sync
+      # push` -- but the secret is a single token shared with ingest.yml.
+      - name: Authenticate to the data repo
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          git config --global \
+            url."https://x-access-token:${DATA_REPO_TOKEN}@github.com/diegoami/newscollection2027-data.git".insteadOf \
+            "https://github.com/diegoami/newscollection2027-data.git"
+
+      # NC_DATA_ROOT unset, so the data root defaults to `data/` under
+      # this checkout -- gitignored and thrown away with the runner.
+      - run: uv run nc sync pull
+
+      # `nc build` publishes only current, still-valid analyses and says
+      # what it refused (see nc.site.publishable). Those lines are the
+      # deploy log: a run that suddenly publishes nothing says why here.
+      - run: uv run nc build --out site
+
+      # Publish. Plain git rather than a third-party action, for the same
+      # reason `nc sync` is plain git: this is the step that writes to a
+      # branch, and it should be readable in full rather than delegated.
+      #
+      # The working tree is emptied and refilled from `site/` so that a
+      # page that stopped being published is deleted rather than left
+      # behind for a reader to find; `git add -A` then stages the
+      # deletions too.
+      #
+      # It commits only when something actually differs, which is what
+      # nc.site's byte-stable output is for: a rebuild that found nothing
+      # new produces no commit and no deploy, so the branch's history is
+      # a log of real changes to the site rather than one commit per run.
+      - name: Publish to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          rm -rf .gh-pages
+          git init -q .gh-pages
+          cd .gh-pages
+          git remote add origin "$remote"
+
+          # Not a shallow fetch: pushing from a shallow clone can be
+          # refused, and this branch holds a handful of small HTML files.
+          # The branch does not exist before the first run, and `git
+          # fetch` fails rather than doing nothing in that case, so that
+          # first run starts an empty history instead.
+          if git fetch -q origin gh-pages 2>/dev/null; then
+            git checkout -q -b gh-pages FETCH_HEAD
+          else
+            echo "deploy: no gh-pages branch yet, starting one"
+            git checkout -q -b gh-pages
+          fi
+
+          find . -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+          cp -r ../site/. .
+
+          # Pages runs the built site through Jekyll unless this file is
+          # present, which would silently drop any path beginning with an
+          # underscore. Nothing `nc build` writes begins with one today;
+          # this makes sure that stays a template-naming detail rather
+          # than a rule about URLs.
+          touch .nojekyll
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "deploy: site unchanged, nothing published"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "site: build from ${GITHUB_SHA}"
+          git push -q origin gh-pages
+          echo "deploy: published to gh-pages"
