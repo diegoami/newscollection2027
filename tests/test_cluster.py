@@ -30,6 +30,7 @@ from pathlib import Path
 import pytest
 
 from nc.cluster import (
+    STATUS_ANALYZED,
     STATUS_SUPERSEDED,
     Cluster,
     ClusterConfig,
@@ -39,6 +40,8 @@ from nc.cluster import (
     UnionFind,
     WriteResult,
     _allocate_id,
+    _backfilled,
+    _cluster_item_from_dict,
     _latest_by_id,
     cluster_items,
     format_report,
@@ -1306,7 +1309,33 @@ def test_cluster_item_from_item_keeps_the_fields_the_agent_quotes() -> None:
         "title": item.title,
         "lede": item.lede,
         "published": item.published,
+        "url": item.url,
     }
+
+
+def test_the_article_url_is_carried_into_the_cluster() -> None:
+    """The site links back to the article from it. Leaving it out meant
+    every story page quoted three outlets and gave a reader no way to
+    open any of them -- which reached the published site."""
+    item = _item("q0", "theverge")
+    assert item.url
+    assert ClusterItem.from_item(item).url == item.url
+
+
+def test_a_cluster_file_written_before_the_url_existed_still_loads() -> None:
+    """`nc cluster` backfills it on the next run, because the window
+    always has the full item. Until then the site renders a heading
+    rather than a broken link."""
+    member = _cluster_item_from_dict(
+        {
+            "item_id": "a" * 40,
+            "outlet": "theverge",
+            "title": "Acme ships the Widget 4",
+            "lede": "The company said it ships in the first quarter.",
+            "published": "2026-09-17T10:00:00Z",
+        }
+    )
+    assert member.url == ""
 
 
 # --- promotional items and same-outlet pairs --------------------------
@@ -1486,3 +1515,63 @@ def test_label_sample_skips_same_outlet_pairs() -> None:
     cross = PendingPair(a=a, b=c, score=0.90)
     chosen = select_label_sample([same, cross], [], 0.30, 0.05, 20)
     assert [pair.pair_id for pair in chosen] == [cross.pair_id]
+
+
+def test_a_url_is_backfilled_into_a_cluster_that_predates_the_field() -> None:
+    """An unchanged cluster is re-emitted as stored, which is what keeps
+    membership monotonic -- and would have left nineteen existing
+    clusters unlinked forever, because `url` was added after they were
+    written."""
+    stored = ClusterItem(
+        item_id="a" * 40,
+        outlet="theverge",
+        title="Acme ships the Widget 4",
+        lede="Ships in the first quarter.",
+        published="2026-09-17T10:00:00Z",
+    )
+    fresh = replace(stored, url="https://www.theverge.com/acme")
+    cluster = Cluster(
+        id="2026-09-17-abc123",
+        version=3,
+        anchor=stored.item_id,
+        status=STATUS_ANALYZED,
+        items=(stored,),
+    )
+
+    out = _backfilled(cluster, {stored.item_id: fresh})
+
+    assert out.items[0].url == "https://www.theverge.com/acme"
+    # Membership did not change, so neither does the version -- bumping
+    # it would make every published analysis stale.
+    assert out.version == 3
+    assert out.status == STATUS_ANALYZED
+
+
+def test_backfilling_never_touches_a_title_or_a_lede() -> None:
+    """A published analysis quotes them verbatim and `nc build` re-checks
+    the quote, so refreshing them from the feed would invalidate a good
+    analysis every time an outlet edited a headline."""
+    stored = ClusterItem(
+        item_id="a" * 40,
+        outlet="theverge",
+        title="Acme ships the Widget 4",
+        lede="Ships in the first quarter.",
+        published="2026-09-17T10:00:00Z",
+        url="https://www.theverge.com/acme",
+    )
+    edited = replace(
+        stored, title="Acme ships the Widget 4 (updated)", lede="Rewritten lede."
+    )
+    cluster = Cluster(
+        id="2026-09-17-abc123",
+        version=1,
+        anchor=stored.item_id,
+        status=STATUS_ANALYZED,
+        items=(stored,),
+    )
+
+    out = _backfilled(cluster, {stored.item_id: edited})
+
+    assert out is cluster
+    assert out.items[0].title == "Acme ships the Widget 4"
+    assert out.items[0].lede == "Ships in the first quarter."
