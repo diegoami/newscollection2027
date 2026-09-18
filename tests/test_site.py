@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from nc.contract import Analysis, analysis_path, render_analysis
 from nc.site import (
     SiteConfig,
     build_site,
+    external_url,
     internal_links,
     load_site_config,
     normalize_base_path,
@@ -51,6 +53,7 @@ def _cluster(**overrides: Any) -> Cluster:
                 title="Acme ships the Widget 4",
                 lede="The company said it ships in the first quarter.",
                 published="2026-09-17T10:00:00Z",
+                url="https://www.theverge.com/acme-widget-4",
             ),
             ClusterItem(
                 item_id=ARS,
@@ -58,6 +61,7 @@ def _cluster(**overrides: Any) -> Cluster:
                 title="Acme announces Widget 4 for Q1",
                 lede="Acme said the Widget 4 will cost $499.",
                 published="2026-09-17T11:00:00Z",
+                url="https://arstechnica.com/acme-widget-4-q1",
             ),
         ),
     )
@@ -477,3 +481,76 @@ def test_the_shipped_config_is_the_github_pages_prefix() -> None:
     """Changing this is the deploy step, not a code change -- but it has
     to match where T42's workflow publishes, or the live site 404s."""
     assert load_site_config().base_path == "/newscollection2027/"
+
+
+# --- linking back to the article ------------------------------------------
+
+
+def test_a_story_page_links_to_every_article_it_quotes(tmp_path: Path) -> None:
+    """The gap that reached the published site: three outlets quoted and
+    no way to open any of them. A quote a reader cannot go and check is
+    the one thing this project is not for."""
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path), out)
+
+    page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
+    for item in _cluster().items:
+        assert f'href="{item.url}"' in page, item.outlet
+
+
+def test_outbound_links_are_marked_as_leaving_the_site(tmp_path: Path) -> None:
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path), out)
+    page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
+    assert 'rel="noopener nofollow"' in page
+
+
+def test_a_url_that_is_not_http_is_not_rendered_as_a_link() -> None:
+    """Item urls come out of RSS feeds, which are not this project's to
+    trust. Autoescape makes an href safe to quote and says nothing about
+    its scheme, and `javascript:` in an href is script execution on our
+    own origin."""
+    assert external_url("https://example.com/a") == "https://example.com/a"
+    assert external_url("http://example.com/a") == "http://example.com/a"
+    assert external_url("  https://example.com/a  ") == "https://example.com/a"
+    for bad in (
+        "javascript:alert(1)",
+        "JavaScript:alert(1)",
+        "data:text/html,<script>",
+        "file:///etc/passwd",
+        "",
+        "   ",
+        "/newscollection2027/",
+    ):
+        assert external_url(bad) == "", bad
+
+
+def test_a_hostile_url_reaches_the_page_as_text_not_a_link(tmp_path: Path) -> None:
+    """End to end, because the guard is only worth having if the
+    template actually applies it."""
+    hostile = _cluster(
+        items=(
+            replace(_cluster().items[0], url="javascript:alert(1)"),
+            _cluster().items[1],
+        )
+    )
+    out = tmp_path / "site"
+    build_site(_prepare(tmp_path, cluster=hostile), out)
+
+    page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
+    assert "javascript:" not in page
+    # The item is still listed, just not as a link.
+    assert hostile.items[0].title in page
+
+
+def test_a_cluster_with_no_urls_still_builds(tmp_path: Path) -> None:
+    """A cluster file written before the url was carried. The page shows
+    a heading rather than a broken link, which is what it did before."""
+    older = _cluster(items=tuple(replace(item, url="") for item in _cluster().items))
+    out = tmp_path / "site"
+    report = build_site(_prepare(tmp_path, cluster=older), out)
+
+    assert report.stories == 1
+    page = (out / "story" / CLUSTER_ID / "index.html").read_text(encoding="utf-8")
+    assert 'rel="noopener nofollow"' not in page
+    assert older.items[0].title in page

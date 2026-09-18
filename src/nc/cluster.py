@@ -363,13 +363,30 @@ def load_cluster_config(path: Path = DEFAULT_CLUSTER_CONFIG_PATH) -> ClusterConf
 @dataclass(frozen=True)
 class ClusterItem:
     """One member of a cluster, as docs/ARCHITECTURE.md's Cluster model
-    describes `items`: "item ids with outlet, title, lede, published"."""
+    describes `items`: "item ids with outlet, title, lede, published",
+    plus the canonical `url`.
+
+    **The url is carried so the site can link back to the article.** It
+    was left out of the first version of this type, and the consequence
+    reached the published site: every story page quoted three outlets
+    and gave a reader no way to open any of them. A quote nobody can go
+    and check is the one thing this project is not for, and the outlets
+    whose words are being reproduced are owed the link (docs/PLAN.md T09
+    scores feeds on terms that "permit aggregation with attribution").
+
+    `url` defaults to empty so a cluster file written before this field
+    existed still loads; `nc cluster` backfills it on the next run,
+    because the window always has the full `Item`. The site renders a
+    plain heading rather than a link when it is missing, so an old file
+    degrades to what the site did before instead of to a broken link.
+    """
 
     item_id: str
     outlet: str
     title: str
     lede: str
     published: str
+    url: str = ""
 
     @classmethod
     def from_item(cls, item: Item) -> ClusterItem:
@@ -379,6 +396,7 @@ class ClusterItem:
             title=item.title,
             lede=item.lede,
             published=item.published,
+            url=item.url,
         )
 
     def to_dict(self) -> dict[str, str]:
@@ -388,6 +406,7 @@ class ClusterItem:
             "title": self.title,
             "lede": self.lede,
             "published": self.published,
+            "url": self.url,
         }
 
 
@@ -448,6 +467,8 @@ def _cluster_item_from_dict(raw: Mapping[str, object]) -> ClusterItem:
         title=str(raw["title"]),
         lede=str(raw["lede"]),
         published=str(raw["published"]),
+        # Absent in cluster files written before the field existed.
+        url=str(raw.get("url", "")),
     )
 
 
@@ -719,6 +740,35 @@ def scan_pairs(
 # --- ids ------------------------------------------------------------------
 
 
+def _backfilled(cluster: Cluster, known: Mapping[str, ClusterItem]) -> Cluster:
+    """Fill denormalized fields a cluster file predates, and nothing else.
+
+    A cluster whose membership did not change is re-emitted as stored,
+    which is what keeps membership monotonic -- but it also means a
+    field added to `ClusterItem` later never reaches an existing
+    cluster. `url` was added after nineteen clusters already existed,
+    and without this they would have stayed unlinked forever, or until
+    their membership happened to change.
+
+    **Only empty fields are filled.** `title` and `lede` are left
+    exactly as stored, deliberately: a published analysis quotes them
+    verbatim and `nc build` re-checks that quote against the cluster, so
+    refreshing them from the feed would invalidate a good analysis
+    every time an outlet edited a headline. A field that was never
+    stored has no quote depending on it, so filling it costs nothing.
+
+    The version is not bumped. It tracks membership (module docstring),
+    and this changes none.
+    """
+    items = tuple(
+        replace(member, url=known[member.item_id].url)
+        if not member.url and known.get(member.item_id, member).url
+        else member
+        for member in cluster.items
+    )
+    return cluster if items == cluster.items else replace(cluster, items=items)
+
+
 def _allocate_id(anchor_item_id: str, anchor_published: str, taken: set[str]) -> str:
     """`<anchor date>-<6 hex>`, unique among `taken`.
 
@@ -896,7 +946,7 @@ def cluster_items(
             )
             requeued += 1
         else:
-            emitted.append(winner)
+            emitted.append(_backfilled(winner, known))
         for loser in losers:
             superseded.append(
                 replace(loser, status=STATUS_SUPERSEDED, superseded_by=winner.id)

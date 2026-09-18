@@ -37,7 +37,11 @@
   <p>{{ discrepancy.explanation }}</p>
   <dl>
   {% for quote in discrepancy.quotes %}
-    <dt>{{ quote.outlet }}</dt>
+    <dt>
+      {% set href = story.url_by_id.get(quote.item_id, '') %}
+      {% if href %}<a href="{{ href }}" rel="noopener nofollow">{{ quote.outlet }}</a>
+      {% else %}{{ quote.outlet }}{% endif %}
+    </dt>
     <dd><blockquote>{{ quote.quote }}</blockquote></dd>
   {% endfor %}
   </dl>
@@ -52,9 +56,20 @@ their headlines and ledes state.</p>
 <h2>Sources</h2>
 <ul class="sources">
 {% for item in story.cluster.items %}
-  <li><strong>{{ item.outlet }}</strong> &middot; <time datetime="{{ item.published }}">{{ item.published }}</time><br>{{ item.title }}</li>
+  <li>
+    <strong>{{ item.outlet }}</strong> &middot;
+    <time datetime="{{ item.published }}">{{ item.published }}</time><br>
+    {% if item.url | external %}
+    <a href="{{ item.url | external }}" rel="noopener nofollow">{{ item.title }}</a>
+    {% else %}
+    {{ item.title }}
+    {% endif %}
+  </li>
 {% endfor %}
 </ul>
+<p class="caveat">Headlines and opening sentences are quoted for comparison;
+the articles themselves belong to the outlets above and are linked, not
+reproduced.</p>
 <p class="caveat">Analysed by <code>{{ story.analysis.backend }}</code> using
 <code>{{ story.analysis.model }}</code> from headlines and opening sentences only.</p>
 </article>

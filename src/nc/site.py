@@ -92,6 +92,24 @@ def load_site_config(path: Path = DEFAULT_SITE_CONFIG_PATH) -> SiteConfig:
     return SiteConfig(base_path=normalize_base_path(str(raw.get("base_path", "/"))))
 
 
+def external_url(raw: str) -> str:
+    """An outbound article link, or empty if it is not one to follow.
+
+    Item urls come out of RSS feeds, which are not this project's to
+    trust. Jinja's autoescape makes an href attribute safe to *quote*
+    but says nothing about its scheme, and `javascript:` in an href is
+    script execution on our origin. Only http and https get rendered;
+    anything else renders as no link at all, which is what the site did
+    before these links existed.
+    """
+    stripped = raw.strip()
+    return (
+        stripped
+        if stripped[:7].lower() in ("http://",) or stripped[:8].lower() == "https://"
+        else ""
+    )
+
+
 def slugify(outlet: str) -> str:
     """`/outlet/<slug>/`. Outlet names in `config/outlets.yaml` are
     already lowercase ascii ids (`theverge`, `bbc-technology`), so this
@@ -136,6 +154,13 @@ class Story:
     @property
     def item_by_id(self) -> dict[str, object]:
         return {item.item_id: item for item in self.cluster.items}
+
+    @property
+    def url_by_id(self) -> dict[str, str]:
+        """item id -> the article's url, for linking a quote back to the
+        thing it was quoted from. Empty for a cluster written before the
+        url was carried; the template falls back to plain text."""
+        return {item.item_id: external_url(item.url) for item in self.cluster.items}
 
 
 @dataclass(frozen=True)
@@ -220,6 +245,7 @@ def environment(template_dir: Path = DEFAULT_TEMPLATE_DIR) -> Environment:
     env.filters["slug"] = slugify
     env.filters["pct"] = lambda value: f"{value * 100:.0f}%"
     env.filters["duration"] = runlog.format_duration
+    env.filters["external"] = external_url
     return env
 
 
