@@ -65,13 +65,26 @@ thead th { background: var(--panel); font-family: ui-sans-serif, system-ui, sans
 /* Outbound links to the outlets' own articles. Marked so a reader can
    see at a glance which links leave the site. */
 .sources a[rel~="nofollow"]::after,
+.outlets a[rel~="nofollow"]::after,
 .discrepancy dt a[rel~="nofollow"]::after { content: " \2197"; color: var(--muted); }
+/* An outlet in a story card with no usable url. It keeps the chip's
+   spacing so the row does not reflow around it, and stays plain text:
+   external_url() refused the scheme, and a span is what "no link at
+   all" looks like. */
+.outlets .unlinked { margin-right: .6rem; white-space: nowrap; color: var(--muted); font-family: ui-sans-serif, system-ui, sans-serif; font-size: .85rem; }
 /* T43. `time[title]` is a timestamp the script rewrote to an age; the
    dotted underline says the exact time is still there, on hover. */
 .age { font-size: 1.1rem; margin: .2rem 0 1rem; }
 time[title] { border-bottom: 1px dotted var(--rule); cursor: help; }
 .claims th[scope="row"] { font-weight: 400; min-width: 12rem; }
 blockquote { margin: 0; font-size: .88rem; color: var(--ink); }
+/* A quote in the claims table links to the article it was taken from.
+   The table is dense enough that link colour on every cell would read
+   as noise, so the quote keeps the body colour and carries a rule
+   under it instead; the arrow marker is left off here for the same
+   reason. */
+.claims blockquote a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--rule); }
+.claims blockquote a:hover { color: var(--link); border-bottom-color: var(--link); }
 blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 .discrepancy { border-left: 3px solid var(--rule); padding: .1rem 0 .1rem .9rem; margin: 1rem 0; }
 .discrepancy.sev-high { border-left-color: var(--high); }
