@@ -1,6 +1,6 @@
 {% macro card(story) %}
 <article class="card">
-  <h3><a href="/newscollection2027/story/{{ story.id }}/">{{ story.analysis.headline }}</a></h3>
+  <h3><a href="{{ base }}story/{{ story.id }}/">{{ story.analysis.headline }}</a></h3>
   <p class="meta">
     <time datetime="{{ story.date }}">{{ story.date }}</time>
     &middot; {{ story.outlets | length }} outlets
@@ -10,6 +10,6 @@
     {% endif %}
   </p>
   <p>{{ story.analysis.summary }}</p>
-  <p class="outlets">{% for outlet in story.outlets %}<a href="/newscollection2027/outlet/{{ outlet | slug }}/">{{ outlet }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
+  <p class="outlets">{% for outlet in story.outlets %}<a href="{{ base }}outlet/{{ outlet | slug }}/">{{ outlet }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
 </article>
 {% endmacro %}

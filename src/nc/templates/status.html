@@ -31,7 +31,7 @@ per nightly run; this page fills in once that runs unattended.</p>
 <tr>
   <td><time datetime="{{ run.finished_at }}">{{ run.date }}</time></td>
   <td>{{ run.status }}</td>
-  <td class="num">{{ run.counts.analyses_today }}</td>
+  <td class="num">{% if run.counts.analyses_written is none %}&mdash;{% else %}{{ run.counts.analyses_written }}{% endif %}</td>
   <td class="num">{{ run.counts.pending }}</td>
   <td class="num">{{ run.counts.rejected }}</td>
   <td class="num">{{ run.duration_seconds | duration }}</td>
@@ -40,7 +40,7 @@ per nightly run; this page fills in once that runs unattended.</p>
 {% endfor %}
 </tbody>
 </table>
-<p class="caveat">"Analysed" is the analyses written that day, "pending" what was
+<p class="caveat">"Analysed" is the analyses that run wrote, "pending" what was
 still waiting when the run ended &mdash; a run can finish cleanly and leave work
 behind. "Agent" is the run's wall clock minus the time its commands took, which
 is the time the model itself spent. An em dash means the run kept no journal, so

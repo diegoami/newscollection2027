@@ -1,0 +1,18 @@
+# Where the built site is served from (src/nc/site.py, `nc build`).
+#
+# `base_path` is the URL prefix every internal link on the site is
+# written with. It is a deployment fact, not a threshold, but it lives
+# here for the same reason CLAUDE.md gives for thresholds: a value that
+# has to change when the host changes belongs in config/, not spelled
+# out in eight templates.
+#
+# GitHub Pages project site  https://diegoami.github.io/newscollection2027/
+#   base_path: "/newscollection2027/"   <- what this file is set to
+#
+# Netlify, or any root domain  https://example.com/
+#   base_path: "/"
+#
+# docs/ARCHITECTURE.md names Netlify as the host after prototyping, and
+# the whole move is this one line: `nc build` rewrites every link and
+# nothing else changes.
+base_path: "/newscollection2027/"

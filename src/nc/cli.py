@@ -248,7 +248,10 @@ def _build(args: argparse.Namespace) -> int:
     data_root = _data_root(args)
     if args.clean:
         site.clean(args.out)
-    report = site.build_site(data_root, args.out, args.templates)
+    config = site.load_site_config(args.site_config)
+    if args.base_path is not None:
+        config = replace(config, base_path=site.normalize_base_path(args.base_path))
+    report = site.build_site(data_root, args.out, args.templates, config=config)
     print(site.format_build_report(report, args.out))
     return 1 if report.skipped_invalid else 0
 
@@ -676,6 +679,15 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=site.DEFAULT_TEMPLATE_DIR,
         help=f"template directory (default: {site.DEFAULT_TEMPLATE_DIR})",
+    )
+    build_parser.add_argument(
+        "--site-config", type=Path, default=site.DEFAULT_SITE_CONFIG_PATH
+    )
+    build_parser.add_argument(
+        "--base-path",
+        default=None,
+        help="override config/site.yaml's base_path for this build, e.g. / "
+        "for a root domain such as Netlify",
     )
     build_parser.add_argument(
         "--clean",

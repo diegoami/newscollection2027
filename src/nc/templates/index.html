@@ -18,7 +18,7 @@ validator.</p>
 
 {% if dates %}
 <h2>Archive</h2>
-<p class="outlets">{% for date in dates %}<a href="/newscollection2027/archive/{{ date }}/">{{ date }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
+<p class="outlets">{% for date in dates %}<a href="{{ base }}archive/{{ date }}/">{{ date }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
 {% endif %}
 
 {% if stats %}
@@ -28,7 +28,7 @@ validator.</p>
 <tbody>
 {% for entry in stats %}
 <tr>
-  <td><a href="/newscollection2027/outlet/{{ entry.outlet | slug }}/">{{ entry.outlet }}</a></td>
+  <td><a href="{{ base }}outlet/{{ entry.outlet | slug }}/">{{ entry.outlet }}</a></td>
   <td class="num">{{ entry.stories }}</td>
   <td class="num">{{ entry.discrepancy_rate | pct }}</td>
   <td class="num">{{ entry.first_rate | pct }}</td>
@@ -36,6 +36,6 @@ validator.</p>
 {% endfor %}
 </tbody>
 </table>
-<p class="caveat">None of these is a quality score. See <a href="/newscollection2027/method/">Method</a>.</p>
+<p class="caveat">None of these is a quality score. See <a href="{{ base }}method/">Method</a>.</p>
 {% endif %}
 {% endblock %}
