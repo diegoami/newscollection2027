@@ -42,6 +42,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
+from nc import runlog
 from nc.cluster import STATUS_SUPERSEDED, Cluster, load_clusters
 from nc.contract import Analysis, analyses_dir
 from nc.stats import compute_outlet_stats
@@ -184,6 +185,7 @@ def environment(template_dir: Path = DEFAULT_TEMPLATE_DIR) -> Environment:
     )
     env.filters["slug"] = slugify
     env.filters["pct"] = lambda value: f"{value * 100:.0f}%"
+    env.filters["duration"] = runlog.format_duration
     return env
 
 
@@ -202,16 +204,17 @@ def build_site(
     data_root: DataRoot,
     out_dir: Path = DEFAULT_SITE_DIR,
     template_dir: Path = DEFAULT_TEMPLATE_DIR,
-    runs: list[dict[str, object]] | None = None,
+    runs: list[runlog.Run] | None = None,
 ) -> BuildReport:
     """Render the whole site into `out_dir`.
 
-    `runs` is T43's status data, passed in rather than read here so the
-    status page renders the same whether the data root has a `runs/`
-    directory or not -- an empty status page is a correct page for a
-    pipeline that has not logged a run yet.
+    `runs` defaults to whatever `runs/` holds (T43). It stays injectable
+    so a test can render the status page against a run it constructed --
+    an empty status page is a correct page for a pipeline that has not
+    logged a run yet, and both cases need covering.
     """
     env = environment(template_dir)
+    history = runlog.load_runs(data_root) if runs is None else runs
     stories, stale, invalid = publishable(data_root)
     stats = compute_outlet_stats([(s.analysis, s.cluster) for s in stories])
     by_outlet: dict[str, list[Story]] = {}
@@ -240,7 +243,11 @@ def build_site(
     pages += _write(
         out_dir / "status" / "index.html",
         env.get_template("status.html").render(
-            runs=runs or [], stale=stale, invalid=invalid, total=len(stories)
+            runs=history,
+            last_success=runlog.last_successful(history),
+            stale=stale,
+            invalid=invalid,
+            total=len(stories),
         ),
     )
     for story in stories:

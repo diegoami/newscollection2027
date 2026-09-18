@@ -303,3 +303,42 @@ def test_a_record_from_an_older_version_still_loads(tmp_path: Path) -> None:
     assert len(runs) == 1
     assert runs[0].counts.analyses_today == 3
     assert runs[0].counts.pending == 0
+
+
+# --- how a duration reads -------------------------------------------------
+
+
+def test_durations_read_as_a_person_would_say_them() -> None:
+    assert runlog.format_duration(0.04) == "<1s"
+    assert runlog.format_duration(9.0) == "9s"
+    assert runlog.format_duration(612.0) == "10m 12s"
+    assert runlog.format_duration(3725.0) == "1h 02m"
+
+
+def test_an_unknown_duration_is_not_zero() -> None:
+    """A run that kept no journal has an unknown duration. Zero is a
+    claim, and the wrong one."""
+    assert runlog.format_duration(None) == "—"
+    assert runlog.format_duration(0.0) == "<1s"
+
+
+def test_an_empty_night_is_still_a_successful_one() -> None:
+    """Most nights look like this once the backlog is clear. Treating
+    `empty` as failure would light the status page up every quiet night.
+    """
+    runs = [
+        runlog.Run(date="2026-09-18", finished_at="x", status=runlog.STATUS_EMPTY),
+        runlog.Run(date="2026-09-17", finished_at="y", status=runlog.STATUS_OK),
+    ]
+    found = runlog.last_successful(runs)
+    assert found is not None and found.date == "2026-09-18"
+
+
+def test_a_failed_run_is_skipped_for_the_last_successful_one() -> None:
+    runs = [
+        runlog.Run(date="2026-09-18", finished_at="x", status=runlog.STATUS_FAILED),
+        runlog.Run(date="2026-09-17", finished_at="y", status=runlog.STATUS_OK),
+    ]
+    found = runlog.last_successful(runs)
+    assert found is not None and found.date == "2026-09-17"
+    assert runlog.last_successful([]) is None

@@ -6,11 +6,14 @@ M0 through M4 are merged, except T42's activation and T43. The pipeline
 ingests and clusters on a schedule, the contract and both analysis
 backends exist, and `nc build` writes the site.
 
+M5 is under way: `nc runlog`, `nc nightly --dry-run` and the failure
+issue are done; the Routine itself (T51) is the owner's.
+
 Remaining owner steps, both of them now blocking an acceptance
-criterion: enable GitHub Pages from `gh-pages` (T42, two steps -- run
-the `deploy` workflow once by hand to create the branch, then point
-Pages at it), and create `DATA_REPO_TOKEN` so the scheduled ingest can
-push (T13). T34, reading the twenty golden cases, is also waiting.
+criterion: point GitHub Pages at `gh-pages` (T42 -- the branch already
+exists; the deploy workflow created it on its first run), and create
+`DATA_REPO_TOKEN` so the scheduled ingest can push (T13). T34, reading
+the twenty golden cases, is also waiting.
 
 Milestones are sequential. Tasks inside a milestone marked `[P]` can run
 in parallel with the other `[P]` tasks of the same milestone. Sizes:
@@ -37,12 +40,10 @@ acceptance criteria are shown in a merged PR.
   repository `newscollection2027-data` created (done). Still to do, if
   not already: add the required status check `check` (T01's CI workflow
   has been green on every PR since M0). Still to do: enable GitHub
-  Pages. That is
-  two steps, in this order, because Pages cannot be pointed at a branch
-  that does not exist yet -- run the `deploy` workflow once from the
-  Actions tab (`Run workflow`), which creates `gh-pages`, then set
-  Settings -> Pages -> Source to "Deploy from a branch", branch
-  `gh-pages`, folder `/`. Also still to do: create a fine-grained token
+  Pages. One step now, not two -- `gh-pages` already exists, created by
+  the deploy workflow's first run when T42 merged -- so set Settings ->
+  Pages -> Source to "Deploy from a branch", branch `gh-pages`, folder
+  `/`. Also still to do: create a fine-grained token
   with contents write on the data repository and store it as the secret
   `DATA_REPO_TOKEN`, which T13's scheduled runs need to push.
 - **T04 (S, size S)** Create one GitHub issue per task below with labels
@@ -221,8 +222,13 @@ acceptance criteria are shown in a merged PR.
   AC: site reachable at `https://diegoami.github.io/newscollection2027/`.
   `.github/workflows/deploy.yml` exists and does this; the AC is met
   once the owner completes the two Pages steps in T03.
-- **T43 (S, size S)** Status page from `data/runs/`.
+- **T43 (S, size S, done)** Status page from `data/runs/`.
   AC: last run's counts, rejects and durations visible on `/status/`.
+  The age of the last successful run is rendered by the browser from an
+  absolute `<time datetime=...>` rather than computed at build time: an
+  age baked into the HTML would be wrong within the minute, and would
+  make every build produce different bytes and so a `gh-pages` commit
+  per deploy.
 
 ## M5 Automation
 
@@ -235,10 +241,14 @@ acceptance criteria are shown in a merged PR.
   repositories attached with push access to the data repo, prompt as in
   `docs/WORKFLOW.md`.
   AC: first unattended run commits analyses and the site updates.
-- **T52 (S, size S)** Failure surfacing: the ingest workflow opens or
-  updates a GitHub issue on failure; the status page shows the last
+- **T52 (S, size S, done)** Failure surfacing: the ingest workflow opens
+  or updates a GitHub issue on failure; the status page shows the last
   successful run age.
-  AC: a forced failure creates the issue.
+  AC: a forced failure creates the issue. Forcing one is a
+  `workflow_dispatch` input, `force_failure`, so the failure path can be
+  demonstrated again at any time -- an alerting path that has never
+  fired once is a guess. One issue per outage, found by exact title:
+  the first failure opens it, every failure after comments on it.
 
 ## M6 Quality
 
