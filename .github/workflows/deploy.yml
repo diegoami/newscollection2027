@@ -13,10 +13,23 @@ name: deploy
 #                           ingest never rebuilds anything. The nightly
 #                           Routine's `nc sync push` reaches this the
 #                           same way.
-#   workflow_dispatch       on demand: the first run has to be started by
-#                           hand, because `gh-pages` does not exist yet
-#                           and the owner cannot enable Pages from a
-#                           branch that is not there (T03).
+#   workflow_dispatch       on demand.
+#   schedule (hourly)       a safety net, added after a real miss: the
+#                           `data-updated` dispatch is fired by
+#                           ingest.yml and by nothing else, so a data
+#                           change written by anything *other* than the
+#                           ingest -- the nightly Routine's `nc sync
+#                           push`, a backfill run by hand -- sat
+#                           unpublished until the next three-hourly
+#                           ingest happened along. That is exactly how a
+#                           stale site hides a problem for hours. An
+#                           hourly build bounds it without needing a
+#                           token on the code repo from anywhere else.
+#
+# The schedule is free when nothing changed: `nc build` is byte-stable,
+# so a run that finds no new data writes no files, makes no commit and
+# triggers no Pages deploy (see the publish step). The cost of an idle
+# run is about twenty seconds of a runner.
 #
 # The build itself is `nc build` -- the same command a developer runs
 # locally and the same one the nightly skill uses as a smoke test. This
@@ -29,6 +42,10 @@ on:
   repository_dispatch:
     types: [data-updated]
   workflow_dispatch:
+  schedule:
+    # Minute 30, so it never lines up with ingest.yml's "0 */3 * * *"
+    # and the two never contend for the data repo.
+    - cron: "30 * * * *"
 
 # `contents: write` is to push the built site to `gh-pages`, and to
 # nothing else. CLAUDE.md's "automation pushes only to the data

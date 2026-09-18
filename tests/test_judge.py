@@ -269,6 +269,52 @@ def test_the_queue_is_what_has_no_judgment_yet(tmp_path: Path) -> None:
     assert [pair.pair_id for pair in unjudged_pairs(data_root)] == [first.pair_id]
 
 
+def test_cross_outlet_pairs_are_judged_before_same_outlet_ones(
+    tmp_path: Path,
+) -> None:
+    """A cluster needs two distinct outlets, so a same-outlet pair
+    cannot form one on its own. It can still bridge two components, so
+    it stays in the queue -- but on the live queue 1 of 78 would bridge,
+    while they took 17 of the next 60 slots. Last, not gone.
+    """
+    high_same = _pair(_item("a", "alpha"), _item("b", "alpha"), score=0.96)
+    low_cross = _pair(_item("c", "beta"), _item("d", "gamma"), score=0.60)
+    data_root = _root(tmp_path, [high_same, low_cross])
+
+    assert [pair.pair_id for pair in unjudged_pairs(data_root)] == [
+        low_cross.pair_id,
+        high_same.pair_id,
+    ]
+
+
+def test_a_self_pair_is_dropped_from_the_queue(tmp_path: Path) -> None:
+    """One item id on both sides. Linking an item to itself is a no-op
+    in union-find, so the answer can never change the output; these only
+    exist because an outlet re-published under one id into two day files
+    before `nc.cluster` was fixed."""
+    item = _item("a", "alpha")
+    self_pair = _pair(item, item, score=1.0)
+    real = _pair(_item("b", "beta"), _item("c", "gamma"), score=0.61)
+    data_root = _root(tmp_path, [self_pair, real])
+
+    assert [pair.pair_id for pair in unjudged_pairs(data_root)] == [real.pair_id]
+
+
+def test_score_still_orders_within_each_group(tmp_path: Path) -> None:
+    low_cross = _pair(_item("a", "alpha"), _item("b", "beta"), score=0.61)
+    high_cross = _pair(_item("c", "gamma"), _item("d", "delta"), score=0.88)
+    low_same = _pair(_item("e", "alpha"), _item("f", "alpha"), score=0.62)
+    high_same = _pair(_item("g", "beta"), _item("h", "beta"), score=0.91)
+    data_root = _root(tmp_path, [low_cross, high_cross, low_same, high_same])
+
+    assert [pair.pair_id for pair in unjudged_pairs(data_root)] == [
+        high_cross.pair_id,
+        low_cross.pair_id,
+        high_same.pair_id,
+        low_same.pair_id,
+    ]
+
+
 def test_the_question_shows_the_text_and_hides_the_score() -> None:
     """The score is the signal that could not decide this pair; showing
     it would anchor the answer on exactly what T23 falsified."""
