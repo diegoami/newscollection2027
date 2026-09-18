@@ -689,6 +689,35 @@ working a queue and the wrong one for a human working an hour, so the
 line goes in the pool rather than in the directory. On the 2026-09-17
 pool, 92 of 362.
 
+*How much the bridge case is actually worth, measured.* The paragraph
+above kept them on an argument nobody had priced. On the live queue of
+2026-09-18, of 78 same-outlet pairs awaiting a judgment, **one** would
+have bridged two existing clusters; the other 77 could not create or
+widen one. They were taking 17 of the next 60 slots -- a third of a
+night's budget on pairs that almost never change the output, while 168
+cross-outlet pairs waited behind them.
+
+So `unjudged_pairs` now orders cross-outlet pairs first and same-outlet
+pairs last, rather than dropping them. The bridge survives; it just
+stops going first. The next window went from 43 useful pairs out of 60
+to 60 out of 60.
+
+One honest limit on that number: it counts pairs that would bridge two
+clusters *as they stand today*. Two loose same-outlet items could
+in principle matter later -- but only once each end acquires a
+cross-outlet link, and at that point the cross-outlet pairs do the
+joining directly, which is why the same-outlet link is so rarely
+load-bearing.
+
+**Self-pairs.** One item id on both sides, so linking them is a no-op
+in union-find: the answer can never form, widen or bridge a cluster.
+They exist only because an outlet re-published under one id into two
+day files and the four-day window read both, fixed in `_latest_by_id`
+and `scan_pairs` -- but pair files written before that fix are still on
+disk and nothing prunes them. `unjudged_pairs` drops them outright,
+which is a guard against the files that remain rather than a change to
+what the pipeline now produces.
+
 **Promotional items and buying advice.** `nc cluster` drops these from
 the window, so no *new* pair can contain one — but pair files written
 before a rule existed are still on disk, and nothing prunes them

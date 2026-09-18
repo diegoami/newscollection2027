@@ -250,16 +250,51 @@ def write_judgments(data_root: DataRoot, judgments: list[Judgment]) -> int:
     return written
 
 
+def _is_self_pair(pair: PendingPair) -> bool:
+    """One item id on both sides.
+
+    Linking an item to itself is a no-op in union-find: it can never
+    form a cluster, widen one, or bridge two. These exist only because
+    an outlet re-published under one id into two day files and the
+    window read both -- fixed in `nc.cluster` (`_latest_by_id` and
+    `scan_pairs`), but the pair files written before that fix are still
+    on disk and nothing prunes them. Asking a model about one is a call
+    spent on a question with no consequence.
+    """
+    return pair.a.item_id == pair.b.item_id
+
+
 def unjudged_pairs(data_root: DataRoot) -> list[PendingPair]:
     """Borderline pairs with no judgment yet -- the queue a backend
-    works through. Ordered highest score first: if a run is interrupted
-    or a budget runs out, the pairs most likely to be real matches have
-    been judged."""
+    works through.
+
+    **Cross-outlet pairs first, then highest score.** A cluster needs
+    two distinct outlets, so a same-outlet pair cannot form one on its
+    own; docs/CLUSTERING.md keeps them in the queue anyway because one
+    *can* bridge two components into a cluster that reaches a second
+    outlet. Measured on the live queue, 1 of 78 same-outlet pairs would
+    bridge two existing clusters -- while they took 17 of the next 60
+    slots, which is a third of a night's budget spent on pairs that
+    almost never change the output.
+
+    So they are ordered last, not dropped: the bridge case survives, it
+    just stops going first. Within each group the highest score comes
+    first, so a run that is interrupted or runs out of budget has judged
+    the pairs most likely to be real matches.
+
+    Self-pairs are dropped outright -- see `_is_self_pair`; there is no
+    case where the answer matters.
+    """
     judged = {judgment.pair_id for judgment in load_judgments(data_root)}
     pairs = [
-        pair for pair in load_pending_pairs(data_root) if pair.pair_id not in judged
+        pair
+        for pair in load_pending_pairs(data_root)
+        if pair.pair_id not in judged and not _is_self_pair(pair)
     ]
-    return sorted(pairs, key=lambda pair: (-pair.score, pair.pair_id))
+    return sorted(
+        pairs,
+        key=lambda pair: (pair.a.outlet == pair.b.outlet, -pair.score, pair.pair_id),
+    )
 
 
 def accepted_links(data_root: DataRoot) -> list[tuple[str, str]]:

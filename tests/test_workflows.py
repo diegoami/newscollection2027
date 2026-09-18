@@ -141,3 +141,25 @@ def test_the_forced_failure_is_opt_in_and_stops_before_any_work() -> None:
     steps = _load("ingest.yml")["jobs"]["ingest"]["steps"]
     assert steps[0]["if"] == "inputs.force_failure"
     assert "exit 1" in steps[0]["run"]
+
+
+def test_the_deploy_workflow_has_an_hourly_safety_net() -> None:
+    """The `data-updated` dispatch is fired by ingest.yml and nothing
+    else, so a data change written by anything other than the ingest --
+    the nightly's `nc sync push`, a backfill by hand -- sat unpublished
+    until the next three-hourly ingest happened along. That is how a
+    stale site hides a problem for hours.
+
+    It is free when nothing changed: `nc build` is byte-stable, so an
+    idle run writes no files, makes no commit and triggers no Pages
+    deploy.
+    """
+    schedule = _triggers("deploy.yml")["schedule"]
+    assert [entry["cron"] for entry in schedule] == ["30 * * * *"]
+
+
+def test_deploy_and_ingest_never_fire_on_the_same_minute() -> None:
+    """They would contend for the same data-repo checkout."""
+    deploy = _triggers("deploy.yml")["schedule"][0]["cron"].split()[0]
+    ingest = _triggers("ingest.yml")["schedule"][0]["cron"].split()[0]
+    assert deploy != ingest
