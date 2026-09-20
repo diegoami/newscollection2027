@@ -667,3 +667,68 @@ def test_a_card_does_not_link_an_outlet_whose_url_is_hostile(tmp_path: Path) -> 
     assert "javascript:" not in page
     assert '<span class="unlinked"' in page
     assert "theverge" in page
+
+
+# --- pages that stopped being current -------------------------------------
+
+
+def test_a_story_that_went_stale_loses_its_page(tmp_path: Path) -> None:
+    """`publishable` refuses to publish a stale analysis, but refusing to
+    write a page is not the same as removing the one already there. On a
+    reused checkout the old page stayed, still served by URL, still
+    quoting outlets against a membership that has since changed."""
+    out = tmp_path / "site"
+    data_root = _prepare(tmp_path)
+    build_site(data_root, out)
+    page = out / "story" / CLUSTER_ID / "index.html"
+    assert page.exists()
+
+    # The cluster gains a member: the analysis on disk is now for an
+    # older version and stops being publishable.
+    moved = _cluster(version=2)
+    path = data_root.resolve("clusters", moved.date, f"{moved.id}.json")
+    path.write_text(render(moved), encoding="utf-8")
+
+    report = build_site(data_root, out)
+
+    assert report.stories == 0
+    assert report.skipped_stale == 1
+    assert report.removed >= 1
+    assert not page.exists()
+    # The site itself is still there -- pruning is not cleaning.
+    assert (out / "index.html").exists()
+    assert (out / "style.css").exists()
+
+
+def test_a_build_removes_an_outlet_page_that_no_longer_has_stories(
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "site"
+    data_root = _prepare(tmp_path)
+    build_site(data_root, out)
+    assert (out / "outlet" / "theverge" / "index.html").exists()
+
+    stray = out / "outlet" / "defunctnews" / "index.html"
+    stray.parent.mkdir(parents=True, exist_ok=True)
+    stray.write_text("<!doctype html>stale", encoding="utf-8")
+
+    report = build_site(data_root, out)
+
+    assert report.removed == 1
+    assert not stray.exists()
+    assert not stray.parent.exists()  # the empty directory goes too
+    assert (out / "outlet" / "theverge" / "index.html").exists()
+
+
+def test_a_second_build_with_nothing_new_writes_and_removes_nothing(
+    tmp_path: Path,
+) -> None:
+    """T42 pushes `site/` to `gh-pages`, so an unchanged build must
+    produce no diff at all -- pruning must not undo that."""
+    out = tmp_path / "site"
+    data_root = _prepare(tmp_path)
+    build_site(data_root, out)
+
+    report = build_site(data_root, out)
+
+    assert (report.pages, report.removed) == (0, 0)

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from hashlib import sha1
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import feedparser
 
@@ -294,3 +296,60 @@ def test_html_is_stripped_and_entities_unescaped_in_lede() -> None:
 def test_load_normalize_config_default_is_valid() -> None:
     config = feeds.load_normalize_config()
     assert config.lede_word_cap == WORD_CAP
+
+
+# --- one bad entry, one bad feed ------------------------------------------
+
+
+def test_a_link_with_a_non_numeric_port_does_not_raise() -> None:
+    """`SplitResult.port` raises ValueError on `http://host:abc/`. Feeds
+    are untrusted input and `canonical_url` runs once per entry, so that
+    exception reached all the way out of an unattended `nc ingest` and
+    stopped the run for all eleven outlets over one bad link."""
+    assert feeds.canonical_url("http://host:abc/x") == "http://host/x"
+    assert feeds.canonical_url("https://host:/x") == "https://host/x"
+    # A real port is still kept, and a default one still dropped.
+    assert feeds.canonical_url("http://host:8080/x") == "http://host:8080/x"
+    assert feeds.canonical_url("http://host:80/x") == "http://host/x"
+
+
+def test_one_unusable_entry_does_not_cost_the_rest_of_the_feed() -> None:
+    parsed = SimpleNamespace(
+        entries=[
+            SimpleNamespace(link="http://host:abc/broken", title="Broken", summary=""),
+            SimpleNamespace(link="https://example.com/good", title="Good", summary=""),
+            SimpleNamespace(link="", title="No link", summary=""),
+        ]
+    )
+    outlet = _outlet("theverge")
+
+    result = feeds.normalize_feed(outlet, parsed, FETCHED, WORD_CAP)
+
+    # The bad port canonicalizes without its port rather than being
+    # dropped; only the entry with no link at all is unusable.
+    assert [item.title for item in result.items] == ["Broken", "Good"]
+    assert result.skipped == 1
+
+
+def test_an_entry_that_raises_is_skipped_and_counted(monkeypatch: Any) -> None:
+    """The specific bug is fixed above; this pins the invariant, which is
+    that *whatever* one entry does, the other entries still arrive."""
+    parsed = SimpleNamespace(
+        entries=[
+            SimpleNamespace(link="https://example.com/boom", title="Boom", summary=""),
+            SimpleNamespace(link="https://example.com/good", title="Good", summary=""),
+        ]
+    )
+    outlet = _outlet("theverge")
+    real = feeds.normalize_entry
+
+    def exploding(outlet: Any, entry: Any, fetched: str, cap: int) -> Any:
+        if getattr(entry, "link", "").endswith("boom"):
+            raise RuntimeError("whatever an outlet's CMS emitted")
+        return real(outlet, entry, fetched, cap)
+
+    monkeypatch.setattr(feeds, "normalize_entry", exploding)
+    result = feeds.normalize_feed(outlet, parsed, FETCHED, WORD_CAP)
+
+    assert [item.title for item in result.items] == ["Good"]
+    assert result.skipped == 1

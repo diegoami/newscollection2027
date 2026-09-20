@@ -36,6 +36,7 @@ from nc.judge import (
     format_judge_report,
     judgment_from_dict,
     judgment_path,
+    judgments_dir,
     load_judge_config,
     load_judge_prompt,
     load_judgments,
@@ -172,8 +173,16 @@ def test_a_missing_field_names_itself() -> None:
 
 
 def test_a_corrupt_file_raises_rather_than_being_skipped(tmp_path: Path) -> None:
-    """Skipping it silently would re-ask the same pair every night
-    forever, and nobody would ever see why."""
+    """`load_judgments` is the loud reader, and stays loud: `nc
+    bench-judge` scoring a corpus it could not fully read would report a
+    number about the wrong set of judgments.
+
+    The clustering path is the quiet one (`accepted_links`), because it
+    runs unattended every three hours and one bad file there stops
+    every outlet. "Nobody would ever see why" is answered by `nc judge
+    --validate`, which lists the file it could not read, and by the pair
+    coming back onto the queue to be judged again.
+    """
     pair = _pair(_item("a", "alpha"), _item("b", "beta"))
     data_root = _root(tmp_path, [pair])
     write_judgments(data_root, [_judgment(pair)])
@@ -347,9 +356,11 @@ def test_only_an_accepted_yes_becomes_a_link(tmp_path: Path) -> None:
     assert accepted_links(data_root) == [(yes.a.item_id, yes.b.item_id)]
 
 
-def test_a_malformed_judgment_cannot_stop_the_nights_clustering(
+def test_a_judgment_for_an_unknown_pair_cannot_stop_the_nights_clustering(
     tmp_path: Path,
 ) -> None:
+    """A well-formed judgment naming a pair that is not on the queue.
+    It fails `validate_judgment` and is skipped."""
     good = _pair(_item("a", "alpha"), _item("b", "beta"))
     data_root = _root(tmp_path, [good])
     write_judgments(
@@ -358,6 +369,65 @@ def test_a_malformed_judgment_cannot_stop_the_nights_clustering(
     )
 
     assert accepted_links(data_root) == [(good.a.item_id, good.b.item_id)]
+
+
+def test_an_unparseable_judgment_file_cannot_stop_the_nights_clustering(
+    tmp_path: Path,
+) -> None:
+    """The case the test above was named for but did not cover: a file
+    that is not valid JSON at all.
+
+    `nc cluster` calls `accepted_links` on every three-hourly ingest, so
+    one truncated file in the data repo used to fail the whole run for
+    every outlet until somebody edited it by hand.
+    """
+    good = _pair(_item("a", "alpha"), _item("b", "beta"))
+    data_root = _root(tmp_path, [good])
+    write_judgments(data_root, [_judgment(good)])
+    truncated = judgments_dir(data_root) / "truncated.json"
+    truncated.write_text('{"pair_id": "abc", "same_st', encoding="utf-8")
+
+    assert accepted_links(data_root) == [(good.a.item_id, good.b.item_id)]
+
+
+def test_a_judgment_file_missing_a_field_cannot_stop_clustering_either(
+    tmp_path: Path,
+) -> None:
+    good = _pair(_item("a", "alpha"), _item("b", "beta"))
+    data_root = _root(tmp_path, [good])
+    write_judgments(data_root, [_judgment(good)])
+    (judgments_dir(data_root) / "partial.json").write_text(
+        json.dumps({"pair_id": "abc"}), encoding="utf-8"
+    )
+
+    assert accepted_links(data_root) == [(good.a.item_id, good.b.item_id)]
+
+
+def test_validate_reports_the_file_it_could_not_read(tmp_path: Path) -> None:
+    """Skipped, not swallowed. `nc judge --validate` is where a person
+    asks what is on disk, and an unreadable file has to show up there or
+    it is invisible until someone wonders why a pair keeps coming back."""
+    good = _pair(_item("a", "alpha"), _item("b", "beta"))
+    data_root = _root(tmp_path, [good])
+    write_judgments(data_root, [_judgment(good)])
+    (judgments_dir(data_root) / "truncated.json").write_text("{", encoding="utf-8")
+
+    report = validate_all(data_root)
+
+    assert report.accepted == 1
+    assert any("truncated.json" in reason for reason in report.rejected)
+
+
+def test_load_judgments_still_raises_for_a_caller_that_wants_to_know(
+    tmp_path: Path,
+) -> None:
+    good = _pair(_item("a", "alpha"), _item("b", "beta"))
+    data_root = _root(tmp_path, [good])
+    write_judgments(data_root, [_judgment(good)])
+    (judgments_dir(data_root) / "truncated.json").write_text("{", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_judgments(data_root)
 
 
 class _FixedBackend:

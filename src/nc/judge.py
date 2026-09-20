@@ -219,16 +219,33 @@ def load_judgments(data_root: DataRoot) -> list[Judgment]:
     """Every judgment on disk, ordered by pair id. A file that does not
     parse raises: a judge queue that silently skips its own corrupt
     output would keep re-judging the same pair every night."""
+    judgments, unreadable = _load_judgments(data_root)
+    if unreadable:
+        raise ValueError(unreadable[0])
+    return judgments
+
+
+def _load_judgments(data_root: DataRoot) -> tuple[list[Judgment], list[str]]:
+    """The judgments that parse, and one message per file that did not.
+
+    Two callers want different things from the same files. `nc judge
+    --validate` is a person asking what is on disk, and it should be
+    told loudly. `accepted_links` runs inside `nc cluster` on an
+    unattended three-hourly schedule, where raising means one truncated
+    file in the data repo stops clustering for every outlet until
+    somebody edits it by hand.
+    """
     directory = judgments_dir(data_root)
     if not directory.exists():
-        return []
+        return [], []
     judgments: list[Judgment] = []
+    unreadable: list[str] = []
     for path in sorted(directory.glob("*.json")):
         try:
             judgments.append(judgment_from_dict(json.loads(path.read_text("utf-8"))))
-        except (ValueError, json.JSONDecodeError) as exc:
-            raise ValueError(f"{path}: {exc}") from exc
-    return judgments
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            unreadable.append(f"{path}: {exc}")
+    return judgments, unreadable
 
 
 def write_judgments(data_root: DataRoot, judgments: list[Judgment]) -> int:
@@ -285,7 +302,10 @@ def unjudged_pairs(data_root: DataRoot) -> list[PendingPair]:
     Self-pairs are dropped outright -- see `_is_self_pair`; there is no
     case where the answer matters.
     """
-    judged = {judgment.pair_id for judgment in load_judgments(data_root)}
+    # Unreadable judgments are ignored rather than raised on, and the
+    # pair they were for comes back onto this queue: a judgment nobody
+    # can read has decided nothing, so the honest state is unjudged.
+    judged = {judgment.pair_id for judgment in _load_judgments(data_root)[0]}
     pairs = [
         pair
         for pair in load_pending_pairs(data_root)
@@ -302,10 +322,17 @@ def accepted_links(data_root: DataRoot) -> list[tuple[str, str]]:
     judgment that says same story *and* passes the validator.
 
     This is the only path from a judgment into clustering. A judgment
-    that fails validation is skipped here rather than raising, so one
-    malformed file cannot stop the night's clustering -- but it is
-    counted and reported by `nc judge --validate`, never swallowed in
-    silence.
+    that fails validation *or does not parse at all* is skipped here
+    rather than raising, so one malformed file cannot stop the night's
+    clustering -- but it is counted and reported by `nc judge
+    --validate`, never swallowed in silence.
+
+    The docstring said that before the code did. `load_judgments`
+    raised on an unparseable file, and `nc cluster` calls this on every
+    three-hourly ingest, so one truncated `judgments/<pair>.json` in the
+    data repo failed the whole run for every outlet. A judgment that
+    cannot be read is a judgment that cannot link anything, which is
+    the same outcome as a rejected one and needs no exception to say so.
     """
     links, _ = _accepted_links_with_rejects(data_root)
     return links
@@ -316,8 +343,9 @@ def _accepted_links_with_rejects(
 ) -> tuple[list[tuple[str, str]], list[str]]:
     pairs = {pair.pair_id: pair for pair in load_pending_pairs(data_root)}
     links: list[tuple[str, str]] = []
-    rejects: list[str] = []
-    for judgment in load_judgments(data_root):
+    judgments, unreadable = _load_judgments(data_root)
+    rejects: list[str] = list(unreadable)
+    for judgment in judgments:
         try:
             validate_judgment(judgment, pairs)
         except JudgmentRejected as exc:
@@ -339,8 +367,8 @@ class JudgeReport:
 
 def validate_all(data_root: DataRoot) -> JudgeReport:
     """`nc judge --validate`: what is on disk, what links, what is
-    rejected and why."""
-    judgments = load_judgments(data_root)
+    rejected and why -- including files that do not parse."""
+    judgments, _ = _load_judgments(data_root)
     links, rejects = _accepted_links_with_rejects(data_root)
     return JudgeReport(
         pending=len(unjudged_pairs(data_root)),
