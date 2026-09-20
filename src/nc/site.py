@@ -47,7 +47,7 @@ from nc import runlog
 from nc.cluster import STATUS_SUPERSEDED, Cluster, load_clusters
 from nc.contract import Analysis, analyses_dir
 from nc.stats import compute_outlet_stats
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 DEFAULT_SITE_DIR = Path("site")
 DEFAULT_TEMPLATE_DIR = Path("src/nc/templates")
@@ -224,8 +224,10 @@ def publishable(
 
     for path in sorted(analyses_dir(data_root).rglob("*.json")):
         cluster = clusters.get(path.stem)
+        raw = path.read_text("utf-8")
         try:
-            analysis = Analysis.model_validate_json(path.read_text("utf-8"))
+            payload = json.loads(raw)
+            analysis = Analysis.model_validate(payload)
         except ValueError as exc:
             invalid.append((path.stem, [f"file: {exc}"]))
             continue
@@ -238,7 +240,7 @@ def publishable(
         ):
             stale += 1
             continue
-        _, problems = validate_analysis(json.loads(path.read_text("utf-8")), cluster)
+        _, problems = validate_analysis(payload, cluster)
         if problems:
             invalid.append((path.stem, problems))
             continue
@@ -290,7 +292,7 @@ def _write(path: Path, text: str) -> bool:
     if path.exists() and path.read_text(encoding="utf-8") == text:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
     return True
 
 

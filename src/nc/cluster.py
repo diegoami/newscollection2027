@@ -264,7 +264,7 @@ import yaml
 from nc.embed import DEFAULT_VECTORS_DB_PATH, load_embed_config, load_vectors
 from nc.feeds import Item
 from nc.promo import DEFAULT_PROMO_CONFIG_PATH, PromoRules, load_promo_rules, partition
-from nc.store import DataRoot, latest_by_id, read_items_since
+from nc.store import DataRoot, latest_by_id, read_items_since, write_text
 
 DEFAULT_CLUSTER_CONFIG_PATH = Path("config/cluster.yaml")
 
@@ -1067,7 +1067,7 @@ def _write_if_changed(path: Path, text: str) -> bool:
     if path.exists() and path.read_text(encoding="utf-8") == text:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
     return True
 
 

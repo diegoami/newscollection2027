@@ -103,6 +103,32 @@ class DataRoot:
         return self.items_dir() / year / month / f"{day}.jsonl"
 
 
+def write_text(path: Path, text: str) -> None:
+    """Write `text` as bytes, exactly.
+
+    `Path.write_text` opens in text mode, and text mode on Windows
+    translates every `\n` into `\r\n`. Byte-stability is load-bearing
+    here -- unchanged data must produce no git diff, `nc build` must
+    write no file, `gh-pages` must get no commit -- and on Windows every
+    run rewrote every file with different bytes, defeating all three.
+    CI is Linux and cannot see it; `make check` on a Windows checkout
+    could, and failed.
+
+    `newline=""` turns the translation off, so one `\n` in the string is
+    one `\n` on disk on every platform. Every writer in this package
+    goes through here or `append_line` rather than `Path.write_text`.
+    """
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+
+
+def append_line(path: Path, line: str) -> None:
+    """One line onto the end of a file, LF-terminated. See `write_text`."""
+    with path.open("a", encoding="utf-8", newline="") as fh:
+        fh.write(line)
+        fh.write("\n")
+
+
 @dataclass(frozen=True)
 class AppendResult:
     added: int
@@ -190,7 +216,7 @@ def append_items(data_root: DataRoot, items: Iterable[Item]) -> AppendResult:
         if not new_items:
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
+        with path.open("a", encoding="utf-8", newline="") as fh:
             for item in new_items:
                 fh.write(_dumps(item))
                 fh.write("\n")

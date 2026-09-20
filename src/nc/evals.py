@@ -51,7 +51,7 @@ from typing import Any
 
 from nc.cluster import STATUS_PENDING, Cluster, ClusterItem, cluster_from_dict, render
 from nc.contract import Analysis, render_analysis, validate_analysis
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 DEFAULT_GOLDEN_DIR = Path("evals/golden")
 DEFAULT_REPORTS_DIR = Path("evals/reports")
@@ -141,9 +141,9 @@ def load_golden(directory: Path = DEFAULT_GOLDEN_DIR) -> list[GoldenCase]:
 def write_golden(case: GoldenCase, directory: Path = DEFAULT_GOLDEN_DIR) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{case.id}.json"
-    path.write_text(
+    write_text(
+        path,
         json.dumps(golden_to_dict(case), sort_keys=True, indent=2) + "\n",
-        encoding="utf-8",
     )
     return path
 
@@ -457,7 +457,7 @@ def format_eval_report(report: EvalReport) -> str:
 def write_report(report: EvalReport, directory: Path = DEFAULT_REPORTS_DIR) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{report.generated_at[:10]}-{report.backend}.md"
-    path.write_text(format_eval_report(report), encoding="utf-8")
+    write_text(path, format_eval_report(report))
     return path
 
 
@@ -531,6 +531,6 @@ def materialize(cases: list[GoldenCase], data_root: DataRoot) -> int:
             pending_path(data_root, case.cluster.id),
         ):
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+            write_text(path, text)
         written += 1
     return written

@@ -68,7 +68,7 @@ import yaml
 
 from nc.cluster import PendingPair, load_pending_pairs
 from nc.labelling import Label, load_labels
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 DEFAULT_JUDGE_CONFIG_PATH = Path("config/judge.yaml")
 
@@ -262,7 +262,7 @@ def write_judgments(data_root: DataRoot, judgments: list[Judgment]) -> int:
         path = judgment_path(data_root, judgment.pair_id)
         if path.exists():
             continue
-        path.write_text(render_judgment(judgment), encoding="utf-8")
+        write_text(path, render_judgment(judgment))
         written += 1
     return written
 

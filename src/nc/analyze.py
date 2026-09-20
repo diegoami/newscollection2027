@@ -62,7 +62,7 @@ from nc.contract import (
     validate_analysis,
     write_rejection,
 )
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 DEFAULT_ANALYZE_CONFIG_PATH = Path("config/analyze.yaml")
 DEFAULT_PROMPT_PATH = Path("prompts/analyze.md")
@@ -394,7 +394,7 @@ def run_analyze(
             first_try += 1
         path = analysis_path(data_root, cluster.id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_analysis(result.analysis), encoding="utf-8")
+        write_text(path, render_analysis(result.analysis))
         written += 1
     return AnalyzeReport(
         attempted=attempted,
@@ -449,7 +449,8 @@ def write_submission(data_root: DataRoot, submission: BatchSubmission) -> Path:
     """
     path = submission_path(data_root, submission.batch_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_text(
+        path,
         json.dumps(
             {
                 "batch_id": submission.batch_id,
@@ -459,7 +460,6 @@ def write_submission(data_root: DataRoot, submission: BatchSubmission) -> Path:
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
     return path
 
@@ -635,7 +635,7 @@ def collect_batch(
             continue
         path = analysis_path(data_root, cluster_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_analysis(analysis), encoding="utf-8")
+        write_text(path, render_analysis(analysis))
         written += 1
     return AnalyzeReport(
         attempted=attempted,

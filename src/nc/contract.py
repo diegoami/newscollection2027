@@ -74,7 +74,7 @@ from nc.cluster import (
     load_clusters,
     set_cluster_status,
 )
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 DEFAULT_SCHEMA_PATH = Path("contract/analysis.schema.json")
 
@@ -387,7 +387,8 @@ def write_rejection(
     path = rejected_path(data_root, cluster_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     moment = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if now is None else now
-    path.write_text(
+    write_text(
+        path,
         json.dumps(
             {
                 "cluster_id": cluster_id,
@@ -399,7 +400,6 @@ def write_rejection(
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
     return path
 
@@ -439,9 +439,9 @@ def _last_run(path: Path) -> float | None:
 
 def _record_run(path: Path, moment: float) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_text(
+        path,
         json.dumps({"last_run_epoch": moment}, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
 
 

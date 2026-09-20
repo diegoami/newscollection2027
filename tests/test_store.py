@@ -11,16 +11,22 @@ append of the same items -- see
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from nc.feeds import Item
 from nc.store import (
     DataRoot,
     append_items,
+    append_line,
     latest_by_id,
     read_items,
     rebuild_db,
+    write_text,
 )
 
 FETCHED_RUN_1 = "2026-09-16T15:00:00Z"
@@ -321,3 +327,96 @@ def test_latest_by_id_keeps_the_freshest_fetched_row() -> None:
 
     assert latest_by_id([newer, older, other]) == [other, newer]
     assert latest_by_id([older, newer, other]) == [other, newer]
+
+
+# --- bytes on disk, on every platform -------------------------------------
+#
+# These pin a guarantee this CI cannot observe. `Path.write_text` opens
+# in text mode, and text mode on Windows translates every "\n" into
+# "\r\n"; on Linux the bug is invisible, so a test asserting the bytes
+# come out with no "\r" passes either way. What can be checked anywhere
+# is the mechanism -- that the writers disable the translation, and that
+# nothing in the package goes around them.
+
+
+def _newline_used(write: Callable[[Path], object], path: Path) -> object:
+    """The `newline=` the writer opened `path` with.
+
+    Checked rather than inferred from the bytes, because on Linux the
+    bytes are identical either way -- the translation this guards
+    against only happens on Windows, and a test that cannot fail on CI
+    is not a guard.
+    """
+    seen: dict[str, object] = {}
+    real = Path.open
+
+    def spy(self: Path, *args: Any, **kwargs: Any) -> Any:
+        seen.update(kwargs)
+        return real(self, *args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "open", spy)
+        write(path)
+    return seen.get("newline", "<not passed>")
+
+
+def test_write_text_disables_newline_translation(tmp_path: Path) -> None:
+    path = tmp_path / "x.json"
+
+    assert _newline_used(lambda p: write_text(p, "one\ntwo\n"), path) == ""
+    assert path.read_bytes() == b"one\ntwo\n"
+
+
+def test_append_line_disables_newline_translation(tmp_path: Path) -> None:
+    path = tmp_path / "x.jsonl"
+
+    assert _newline_used(lambda p: append_line(p, "one"), path) == ""
+    append_line(path, "two")
+    assert path.read_bytes() == b"one\ntwo\n"
+
+
+def test_append_items_disables_newline_translation(tmp_path: Path) -> None:
+    """The store's own writer, which opens the file itself rather than
+    going through `append_line` (it holds one handle for a whole day's
+    batch)."""
+    root = DataRoot(tmp_path / "data")
+    item = _item("a" * 40)
+    path = root.item_file_for(item.published)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    assert _newline_used(lambda _: append_items(root, [item]), path) == ""
+    assert b"\r" not in path.read_bytes()
+
+
+def test_no_module_writes_a_pipeline_file_with_path_write_text() -> None:
+    """The regression guard. `Path.write_text` is the easy thing to
+    reach for and the one that breaks byte-stability on Windows, and no
+    Linux test can catch a new call site after the fact -- so the call
+    site itself is what is checked.
+    """
+    package = Path(__file__).resolve().parents[1] / "src" / "nc"
+    offenders = [
+        f"{path.name}:{number}"
+        for path in sorted(package.glob("*.py"))
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
+        if ".write_text(" in line
+    ]
+    assert offenders == [], (
+        "use nc.store.write_text (or append_line) instead of Path.write_text: "
+        + ", ".join(offenders)
+    )
+
+
+def test_every_writer_opens_in_binary_safe_text_mode() -> None:
+    """Same guard for the append path: an `open(..., "a")` or
+    `open(..., "w")` without `newline=""` translates on Windows too."""
+    package = Path(__file__).resolve().parents[1] / "src" / "nc"
+    offenders = [
+        f"{path.name}:{number}"
+        for path in sorted(package.glob("*.py"))
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
+        if ('.open("w"' in line or '.open("a"' in line) and "newline=" not in line
+    ]
+    assert offenders == [], 'every write-mode open needs newline="": ' + ", ".join(
+        offenders
+    )
