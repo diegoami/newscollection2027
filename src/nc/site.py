@@ -47,7 +47,7 @@ from nc import runlog
 from nc.cluster import STATUS_SUPERSEDED, Cluster, load_clusters
 from nc.contract import Analysis, analyses_dir
 from nc.stats import compute_outlet_stats
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 DEFAULT_SITE_DIR = Path("site")
 DEFAULT_TEMPLATE_DIR = Path("src/nc/templates")
@@ -200,6 +200,7 @@ class Story:
 class BuildReport:
     pages: int = 0
     stories: int = 0
+    removed: int = 0
     skipped_stale: int = 0
     skipped_invalid: list[tuple[str, list[str]]] = field(default_factory=list)
 
@@ -223,8 +224,10 @@ def publishable(
 
     for path in sorted(analyses_dir(data_root).rglob("*.json")):
         cluster = clusters.get(path.stem)
+        raw = path.read_text("utf-8")
         try:
-            analysis = Analysis.model_validate_json(path.read_text("utf-8"))
+            payload = json.loads(raw)
+            analysis = Analysis.model_validate(payload)
         except ValueError as exc:
             invalid.append((path.stem, [f"file: {exc}"]))
             continue
@@ -237,7 +240,7 @@ def publishable(
         ):
             stale += 1
             continue
-        _, problems = validate_analysis(json.loads(path.read_text("utf-8")), cluster)
+        _, problems = validate_analysis(payload, cluster)
         if problems:
             invalid.append((path.stem, problems))
             continue
@@ -289,8 +292,38 @@ def _write(path: Path, text: str) -> bool:
     if path.exists() and path.read_text(encoding="utf-8") == text:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
     return True
+
+
+def _prune(out_dir: Path, keep: set[Path]) -> int:
+    """Remove every file under `out_dir` this build did not write.
+
+    **Only current analyses are published** is this module's first
+    promise, and writing the current pages is only half of keeping it:
+    a story that went stale or was superseded left its
+    `/story/<id>/index.html` behind, still served by URL, still quoting
+    outlets against a membership that has since changed. The deploy
+    workflow appeared to handle this by emptying `gh-pages` before
+    copying `site/` in, but that only worked because a fresh CI checkout
+    has no `site/` to begin with. Any reused checkout -- a developer's
+    machine, a persistent Routine -- accumulated them.
+
+    It runs last, after every page has been written, so a build that
+    failed partway leaves the previous site intact rather than a
+    half-empty one. That is the same reason `clean` is not the default:
+    deleting first and writing after is how a deploy publishes nothing.
+    """
+    if not out_dir.exists():
+        return 0
+    removed = 0
+    for path in sorted(out_dir.rglob("*"), reverse=True):
+        if path.is_file() and path not in keep:
+            path.unlink()
+            removed += 1
+        elif path.is_dir() and not any(path.iterdir()):
+            path.rmdir()
+    return removed
 
 
 def build_site(
@@ -325,18 +358,24 @@ def build_site(
     front = [story for story in stories if story.date in dates[:FRONT_PAGE_DAYS]]
 
     pages = 0
-    pages += _write(
+    written: set[Path] = set()
+
+    def render(path: Path, text: str) -> int:
+        written.add(path)
+        return _write(path, text)
+
+    pages += render(
         out_dir / "index.html",
         env.get_template("index.html").render(
             stories=front, stats=stats, dates=dates, total=len(stories)
         ),
     )
-    pages += _write(out_dir / "style.css", env.get_template("style.css").render())
-    pages += _write(
+    pages += render(out_dir / "style.css", env.get_template("style.css").render())
+    pages += render(
         out_dir / "method" / "index.html",
         env.get_template("method.html").render(stats=stats, total=len(stories)),
     )
-    pages += _write(
+    pages += render(
         out_dir / "status" / "index.html",
         env.get_template("status.html").render(
             runs=history,
@@ -347,19 +386,19 @@ def build_site(
         ),
     )
     for story in stories:
-        pages += _write(
+        pages += render(
             out_dir / "story" / story.id / "index.html",
             env.get_template("story.html").render(story=story),
         )
     for entry in stats:
-        pages += _write(
+        pages += render(
             out_dir / "outlet" / slugify(entry.outlet) / "index.html",
             env.get_template("outlet.html").render(
                 entry=entry, stories=by_outlet.get(entry.outlet, [])
             ),
         )
     for date in dates:
-        pages += _write(
+        pages += render(
             out_dir / "archive" / date / "index.html",
             env.get_template("archive.html").render(
                 date=date, stories=by_date[date], dates=dates
@@ -369,6 +408,7 @@ def build_site(
     return BuildReport(
         pages=pages,
         stories=len(stories),
+        removed=_prune(out_dir, written),
         skipped_stale=stale,
         skipped_invalid=invalid,
     )
@@ -387,6 +427,8 @@ def format_build_report(report: BuildReport, out_dir: Path) -> str:
         f"build: {report.stories} story page(s), {report.pages} file(s) "
         f"written to {out_dir}"
     ]
+    if report.removed:
+        lines.append(f"build: {report.removed} file(s) removed, no longer published")
     if report.skipped_stale:
         lines.append(
             f"build: {report.skipped_stale} analysis file(s) skipped as stale "

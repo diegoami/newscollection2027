@@ -72,17 +72,34 @@ def _ingest(args: argparse.Namespace) -> int:
 
     fetched = feeds.utc_now_iso()
     items: list[feeds.Item] = []
+    unusable = 0
+    failed: list[str] = []
     for outlet in outlets:
-        parsed = feedparser.parse(outlet.feed_url, agent=thresholds.user_agent)
-        items.extend(
-            feeds.normalize_entries(
+        # One outlet's feed being down, malformed, or slow must not cost
+        # the other ten their run: the schedule is three-hourly and
+        # unattended, and feeds only expose their last 10 to 30 entries.
+        try:
+            parsed = feedparser.parse(outlet.feed_url, agent=thresholds.user_agent)
+            normalized = feeds.normalize_feed(
                 outlet, parsed, fetched, normalize_config.lede_word_cap
             )
-        )
+        except Exception as exc:  # noqa: BLE001 -- untrusted input and network
+            failed.append(f"{outlet.slug}: {exc}")
+            continue
+        items.extend(normalized.items)
+        unusable += normalized.skipped
 
     result = store.append_items(data_root, items)
     print(f"ingest: {result.added} new item(s), {result.skipped} already stored")
-    return 0
+    if unusable:
+        print(f"ingest: {unusable} entr(y/ies) skipped as unusable")
+    for failure in failed:
+        print(f"ingest: feed failed -- {failure}")
+    # A run where every feed failed is a failed run, and the workflow
+    # opens an issue on a non-zero exit (T52). A run where some feeds
+    # worked is a run: the next one is three hours away and the feeds
+    # overlap.
+    return 1 if failed and not items else 0
 
 
 def _embed(args: argparse.Namespace) -> int:
@@ -285,10 +302,10 @@ def _eval(args: argparse.Namespace) -> int:
         schema = analyze.response_schema()
         produced: dict[str, contract.Analysis | None] = {}
         for case in cases:
-            analysis, _, _ = analyze.analyze_cluster(
+            result = analyze.analyze_cluster(
                 case.cluster, backend, config, prompt, schema
             )
-            produced[case.id] = analysis
+            produced[case.id] = result.analysis
         model = config.model
     else:
         produced = evals.load_analyses_from_files(data_root, cases)

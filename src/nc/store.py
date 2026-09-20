@@ -89,12 +89,44 @@ class DataRoot:
     def items_dir(self) -> Path:
         return self.path / "items"
 
+    def batches_dir(self) -> Path:
+        """`batches/<batch id>.json`: what a `nc analyze --batch`
+        submission sent, so the collect hours later can tell whether the
+        clusters still look the way they did. See `nc.analyze`."""
+        return self.path / "batches"
+
     def item_file_for(self, published: str) -> Path:
         """`items/YYYY/MM/DD.jsonl` for an item whose `published` is
         `published`. `published` is ISO 8601 UTC (`nc.feeds.Item`), so
         its first 10 characters are always `YYYY-MM-DD`."""
         year, month, day = published[:10].split("-")
         return self.items_dir() / year / month / f"{day}.jsonl"
+
+
+def write_text(path: Path, text: str) -> None:
+    """Write `text` as bytes, exactly.
+
+    `Path.write_text` opens in text mode, and text mode on Windows
+    translates every `\n` into `\r\n`. Byte-stability is load-bearing
+    here -- unchanged data must produce no git diff, `nc build` must
+    write no file, `gh-pages` must get no commit -- and on Windows every
+    run rewrote every file with different bytes, defeating all three.
+    CI is Linux and cannot see it; `make check` on a Windows checkout
+    could, and failed.
+
+    `newline=""` turns the translation off, so one `\n` in the string is
+    one `\n` on disk on every platform. Every writer in this package
+    goes through here or `append_line` rather than `Path.write_text`.
+    """
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+
+
+def append_line(path: Path, line: str) -> None:
+    """One line onto the end of a file, LF-terminated. See `write_text`."""
+    with path.open("a", encoding="utf-8", newline="") as fh:
+        fh.write(line)
+        fh.write("\n")
 
 
 @dataclass(frozen=True)
@@ -184,7 +216,7 @@ def append_items(data_root: DataRoot, items: Iterable[Item]) -> AppendResult:
         if not new_items:
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
+        with path.open("a", encoding="utf-8", newline="") as fh:
             for item in new_items:
                 fh.write(_dumps(item))
                 fh.write("\n")
@@ -204,7 +236,14 @@ def _read_item_file(path: Path) -> list[Item]:
 
 
 def read_items(data_root: DataRoot) -> Iterator[Item]:
-    """Every stored item, in a deterministic (file path, then id) order."""
+    """Every stored *row*, in a deterministic (file path, then id) order.
+
+    Rows, not items: one id can appear in two day files. The store
+    deduplicates within a day file and files by `published`, so an
+    outlet that re-publishes an article under a new date leaves the same
+    id in two places. Callers that need one row per id -- anything
+    keying on the id -- want `latest_by_id`.
+    """
     items_dir = data_root.items_dir()
     if not items_dir.exists():
         return
@@ -235,6 +274,32 @@ def read_items_since(data_root: DataRoot, start_date: str) -> Iterator[Item]:
         yield from _read_item_file(path)
 
 
+def latest_by_id(items: Iterable[Item]) -> list[Item]:
+    """One row per item id, the most recently fetched one.
+
+    The store is append-only and deduplicates only within a day file, so
+    an outlet that re-publishes an article -- same id, new `published`
+    -- leaves two rows in two different files. Found on the live data:
+    BBC's "Why are there concerns AI could threaten humanity" sat in
+    both `2026/09/14.jsonl` and `2026/09/17.jsonl`.
+
+    The freshest row wins because that is what the outlet is currently
+    publishing; ties break on `published` then id so the choice never
+    depends on file order. `nc.cluster` applies the same rule to its
+    four-day window, and this is the one definition both use: a
+    duplicate that two callers resolve differently is two stores.
+    """
+    latest: dict[str, Item] = {}
+    for item in items:
+        current = latest.get(item.id)
+        if current is None or (item.fetched, item.published) >= (
+            current.fetched,
+            current.published,
+        ):
+            latest[item.id] = item
+    return sorted(latest.values(), key=lambda item: (item.published, item.id))
+
+
 _SCHEMA = """
 CREATE TABLE items (
     id TEXT PRIMARY KEY,
@@ -255,6 +320,13 @@ def rebuild_db(data_root: DataRoot, db_path: Path = DEFAULT_DB_PATH) -> int:
 
     Always starts from an empty database: the cache holds no state of
     its own (CLAUDE.md), so "rebuild" means exactly that, not "upsert".
+
+    One row per id, the freshest fetched (`latest_by_id`). `items.id` is
+    the primary key, and the store can hold the same id in two day
+    files, so inserting every row raised `IntegrityError` and failed the
+    one documented way to rebuild the cache. Resolving the duplicate
+    here rather than letting the insert order decide means the cache
+    holds the row `nc cluster` would have used.
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
@@ -264,7 +336,7 @@ def rebuild_db(data_root: DataRoot, db_path: Path = DEFAULT_DB_PATH) -> int:
     try:
         conn.execute(_SCHEMA)
         count = 0
-        for item in read_items(data_root):
+        for item in latest_by_id(read_items(data_root)):
             conn.execute(
                 "INSERT INTO items "
                 "(id, outlet, url, title, lede, author, published, fetched, tags) "

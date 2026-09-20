@@ -100,7 +100,7 @@ from typing import TYPE_CHECKING, Protocol
 import yaml
 
 from nc.feeds import Item
-from nc.store import DataRoot, read_items
+from nc.store import DataRoot, latest_by_id, read_items
 
 if TYPE_CHECKING:
     from model2vec import StaticModel
@@ -399,7 +399,11 @@ def embed_items(
                 "SELECT item_id FROM vectors WHERE model_id = ?", (model_id,)
             ).fetchall()
         }
-        items = list(read_items(data_root))
+        # `latest_by_id` rather than every row: a duplicated id would
+        # otherwise be embedded twice, and `INSERT OR REPLACE` means the
+        # second call's only effect is to overwrite the first. The
+        # output was already right; the model work was wasted.
+        items = latest_by_id(read_items(data_root))
         pending = [item for item in items if item.id not in existing_ids]
 
         step = max(batch_size, 1)

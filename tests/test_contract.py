@@ -690,3 +690,62 @@ def test_the_shipped_prompt_states_the_rules_the_validator_enforces() -> None:
     prompt = Path("prompts/analyze.md").read_text(encoding="utf-8")
     for needle in ("verbatim", "15 WORDS", "80 WORDS", "at least two", "item_id"):
         assert needle in prompt, needle
+
+
+# --- a misfiled analysis --------------------------------------------------
+
+
+def test_a_misfiled_analysis_cannot_retire_the_cluster_it_names(
+    tmp_path: Path,
+) -> None:
+    """`run_validate` keys the status update on the *filename*, and that
+    is deliberate.
+
+    An analysis whose embedded `cluster_id` disagrees with its filename
+    is rejected outright -- `check_against_cluster` compares the two and
+    returns on the mismatch before anything else -- so no analysis can
+    ever be marked analyzed against a cluster it does not name. What the
+    filename decides is only which cluster goes *back on the queue*, and
+    the file-named one is the right answer there: its analysis slot was
+    occupied and has just been emptied.
+
+    Keying the status on `analysis.cluster_id` instead would be the
+    actual bug: it would requeue the cluster the file claims while
+    leaving the file-named one marked `analyzed` with no analysis on
+    disk at all.
+    """
+    data_root = DataRoot(tmp_path / "data")
+    # `occupant` starts *analyzed*, so the requeue is a real transition
+    # rather than a no-op: asserting `pending` against a cluster that
+    # was already pending would pass with the requeue deleted.
+    occupant = _cluster(status=STATUS_ANALYZED)
+    claimed = _cluster(id="2026-09-17-def456", status=STATUS_ANALYZED)
+    _write_cluster(data_root, occupant)
+    _write_cluster(data_root, claimed)
+
+    # An analysis for `claimed`, written into `occupant`'s filename.
+    path = analysis_path(data_root, occupant.id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(_analysis(cluster_id=claimed.id)), encoding="utf-8")
+
+    report = run_validate(data_root, state_path=tmp_path / "state.json")
+
+    assert report.valid == 0
+    assert [cluster_id for cluster_id, _ in report.rejected] == [occupant.id]
+    assert not path.exists()
+
+    # The cluster whose slot was emptied is back on the queue.
+    assert report.requeued == 1
+    assert _status(data_root, occupant) == STATUS_PENDING
+    # The cluster the file merely *claimed* is untouched: nothing has
+    # validly analysed it, and nothing here pretended otherwise.
+    assert _status(data_root, claimed) == STATUS_ANALYZED
+
+
+def _status(data_root: DataRoot, cluster: Cluster) -> str:
+    stored = json.loads(
+        data_root.resolve("clusters", cluster.date, f"{cluster.id}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    return str(stored["status"])

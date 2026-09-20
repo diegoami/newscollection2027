@@ -711,8 +711,17 @@ def _embed(
 
 
 def _snapshot(root: Path) -> dict[str, tuple[str, float]]:
+    """Keys are posix-style relative paths on every platform.
+
+    `str(path.relative_to(root))` gives `label-sample\\x.json` on
+    Windows, so the `startswith("label-sample/")` filters below matched
+    nothing there. One test then failed and the other -- comparing two
+    empty dicts -- passed *vacuously*, which is the worse of the two: it
+    silently checked nothing about label-sample stability on that
+    platform.
+    """
     return {
-        str(path.relative_to(root)): (path.read_text(), path.stat().st_mtime)
+        path.relative_to(root).as_posix(): (path.read_text(), path.stat().st_mtime)
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }

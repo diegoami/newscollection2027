@@ -59,7 +59,7 @@ from pathlib import Path
 from nc.embed import EmbeddingBackend, embed_text
 from nc.feeds import Item
 from nc.labelling import Label, load_labels
-from nc.store import DataRoot, read_items
+from nc.store import DataRoot, latest_by_id, read_items
 
 
 @dataclass(frozen=True)
@@ -200,8 +200,17 @@ def measure(
 def bench_model(
     data_root: DataRoot, model_id: str, backend: EmbeddingBackend
 ) -> BenchResult:
-    """Score every labelled pair with `backend` and measure it."""
-    items = {item.id: item for item in read_items(data_root)}
+    """Score every labelled pair with `backend` and measure it.
+
+    `latest_by_id`, not a dict comprehension over the rows: the store
+    can hold one id in two day files, and a comprehension's winner is
+    whichever row comes last in (file, id) order rather than the
+    freshest fetched. An outlet that re-published an article under a new
+    date would otherwise be benchmarked against its older text -- and it
+    happens with the headline changed, so the two are not
+    interchangeable.
+    """
+    items = {item.id: item for item in latest_by_id(read_items(data_root))}
     scored, skipped = score_labels(load_labels(data_root), items, backend)
     return measure(model_id, scored, skipped)
 

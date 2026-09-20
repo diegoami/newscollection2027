@@ -52,7 +52,7 @@ from pathlib import Path
 from nc.cluster import load_clusters, pending_clusters
 from nc.contract import analyses_dir, rejected_dir
 from nc.judge import judgments_dir, unjudged_pairs
-from nc.store import DataRoot
+from nc.store import DataRoot, write_text
 
 # Beside `.cache/nc.sqlite` and `.cache/validate-state.json`: derived
 # state about a run, never committed.
@@ -142,7 +142,8 @@ def start(path: Path | None = None, now: datetime | None = None) -> datetime:
     path = journal_path() if path is None else path
     moment = datetime.now(UTC) if now is None else now
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_text(
+        path,
         json.dumps(
             {
                 "started_at": iso(moment),
@@ -153,7 +154,6 @@ def start(path: Path | None = None, now: datetime | None = None) -> datetime:
             sort_keys=True,
         )
         + "\n",
-        encoding="utf-8",
     )
     return moment
 
@@ -188,9 +188,7 @@ def record_step(name: str, seconds: float, ok: bool, path: Path | None = None) -
             steps = []
         steps.append({"name": name, "seconds": round(seconds, 3), "ok": ok})
         journal["steps"] = steps
-        path.write_text(
-            json.dumps(journal, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        write_text(path, json.dumps(journal, indent=2, sort_keys=True) + "\n")
     except OSError:
         return
 
@@ -254,7 +252,7 @@ def _written_since(data_root: DataRoot, since: float | None) -> int | None:
     return sum(1 for path in directory.rglob("*.json") if path.stat().st_mtime >= since)
 
 
-def count(data_root: DataRoot, date: str, since: float | None = None) -> RunCounts:
+def count(data_root: DataRoot, since: float | None = None) -> RunCounts:
     """Recompute every number from the data root. See the module
     docstring: nothing here is taken on the agent's word."""
     return RunCounts(
@@ -295,7 +293,7 @@ def build_run(
     started_raw = entries.get("started_at")
     started_at = started_raw if isinstance(started_raw, str) else None
     epoch = entries.get("started_epoch")
-    counts = count(data_root, date, epoch if isinstance(epoch, int | float) else None)
+    counts = count(data_root, epoch if isinstance(epoch, int | float) else None)
     duration = (
         round(moment.timestamp() - float(epoch), 3)
         if isinstance(epoch, int | float)
@@ -337,9 +335,10 @@ def render_run(run: Run) -> str:
     """Byte-stable, like every other file this project writes: the run
     record is committed to the data repo, and a re-render that reordered
     keys would be a diff saying nothing."""
-    payload = asdict(run)
-    payload["steps"] = [asdict(step) for step in run.steps]
-    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    # `asdict` already recurses into the `Step` dataclasses, so
+    # re-converting them was a no-op that read as though it were doing
+    # something.
+    return json.dumps(asdict(run), indent=2, sort_keys=True) + "\n"
 
 
 def write_run(data_root: DataRoot, run: Run) -> Path | None:
@@ -367,7 +366,7 @@ def write_run(data_root: DataRoot, run: Run) -> Path | None:
         if existing is not None and existing.duration_seconds is not None:
             return None
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_run(run), encoding="utf-8")
+    write_text(path, render_run(run))
     return path
 
 

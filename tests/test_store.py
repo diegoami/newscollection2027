@@ -10,11 +10,25 @@ append of the same items -- see
 
 from __future__ import annotations
 
+import re
 import sqlite3
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from nc.feeds import Item
-from nc.store import DataRoot, append_items, read_items, rebuild_db
+from nc.store import (
+    DataRoot,
+    append_items,
+    append_line,
+    latest_by_id,
+    read_items,
+    rebuild_db,
+    write_text,
+)
 
 FETCHED_RUN_1 = "2026-09-16T15:00:00Z"
 FETCHED_RUN_2 = "2026-09-16T18:00:00Z"
@@ -269,3 +283,186 @@ def test_rebuild_db_is_a_full_rebuild_not_an_upsert(tmp_path: Path) -> None:
     finally:
         conn.close()
     assert [row[0] for row in rows] == ["b" * 40]
+
+
+# --- the same id in two day files -----------------------------------------
+
+
+def test_rebuild_db_survives_one_id_filed_under_two_dates(tmp_path: Path) -> None:
+    """`append_items` only checks the target day file, so an outlet that
+    re-publishes an article under a new `published` leaves the same id in
+    two files. `items.id` is the primary key, so inserting both rows
+    raised IntegrityError and `nc db rebuild` -- the one documented way
+    to rebuild the cache -- failed on real data.
+    """
+    root = DataRoot(tmp_path / "data")
+    item_id = "a" * 40
+    first = _item(item_id, published="2026-09-14T10:00:00Z")
+    republished = replace(
+        first, published="2026-09-17T10:00:00Z", fetched="2026-09-17T11:00:00Z"
+    )
+    append_items(root, [first])
+    append_items(root, [republished])
+
+    # Two rows on disk, in two files: that is the store working as built.
+    assert len(list(read_items(root))) == 2
+
+    count = rebuild_db(root, tmp_path / "nc.sqlite")
+
+    assert count == 1
+    conn = sqlite3.connect(tmp_path / "nc.sqlite")
+    try:
+        rows = conn.execute("SELECT id, published FROM items").fetchall()
+    finally:
+        conn.close()
+    # The freshest fetched row wins, the same one `nc cluster` uses.
+    assert rows == [(item_id, "2026-09-17T10:00:00Z")]
+
+
+def test_latest_by_id_keeps_the_freshest_fetched_row() -> None:
+    older = _item("a" * 40, published="2026-09-14T10:00:00Z")
+    newer = replace(
+        older, published="2026-09-17T10:00:00Z", fetched="2026-09-17T11:00:00Z"
+    )
+    other = _item("b" * 40, published="2026-09-15T10:00:00Z")
+
+    assert latest_by_id([newer, older, other]) == [other, newer]
+    assert latest_by_id([older, newer, other]) == [other, newer]
+
+
+# --- bytes on disk, on every platform -------------------------------------
+#
+# These pin a guarantee this CI cannot observe. `Path.write_text` opens
+# in text mode, and text mode on Windows translates every "\n" into
+# "\r\n"; on Linux the bug is invisible, so a test asserting the bytes
+# come out with no "\r" passes either way. What can be checked anywhere
+# is the mechanism -- that the writers disable the translation, and that
+# nothing in the package goes around them.
+
+
+def _newline_used(write: Callable[[Path], object], path: Path) -> object:
+    """The `newline=` the writer opened `path` with.
+
+    Checked rather than inferred from the bytes, because on Linux the
+    bytes are identical either way -- the translation this guards
+    against only happens on Windows, and a test that cannot fail on CI
+    is not a guard.
+    """
+    seen: dict[str, object] = {}
+    real = Path.open
+
+    def spy(self: Path, *args: Any, **kwargs: Any) -> Any:
+        seen.update(kwargs)
+        return real(self, *args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "open", spy)
+        write(path)
+    return seen.get("newline", "<not passed>")
+
+
+def test_write_text_disables_newline_translation(tmp_path: Path) -> None:
+    path = tmp_path / "x.json"
+
+    assert _newline_used(lambda p: write_text(p, "one\ntwo\n"), path) == ""
+    assert path.read_bytes() == b"one\ntwo\n"
+
+
+def test_append_line_disables_newline_translation(tmp_path: Path) -> None:
+    path = tmp_path / "x.jsonl"
+
+    assert _newline_used(lambda p: append_line(p, "one"), path) == ""
+    append_line(path, "two")
+    assert path.read_bytes() == b"one\ntwo\n"
+
+
+def test_append_items_disables_newline_translation(tmp_path: Path) -> None:
+    """The store's own writer, which opens the file itself rather than
+    going through `append_line` (it holds one handle for a whole day's
+    batch)."""
+    root = DataRoot(tmp_path / "data")
+    item = _item("a" * 40)
+    path = root.item_file_for(item.published)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    assert _newline_used(lambda _: append_items(root, [item]), path) == ""
+    assert b"\r" not in path.read_bytes()
+
+
+def test_no_module_writes_a_pipeline_file_with_path_write_text() -> None:
+    """The regression guard. `Path.write_text` is the easy thing to
+    reach for and the one that breaks byte-stability on Windows, and no
+    Linux test can catch a new call site after the fact -- so the call
+    site itself is what is checked.
+    """
+    package = Path(__file__).resolve().parents[1] / "src" / "nc"
+    offenders = [
+        f"{path.name}:{number}"
+        for path in sorted(package.glob("*.py"))
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
+        if ".write_text(" in line
+    ]
+    assert offenders == [], (
+        "use nc.store.write_text (or append_line) instead of Path.write_text: "
+        + ", ".join(offenders)
+    )
+
+
+# `path.open("w")`, `open(path, "a")`, `io.open(f, mode="wt")` -- any
+# write- or append-mode text open, however it is spelled. Binary modes
+# are excluded because binary never translates; `newline=` on the same
+# line is what clears it.
+#
+# A heuristic over source text, not a parser: it sees one line at a
+# time, so a call split across lines with the mode on its own line, or a
+# mode held in a variable, slips past. That is a deliberate floor rather
+# than a ceiling -- it catches the forms anyone actually writes, and the
+# test below pins which those are, because a guard nobody has seen fail
+# is a guard nobody knows works.
+_WRITE_OPEN = re.compile(r"""\bopen\(\s*[^)]*?["'][wax]t?\+?["']""")
+
+
+def _write_mode_opens_without_newline(source: str) -> list[int]:
+    return [
+        number
+        for number, line in enumerate(source.split("\n"), 1)
+        if _WRITE_OPEN.search(line) and "newline=" not in line
+    ]
+
+
+def test_the_write_mode_detector_catches_what_it_claims_to() -> None:
+    for line in [
+        'path.open("w", encoding="utf-8")',
+        "path.open('a', encoding='utf-8')",
+        'open(path, "w")',
+        'with open(name, "at") as fh:',
+        'io.open(path, mode="w", encoding="utf-8")',
+    ]:
+        assert _write_mode_opens_without_newline(line) == [1], line
+
+    for line in [
+        'path.open("r", encoding="utf-8")',
+        'path.open("rb")',
+        'open(path, "wb")',  # binary never translates
+        'path.open("w", encoding="utf-8", newline="")',
+        'open(path, "a", newline="")',
+    ]:
+        assert _write_mode_opens_without_newline(line) == [], line
+
+
+def test_every_writer_opens_in_binary_safe_text_mode() -> None:
+    """A write- or append-mode text open without `newline=""` translates
+    on Windows. Covers the builtin `open(path, "w")` as well as
+    `Path.open` -- both are things a new writer would reach for, and the
+    first form used to slip past this guard entirely."""
+    package = Path(__file__).resolve().parents[1] / "src" / "nc"
+    offenders = [
+        f"{path.name}:{number}"
+        for path in sorted(package.glob("*.py"))
+        for number in _write_mode_opens_without_newline(
+            path.read_text(encoding="utf-8")
+        )
+    ]
+    assert offenders == [], 'every write-mode open needs newline="": ' + ", ".join(
+        offenders
+    )

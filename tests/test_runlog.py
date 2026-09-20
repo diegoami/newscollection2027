@@ -77,7 +77,7 @@ def test_the_counts_are_read_off_the_disk(tmp_path: Path) -> None:
     _touch(data_root.resolve("analyses", "2026-09-17", "2026-09-17-cccccc.json"))
     _touch(data_root.resolve("rejected", "2026-09-18-dddddd.json"))
 
-    counts = runlog.count(data_root, "2026-09-18")
+    counts = runlog.count(data_root)
 
     # No `since`, so how many were written *this run* is unknown -- see
     # test_analyses_are_counted_by_when_they_were_written.

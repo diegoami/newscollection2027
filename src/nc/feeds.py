@@ -25,7 +25,7 @@ from html import unescape
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 
 import feedparser
 import yaml
@@ -283,12 +283,29 @@ class NormalizeConfig:
     lede_word_cap: int
 
 
+def _port(parts: SplitResult) -> int | None:
+    """The link's port, or None when it does not have a usable one.
+
+    `SplitResult.port` raises `ValueError` on a non-numeric port --
+    `http://host:abc/` is enough. Feeds are untrusted input and this is
+    called once per entry, so that exception reached all the way out of
+    an unattended `nc ingest` and stopped the run for every outlet over
+    one bad link in one feed. A port we cannot parse is a port we drop;
+    the rest of the url still canonicalizes, and the item is still
+    identified.
+    """
+    try:
+        return parts.port
+    except ValueError:
+        return None
+
+
 def canonical_url(url: str) -> str:
     """Canonical form of an item link -- see the rules above this section."""
     parts = urlsplit(url)
     scheme = parts.scheme.lower()
     hostname = (parts.hostname or "").lower()
-    port = parts.port
+    port = _port(parts)
     if port == _DEFAULT_PORTS.get(scheme):
         port = None
     netloc = hostname if port is None else f"{hostname}:{port}"
@@ -386,15 +403,54 @@ def normalize_entry(
     )
 
 
+@dataclass(frozen=True)
+class NormalizeResult:
+    """What one feed's entries yielded, and how many were unusable."""
+
+    items: list[Item]
+    skipped: int = 0
+
+
+def normalize_feed(
+    outlet: Outlet, parsed: Any, fetched: str, lede_word_cap: int
+) -> NormalizeResult:
+    """Every entry of one parsed feed -> `Item`s, plus a count of the
+    ones that could not be turned into any.
+
+    **One bad entry never stops the feed, and one bad feed never stops
+    the run.** Feeds are untrusted input arriving on an unattended
+    three-hourly schedule, and everything in `normalize_entry` -- url
+    parsing, date parsing, whatever feedparser hands back for a field --
+    is working on whatever an outlet's CMS emitted. A single entry that
+    raises used to abort `nc ingest` for all eleven outlets; the run
+    that skips it loses one article, and the next run of a
+    ten-to-thirty-entry feed picks it up again anyway.
+
+    Skips are counted and reported rather than swallowed: a feed that
+    quietly yields nothing looks exactly like a feed with no news, and
+    that is the failure no alert on a crash would ever catch.
+    """
+    items: list[Item] = []
+    skipped = 0
+    for entry in parsed.entries:
+        try:
+            item = normalize_entry(outlet, entry, fetched, lede_word_cap)
+        except Exception:  # noqa: BLE001 -- untrusted input, see the docstring
+            skipped += 1
+            continue
+        if item is None:
+            skipped += 1
+            continue
+        items.append(item)
+    return NormalizeResult(items=items, skipped=skipped)
+
+
 def normalize_entries(
     outlet: Outlet, parsed: Any, fetched: str, lede_word_cap: int
 ) -> list[Item]:
-    """Every entry of one parsed feed -> `Item`s, dropping unidentifiable ones."""
-    items = (
-        normalize_entry(outlet, entry, fetched, lede_word_cap)
-        for entry in parsed.entries
-    )
-    return [item for item in items if item is not None]
+    """`normalize_feed`'s items alone, for callers that do not need the
+    skip count."""
+    return normalize_feed(outlet, parsed, fetched, lede_word_cap).items
 
 
 def load_outlets(path: Path = DEFAULT_OUTLETS_PATH) -> list[Outlet]:

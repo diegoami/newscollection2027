@@ -120,7 +120,12 @@ jobs:
       # The working tree is emptied and refilled from `site/` so that a
       # page that stopped being published is deleted rather than left
       # behind for a reader to find; `git add -A` then stages the
-      # deletions too.
+      # deletions too. That is belt and braces now rather than the whole
+      # belt: `nc build` prunes its own output directory, so a page that
+      # stopped being current is already gone from `site/`. It used to
+      # be the only thing removing them, and it only worked here because
+      # a fresh CI checkout has no `site/` -- on any reused checkout the
+      # old pages stayed.
       #
       # It commits only when something actually differs, which is what
       # nc.site's byte-stable output is for: a rebuild that found nothing

@@ -69,7 +69,7 @@ from pathlib import Path
 
 from nc.cluster import ClusterConfig, PendingPair, load_label_sample, load_pending_pairs
 from nc.promo import DEFAULT_PROMO_CONFIG_PATH, PromoRules, load_promo_rules
-from nc.store import DataRoot
+from nc.store import DataRoot, append_line
 
 # nc.cluster._TIME_FORMAT is private to that module; labels are a
 # different file with their own timestamp field, so this is its own
@@ -176,9 +176,7 @@ def append_label(data_root: DataRoot, label: Label) -> None:
     same append-only shape as `nc.store.append_items`."""
     path = labels_path(data_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(label.to_dict(), sort_keys=True, ensure_ascii=True))
-        fh.write("\n")
+    append_line(path, json.dumps(label.to_dict(), sort_keys=True, ensure_ascii=True))
 
 
 # --- ordering -----------------------------------------------------------
