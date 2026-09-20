@@ -11,6 +11,8 @@ proven separately by `.github/workflows/embed-check.yml`.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -420,3 +422,40 @@ def test_bench_never_reads_the_stored_label_score(tmp_path: Path) -> None:
     scored, _ = score_labels([nonsense], items, HashBackend(dim=8))
     assert scored[0][0] != -99.0
     assert -1.0 <= scored[0][0] <= 1.0
+
+
+# --- the same id in two day files -----------------------------------------
+
+
+def test_embed_items_does_not_embed_a_duplicated_id_twice(tmp_path: Path) -> None:
+    """The store can hold one id in two day files (an outlet
+    re-publishing under a new date). `INSERT OR REPLACE` meant the
+    second embedding's only effect was to overwrite the first: the
+    output was right, the model work was wasted."""
+    root = DataRoot(tmp_path / "data")
+    db_path = tmp_path / "cache" / "vectors.sqlite"
+    first = _item("a" * 40)
+    republished = replace(
+        first, published="2026-09-19T10:00:00Z", fetched="2026-09-19T11:00:00Z"
+    )
+    append_items(root, [first])
+    append_items(root, [republished])
+
+    backend = _CountingBackend()
+    result = embed_items(root, backend, MODEL_ID, db_path, batch_size=10)
+
+    assert result.embedded == 1
+    assert backend.texts_seen == 1
+    assert stored_item_ids(MODEL_ID, db_path) == {"a" * 40}
+
+
+class _CountingBackend(HashBackend):
+    """A `HashBackend` that records how many texts it was asked for."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.texts_seen = 0
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        self.texts_seen += len(texts)
+        return super().embed(texts)

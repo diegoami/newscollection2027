@@ -715,7 +715,10 @@ def test_a_misfiled_analysis_cannot_retire_the_cluster_it_names(
     disk at all.
     """
     data_root = DataRoot(tmp_path / "data")
-    occupant = _cluster()
+    # `occupant` starts *analyzed*, so the requeue is a real transition
+    # rather than a no-op: asserting `pending` against a cluster that
+    # was already pending would pass with the requeue deleted.
+    occupant = _cluster(status=STATUS_ANALYZED)
     claimed = _cluster(id="2026-09-17-def456", status=STATUS_ANALYZED)
     _write_cluster(data_root, occupant)
     _write_cluster(data_root, claimed)
@@ -732,6 +735,7 @@ def test_a_misfiled_analysis_cannot_retire_the_cluster_it_names(
     assert not path.exists()
 
     # The cluster whose slot was emptied is back on the queue.
+    assert report.requeued == 1
     assert _status(data_root, occupant) == STATUS_PENDING
     # The cluster the file merely *claimed* is untouched: nothing has
     # validly analysed it, and nothing here pretended otherwise.

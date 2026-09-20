@@ -10,6 +10,7 @@ append of the same items -- see
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import replace
@@ -407,15 +408,60 @@ def test_no_module_writes_a_pipeline_file_with_path_write_text() -> None:
     )
 
 
+# `path.open("w")`, `open(path, "a")`, `io.open(f, mode="wt")` -- any
+# write- or append-mode text open, however it is spelled. Binary modes
+# are excluded because binary never translates; `newline=` on the same
+# line is what clears it.
+#
+# A heuristic over source text, not a parser: it sees one line at a
+# time, so a call split across lines with the mode on its own line, or a
+# mode held in a variable, slips past. That is a deliberate floor rather
+# than a ceiling -- it catches the forms anyone actually writes, and the
+# test below pins which those are, because a guard nobody has seen fail
+# is a guard nobody knows works.
+_WRITE_OPEN = re.compile(r"""\bopen\(\s*[^)]*?["'][wax]t?\+?["']""")
+
+
+def _write_mode_opens_without_newline(source: str) -> list[int]:
+    return [
+        number
+        for number, line in enumerate(source.split("\n"), 1)
+        if _WRITE_OPEN.search(line) and "newline=" not in line
+    ]
+
+
+def test_the_write_mode_detector_catches_what_it_claims_to() -> None:
+    for line in [
+        'path.open("w", encoding="utf-8")',
+        "path.open('a', encoding='utf-8')",
+        'open(path, "w")',
+        'with open(name, "at") as fh:',
+        'io.open(path, mode="w", encoding="utf-8")',
+    ]:
+        assert _write_mode_opens_without_newline(line) == [1], line
+
+    for line in [
+        'path.open("r", encoding="utf-8")',
+        'path.open("rb")',
+        'open(path, "wb")',  # binary never translates
+        'path.open("w", encoding="utf-8", newline="")',
+        'open(path, "a", newline="")',
+    ]:
+        assert _write_mode_opens_without_newline(line) == [], line
+
+
 def test_every_writer_opens_in_binary_safe_text_mode() -> None:
-    """Same guard for the append path: an `open(..., "a")` or
-    `open(..., "w")` without `newline=""` translates on Windows too."""
+    """A write- or append-mode text open without `newline=""` translates
+    on Windows. Covers the builtin `open(path, "w")` as well as
+    `Path.open` -- both are things a new writer would reach for, and the
+    first form used to slip past this guard entirely."""
     package = Path(__file__).resolve().parents[1] / "src" / "nc"
     offenders = [
         f"{path.name}:{number}"
         for path in sorted(package.glob("*.py"))
-        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
-        if ('.open("w"' in line or '.open("a"' in line) and "newline=" not in line
+        for number in _write_mode_opens_without_newline(
+            path.read_text(encoding="utf-8")
+        )
     ]
     assert offenders == [], 'every write-mode open needs newline="": ' + ", ".join(
         offenders
