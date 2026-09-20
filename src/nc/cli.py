@@ -285,10 +285,10 @@ def _eval(args: argparse.Namespace) -> int:
         schema = analyze.response_schema()
         produced: dict[str, contract.Analysis | None] = {}
         for case in cases:
-            analysis, _, _ = analyze.analyze_cluster(
+            result = analyze.analyze_cluster(
                 case.cluster, backend, config, prompt, schema
             )
-            produced[case.id] = analysis
+            produced[case.id] = result.analysis
         model = config.model
     else:
         produced = evals.load_analyses_from_files(data_root, cases)

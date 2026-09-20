@@ -47,7 +47,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, NamedTuple, Protocol
 
 import yaml
 
@@ -259,11 +259,25 @@ class AnthropicBackend:
 # --- the run --------------------------------------------------------------
 
 
+def _take(limit: int | None, default: int) -> int:
+    """How many clusters this run may take.
+
+    `limit or default` read well and was wrong for one value: `--limit
+    0` is falsy, so asking for nothing silently got the config default
+    instead -- a command that spends money doing the opposite of what it
+    was told. `nc.judge` already spells this out with an explicit `is
+    None`; this is the same check in the one place both analyze paths
+    can share.
+    """
+    return default if limit is None else limit
+
+
 @dataclass(frozen=True)
 class AnalyzeReport:
     attempted: int
     written: int
     retried: int
+    first_try: int = 0
     failed: list[tuple[str, list[str]]] = field(default_factory=list)
 
     @property
@@ -271,10 +285,34 @@ class AnalyzeReport:
         """T31's acceptance criterion: the share that passed without a
         retry. Counted on first attempts only, because a backend that
         needs a second pass every time is a backend with a prompt
-        problem, however green the final number looks."""
+        problem, however green the final number looks.
+
+        **Counted, not derived.** This was `(written - retried) /
+        attempted`, which quietly assumes every retried cluster
+        eventually wrote. A cluster that failed *after* its retry is
+        counted in `retried` and not in `written`, so each one moved the
+        rate down by a whole cluster: four attempted with three clean
+        passes and one retried failure reported 0.500 instead of 0.750,
+        and a single cluster failing after a retry reported -1.000. A
+        negative rate is not a number anyone can act on, and this is the
+        one figure T31 is judged by.
+        """
         if not self.attempted:
             return 0.0
-        return (self.written - self.retried) / self.attempted
+        return self.first_try / self.attempted
+
+
+class AttemptResult(NamedTuple):
+    """What one cluster's trip through the backend produced.
+
+    `payload` is the last thing the model returned, valid or not, so the
+    caller can file a rejection with the output in it.
+    """
+
+    analysis: Analysis | None
+    problems: list[str]
+    retried: bool
+    payload: dict[str, Any] | None
 
 
 def analyze_cluster(
@@ -284,11 +322,18 @@ def analyze_cluster(
     prompt: str,
     schema: dict[str, Any],
     now: str | None = None,
-) -> tuple[Analysis | None, list[str], bool]:
-    """One cluster, one retry. `(analysis, problems, retried)`.
+) -> AttemptResult:
+    """One cluster, one retry.
 
     The five code-filled fields are stamped here rather than trusted
     from the model -- see the module docstring.
+
+    The last payload is handed back alongside the verdict so a
+    rejection can be filed with the analysis that earned it. `rejected/`
+    exists to hold the reasons *and* the output together (see
+    `nc.contract.write_rejection`); a rejection carrying only reasons
+    tells a prompt-tuning pass that something was wrong but not what the
+    model actually wrote, which is the evidence it needs.
     """
     moment = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if now is None else now
 
@@ -303,17 +348,17 @@ def analyze_cluster(
         }
 
     user = render_cluster(cluster)
-    analysis, problems = validate_analysis(
-        stamp(backend.complete(prompt, user, schema)), cluster
-    )
+    payload = stamp(backend.complete(prompt, user, schema))
+    analysis, problems = validate_analysis(payload, cluster)
     if not problems:
-        return analysis, [], False
+        return AttemptResult(analysis, [], retried=False, payload=payload)
 
     retry_user = f"{user}\n{retry_prompt(problems)}\n"
-    analysis, problems = validate_analysis(
-        stamp(backend.complete(prompt, retry_user, schema)), cluster
+    payload = stamp(backend.complete(prompt, retry_user, schema))
+    analysis, problems = validate_analysis(payload, cluster)
+    return AttemptResult(
+        analysis if not problems else None, problems, retried=True, payload=payload
     )
-    return (analysis if not problems else None), problems, True
 
 
 def run_analyze(
@@ -333,26 +378,30 @@ def run_analyze(
     """
     prompt = load_prompt(prompt_path)
     schema = response_schema(schema_path)
-    queue = pending_clusters(data_root)[: limit or config.max_clusters_per_run]
+    queue = pending_clusters(data_root)[: _take(limit, config.max_clusters_per_run)]
 
-    attempted = written = retried = 0
+    attempted = written = retried = first_try = 0
     failed: list[tuple[str, list[str]]] = []
     for cluster in queue:
         attempted += 1
-        analysis, problems, did_retry = analyze_cluster(
-            cluster, backend, config, prompt, schema, now
-        )
-        retried += did_retry
-        if analysis is None:
-            failed.append((cluster.id, problems))
-            write_rejection(data_root, cluster.id, problems, None)
+        result = analyze_cluster(cluster, backend, config, prompt, schema, now)
+        retried += result.retried
+        if result.analysis is None:
+            failed.append((cluster.id, result.problems))
+            write_rejection(data_root, cluster.id, result.problems, result.payload)
             continue
+        if not result.retried:
+            first_try += 1
         path = analysis_path(data_root, cluster.id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_analysis(analysis), encoding="utf-8")
+        path.write_text(render_analysis(result.analysis), encoding="utf-8")
         written += 1
     return AnalyzeReport(
-        attempted=attempted, written=written, retried=retried, failed=failed
+        attempted=attempted,
+        written=written,
+        retried=retried,
+        first_try=first_try,
+        failed=failed,
     )
 
 
@@ -361,7 +410,8 @@ def format_analyze_report(report: AnalyzeReport) -> str:
         f"analyze: {report.attempted} cluster(s) attempted, "
         f"{report.written} written, {len(report.failed)} failed",
         f"analyze: first-try rate {report.first_try_rate:.3f} "
-        f"({report.retried} needed a retry)",
+        f"({report.first_try} of {report.attempted} passed first time, "
+        f"{report.retried} needed a retry)",
     ]
     for cluster_id, problems in report.failed:
         lines.append(f"  {cluster_id} still invalid after one retry:")
@@ -382,6 +432,57 @@ def format_analyze_report(report: AnalyzeReport) -> str:
 class BatchSubmission:
     batch_id: str
     cluster_ids: list[str]
+    cluster_versions: dict[str, int] = field(default_factory=dict)
+
+
+def submission_path(data_root: DataRoot, batch_id: str) -> Path:
+    return data_root.batches_dir() / f"{batch_id}.json"
+
+
+def write_submission(data_root: DataRoot, submission: BatchSubmission) -> Path:
+    """Record which cluster versions went into a batch.
+
+    A batch can take 24 hours, and a cluster's membership can change in
+    that time. Nothing else on disk remembers what was sent, so without
+    this file the collect has no way to tell an analysis written for the
+    old membership from one written for the new.
+    """
+    path = submission_path(data_root, submission.batch_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "batch_id": submission.batch_id,
+                "cluster_versions": submission.cluster_versions,
+            },
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def read_submission(data_root: DataRoot, batch_id: str) -> dict[str, int] | None:
+    """The `cluster_id -> version` map a submission recorded, or None.
+
+    None means the record is missing or unreadable -- a batch submitted
+    before this file existed, or one submitted from another checkout.
+    The caller decides what to do about it; it does not get to be
+    mistaken for "every version still matches".
+    """
+    path = submission_path(data_root, batch_id)
+    if not path.exists():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    versions = raw.get("cluster_versions") if isinstance(raw, dict) else None
+    if not isinstance(versions, dict):
+        return None
+    return {str(k): int(v) for k, v in versions.items()}
 
 
 def submit_batch(
@@ -404,7 +505,7 @@ def submit_batch(
 
     prompt = load_prompt(prompt_path)
     schema = response_schema(schema_path)
-    queue = pending_clusters(data_root)[: limit or config.max_clusters_per_run]
+    queue = pending_clusters(data_root)[: _take(limit, config.max_clusters_per_run)]
 
     requests = [
         Request(
@@ -424,9 +525,45 @@ def submit_batch(
         for cluster in queue
     ]
     batch = client.messages.batches.create(requests=requests)
-    return BatchSubmission(
-        batch_id=batch.id, cluster_ids=[cluster.id for cluster in queue]
+    submission = BatchSubmission(
+        batch_id=batch.id,
+        cluster_ids=[cluster.id for cluster in queue],
+        cluster_versions={cluster.id: cluster.version for cluster in queue},
     )
+    write_submission(data_root, submission)
+    return submission
+
+
+def _batch_staleness(
+    cluster_id: str,
+    cluster: Cluster | None,
+    sent_version: int | None,
+    submitted: dict[str, int] | None,
+) -> list[str]:
+    """Whether this result still answers for the cluster that was sent.
+
+    Two ways it does not, and both are refusals rather than guesses:
+    the submission record is missing, so what was sent is unknowable;
+    or the cluster has moved to a new version since, so the analysis
+    describes a membership that is no longer the story. Re-submitting a
+    batch costs half-price tokens and a wait. Publishing a story that
+    omits an outlet that has since joined it costs the thing the site
+    is for.
+    """
+    if submitted is None:
+        return [
+            f"batch: no submission record for this batch, so the cluster "
+            f"version {cluster_id} was analysed at is unknown; re-submit it"
+        ]
+    if sent_version is None:
+        return [f"batch: {cluster_id} is not in this batch's submission record"]
+    if cluster is not None and cluster.version != sent_version:
+        return [
+            f"cluster: analysis is for version {sent_version}, cluster is at "
+            f"version {cluster.version}; its membership changed while the "
+            "batch was running"
+        ]
+    return []
 
 
 def collect_batch(
@@ -442,11 +579,22 @@ def collect_batch(
     another wait of up to 24 hours, so a rejected analysis is recorded
     in `rejected/` and left for a later run. The cluster stays on the
     queue by virtue of never having been marked analyzed.
+
+    **The version comes from the submission record, not from the
+    cluster as it is now.** Re-reading `cluster.version` at collect time
+    stamped the *current* version onto an analysis written against the
+    membership of up to a day ago: if an outlet joined the cluster in
+    the meantime, that analysis passed the validator and was published
+    as current while missing the outlet that arrived. `cluster_version`
+    is the one thing that makes a stale analysis unpublishable, so the
+    version that was sent is what it has to carry; a cluster that moved
+    is rejected here and stays on the queue.
     """
     moment = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if now is None else now
     attempted = written = 0
     failed: list[tuple[str, list[str]]] = []
     clusters = {cluster.id: cluster for cluster in pending_clusters(data_root)}
+    submitted = read_submission(data_root, batch_id)
 
     for result in client.messages.batches.results(batch_id):
         attempted += 1
@@ -462,14 +610,24 @@ def collect_batch(
             for block in result.result.message.content
             if block.type == "text"
         )
+        sent_version = None if submitted is None else submitted.get(cluster_id)
         payload = {
             **json.loads(text),
             "cluster_id": cluster_id,
-            "cluster_version": cluster.version if cluster else 0,
+            "cluster_version": (
+                sent_version
+                if sent_version is not None
+                else (cluster.version if cluster else 0)
+            ),
             "backend": BACKEND_API,
             "model": config.model,
             "generated_at": moment,
         }
+        problems = _batch_staleness(cluster_id, cluster, sent_version, submitted)
+        if problems:
+            failed.append((cluster_id, problems))
+            write_rejection(data_root, cluster_id, problems, payload)
+            continue
         analysis, problems = validate_analysis(payload, cluster)
         if problems or analysis is None:
             failed.append((cluster_id, problems))
@@ -479,4 +637,10 @@ def collect_batch(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(render_analysis(analysis), encoding="utf-8")
         written += 1
-    return AnalyzeReport(attempted=attempted, written=written, retried=0, failed=failed)
+    return AnalyzeReport(
+        attempted=attempted,
+        written=written,
+        retried=0,
+        first_try=written,
+        failed=failed,
+    )

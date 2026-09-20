@@ -264,7 +264,7 @@ import yaml
 from nc.embed import DEFAULT_VECTORS_DB_PATH, load_embed_config, load_vectors
 from nc.feeds import Item
 from nc.promo import DEFAULT_PROMO_CONFIG_PATH, PromoRules, load_promo_rules, partition
-from nc.store import DataRoot, read_items_since
+from nc.store import DataRoot, latest_by_id, read_items_since
 
 DEFAULT_CLUSTER_CONFIG_PATH = Path("config/cluster.yaml")
 
@@ -1285,27 +1285,16 @@ class RunReport:
 def _latest_by_id(items: Iterable[Item]) -> list[Item]:
     """One row per item id, the most recently fetched one.
 
-    `nc.store` is append-only and deduplicates within a day file, so an
-    outlet that re-publishes an article -- same id, new `published` --
-    leaves two rows in two different day files, and a four-day window
-    reads both. Found on the live data: BBC's "Why are there concerns AI
-    could threaten humanity" sat in both `2026/09/14.jsonl` and
-    `2026/09/17.jsonl`, and the window produced a pair of that item with
-    itself at cosine 1.0, queued for T24's judge.
-
-    The freshest row wins because that is what the outlet is currently
-    publishing; ties break on `published` then id so the choice never
-    depends on file order.
+    The rule lives in `nc.store.latest_by_id`, next to the append-only
+    writer that creates the duplicates; `nc db rebuild` needs the same
+    answer this does, and a duplicate two callers resolve differently is
+    two stores. What this window in particular needs it for: the
+    four-day read spans day files, and the live data had BBC's "Why are
+    there concerns AI could threaten humanity" in both
+    `2026/09/14.jsonl` and `2026/09/17.jsonl`, which produced a pair of
+    that item with itself at cosine 1.0, queued for T24's judge.
     """
-    latest: dict[str, Item] = {}
-    for item in items:
-        current = latest.get(item.id)
-        if current is None or (item.fetched, item.published) >= (
-            current.fetched,
-            current.published,
-        ):
-            latest[item.id] = item
-    return sorted(latest.values(), key=lambda item: (item.published, item.id))
+    return latest_by_id(items)
 
 
 def run_clustering(

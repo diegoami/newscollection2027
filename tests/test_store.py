@@ -11,10 +11,17 @@ append of the same items -- see
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 from nc.feeds import Item
-from nc.store import DataRoot, append_items, read_items, rebuild_db
+from nc.store import (
+    DataRoot,
+    append_items,
+    latest_by_id,
+    read_items,
+    rebuild_db,
+)
 
 FETCHED_RUN_1 = "2026-09-16T15:00:00Z"
 FETCHED_RUN_2 = "2026-09-16T18:00:00Z"
@@ -269,3 +276,48 @@ def test_rebuild_db_is_a_full_rebuild_not_an_upsert(tmp_path: Path) -> None:
     finally:
         conn.close()
     assert [row[0] for row in rows] == ["b" * 40]
+
+
+# --- the same id in two day files -----------------------------------------
+
+
+def test_rebuild_db_survives_one_id_filed_under_two_dates(tmp_path: Path) -> None:
+    """`append_items` only checks the target day file, so an outlet that
+    re-publishes an article under a new `published` leaves the same id in
+    two files. `items.id` is the primary key, so inserting both rows
+    raised IntegrityError and `nc db rebuild` -- the one documented way
+    to rebuild the cache -- failed on real data.
+    """
+    root = DataRoot(tmp_path / "data")
+    item_id = "a" * 40
+    first = _item(item_id, published="2026-09-14T10:00:00Z")
+    republished = replace(
+        first, published="2026-09-17T10:00:00Z", fetched="2026-09-17T11:00:00Z"
+    )
+    append_items(root, [first])
+    append_items(root, [republished])
+
+    # Two rows on disk, in two files: that is the store working as built.
+    assert len(list(read_items(root))) == 2
+
+    count = rebuild_db(root, tmp_path / "nc.sqlite")
+
+    assert count == 1
+    conn = sqlite3.connect(tmp_path / "nc.sqlite")
+    try:
+        rows = conn.execute("SELECT id, published FROM items").fetchall()
+    finally:
+        conn.close()
+    # The freshest fetched row wins, the same one `nc cluster` uses.
+    assert rows == [(item_id, "2026-09-17T10:00:00Z")]
+
+
+def test_latest_by_id_keeps_the_freshest_fetched_row() -> None:
+    older = _item("a" * 40, published="2026-09-14T10:00:00Z")
+    newer = replace(
+        older, published="2026-09-17T10:00:00Z", fetched="2026-09-17T11:00:00Z"
+    )
+    other = _item("b" * 40, published="2026-09-15T10:00:00Z")
+
+    assert latest_by_id([newer, older, other]) == [other, newer]
+    assert latest_by_id([older, newer, other]) == [other, newer]

@@ -16,7 +16,9 @@ files describing one thing.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -25,13 +27,16 @@ from nc.analyze import (
     AnalyzeConfig,
     AnalyzeReport,
     analyze_cluster,
+    collect_batch,
     format_analyze_report,
     load_analyze_config,
     load_prompt,
+    read_submission,
     render_cluster,
     response_schema,
     retry_prompt,
     run_analyze,
+    submit_batch,
 )
 from nc.cluster import STATUS_PENDING, Cluster, ClusterItem, render
 from nc.contract import analysis_path, rejected_path
@@ -203,7 +208,7 @@ def test_the_prompt_is_the_one_the_skill_reads() -> None:
 
 
 def test_the_code_stamps_the_five_fields_itself() -> None:
-    analysis, problems, retried = analyze_cluster(
+    analysis, problems, retried, _ = analyze_cluster(
         _cluster(),
         _Stub(_model_output()),
         CONFIG,
@@ -224,7 +229,7 @@ def test_the_code_stamps_the_five_fields_itself() -> None:
 def test_a_model_that_returns_the_wrong_cluster_id_cannot_win() -> None:
     """Even if the model invents one, the code's value is what is
     written -- the stamp is applied after, not merged before."""
-    analysis, problems, _ = analyze_cluster(
+    analysis, problems, _, _ = analyze_cluster(
         _cluster(),
         _Stub(_model_output(cluster_id="2026-01-01-ffffff")),
         CONFIG,
@@ -259,7 +264,7 @@ def test_a_rejected_analysis_is_retried_once_with_every_reason() -> None:
     )
     stub = _Stub(bad, _model_output())
 
-    analysis, problems, retried = analyze_cluster(
+    analysis, problems, retried, _ = analyze_cluster(
         _cluster(), stub, CONFIG, "prompt", response_schema()
     )
 
@@ -280,7 +285,7 @@ def test_the_retry_is_not_a_loop() -> None:
     bad = _model_output(headline=" ".join(["word"] * 16))
     stub = _Stub(bad, bad, _model_output())
 
-    analysis, problems, retried = analyze_cluster(
+    analysis, problems, retried, _ = analyze_cluster(
         _cluster(), stub, CONFIG, "prompt", response_schema()
     )
 
@@ -335,12 +340,43 @@ def test_the_first_try_rate_counts_first_attempts() -> None:
     """T31's acceptance criterion. A backend that needs a retry every
     time still writes every file, so counting finished files would
     report 1.000 for a prompt that is failing every first attempt."""
-    assert AnalyzeReport(attempted=4, written=4, retried=0).first_try_rate == 1.0
-    assert AnalyzeReport(attempted=4, written=4, retried=4).first_try_rate == 0.0
-    assert AnalyzeReport(attempted=4, written=3, retried=1).first_try_rate == 0.5
-    assert AnalyzeReport(attempted=0, written=0, retried=0).first_try_rate == 0.0
+    assert (
+        AnalyzeReport(attempted=4, written=4, retried=0, first_try=4).first_try_rate
+        == 1.0
+    )
+    assert (
+        AnalyzeReport(attempted=4, written=4, retried=4, first_try=0).first_try_rate
+        == 0.0
+    )
+    assert (
+        AnalyzeReport(attempted=4, written=3, retried=1, first_try=2).first_try_rate
+        == 0.5
+    )
+    assert (
+        AnalyzeReport(attempted=0, written=0, retried=0, first_try=0).first_try_rate
+        == 0.0
+    )
     assert "first-try rate" in format_analyze_report(
-        AnalyzeReport(attempted=1, written=1, retried=0)
+        AnalyzeReport(attempted=1, written=1, retried=0, first_try=1)
+    )
+
+
+def test_the_first_try_rate_survives_a_retry_that_still_failed() -> None:
+    """The bug this counter replaced. `(written - retried) / attempted`
+    assumes every retried cluster eventually wrote, so a cluster that
+    failed *after* its retry was subtracted from a total it was never in.
+
+    Three clean passes and one cluster that failed twice is a first-try
+    rate of 0.750, not 0.500; one cluster that failed twice is 0.000,
+    not -1.000. A negative rate is not a number anyone can act on.
+    """
+    assert (
+        AnalyzeReport(attempted=4, written=3, retried=1, first_try=3).first_try_rate
+        == 0.75
+    )
+    assert (
+        AnalyzeReport(attempted=1, written=0, retried=1, first_try=0).first_try_rate
+        == 0.0
     )
 
 
@@ -364,3 +400,205 @@ def test_a_bad_effort_fails_at_load_not_at_the_api(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="effort must be one of"):
         load_analyze_config(path)
+
+
+# --- a retry that still failed --------------------------------------------
+
+
+def test_a_cluster_that_failed_twice_does_not_drag_the_rate_negative(
+    tmp_path: Path,
+) -> None:
+    """End to end, because the arithmetic bug only showed up once a
+    retried cluster actually failed: one cluster, two bad answers,
+    `written - retried` was 0 - 1 = -1 over one attempt."""
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    bad = _model_output(headline=" ".join(["word"] * 16))
+
+    report = run_analyze(data_root, _Stub(bad, bad), CONFIG)
+
+    assert (report.attempted, report.written, report.retried) == (1, 0, 1)
+    assert report.first_try == 0
+    assert report.first_try_rate == 0.0
+
+
+def test_a_clean_pass_counts_as_a_first_try(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+
+    report = run_analyze(data_root, _Stub(_model_output()), CONFIG)
+
+    assert (report.first_try, report.retried) == (1, 0)
+    assert report.first_try_rate == 1.0
+
+
+# --- what a rejection keeps -----------------------------------------------
+
+
+def test_a_rejection_keeps_what_the_model_wrote(tmp_path: Path) -> None:
+    """`rejected/` exists to hold the reasons and the output together so
+    a prompt-tuning pass can see what earned them. The API path used to
+    file the reasons alone, which is half the evidence."""
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    headline = " ".join(["word"] * 16)
+    bad = _model_output(headline=headline)
+
+    run_analyze(data_root, _Stub(bad, bad), CONFIG)
+
+    record = json.loads(rejected_path(data_root, CLUSTER_ID).read_text())
+    assert record["problems"]
+    assert record["analysis"] is not None
+    assert record["analysis"]["headline"] == headline
+    # The stamped fields are on it too: what was sent is what is kept.
+    assert record["analysis"]["cluster_id"] == CLUSTER_ID
+
+
+def test_analyze_cluster_hands_back_the_payload_it_validated() -> None:
+    result = analyze_cluster(
+        _cluster(),
+        _Stub(_model_output()),
+        CONFIG,
+        "prompt",
+        response_schema(),
+        now="2026-09-17T12:00:00Z",
+    )
+    assert result.payload is not None
+    assert result.payload["cluster_id"] == CLUSTER_ID
+
+
+# --- `--limit 0` ----------------------------------------------------------
+
+
+def test_limit_zero_means_zero_not_the_config_default(tmp_path: Path) -> None:
+    """`limit or config.max_clusters_per_run` made 0 fall through to the
+    default -- a command that spends money doing the opposite of what it
+    was told."""
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+
+    report = run_analyze(data_root, _Stub(_model_output()), CONFIG, limit=0)
+
+    assert report.attempted == 0
+    assert not analysis_path(data_root, CLUSTER_ID).exists()
+
+
+# --- `--batch`: the version that was sent ---------------------------------
+#
+# The batch path had no tests at all, and it is the one path where a day
+# can pass between the question and the answer. These use stub clients
+# with the two methods the code calls; nothing here reaches the network.
+
+
+class _StubBatches:
+    def __init__(self, batch_id: str, results: list[Any]) -> None:
+        self._batch_id = batch_id
+        self._results = results
+        self.submitted: list[Any] = []
+
+    def create(self, requests: list[Any]) -> Any:
+        self.submitted = requests
+        return SimpleNamespace(id=self._batch_id)
+
+    def results(self, batch_id: str) -> list[Any]:
+        assert batch_id == self._batch_id
+        return self._results
+
+
+class _StubClient:
+    def __init__(self, batches: _StubBatches) -> None:
+        self.messages = SimpleNamespace(batches=batches)
+
+
+def _batch_result(cluster_id: str, payload: dict[str, Any]) -> Any:
+    return SimpleNamespace(
+        custom_id=cluster_id,
+        result=SimpleNamespace(
+            type="succeeded",
+            message=SimpleNamespace(
+                content=[SimpleNamespace(type="text", text=json.dumps(payload))]
+            ),
+        ),
+    )
+
+
+def test_submit_batch_records_the_version_of_every_cluster_it_sent(
+    tmp_path: Path,
+) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    client = _StubClient(_StubBatches("batch_1", []))
+
+    submission = submit_batch(data_root, CONFIG, client)
+
+    assert submission.cluster_versions == {CLUSTER_ID: 2}
+    assert read_submission(data_root, "batch_1") == {CLUSTER_ID: 2}
+
+
+def test_collect_batch_stamps_the_version_that_was_sent(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    client = _StubClient(
+        _StubBatches("batch_1", [_batch_result(CLUSTER_ID, _model_output())])
+    )
+    submit_batch(data_root, CONFIG, client)
+
+    report = collect_batch(data_root, CONFIG, client, "batch_1")
+
+    assert (report.written, report.failed) == (1, [])
+    written = json.loads(analysis_path(data_root, CLUSTER_ID).read_text())
+    assert written["cluster_version"] == 2
+
+
+def test_collect_batch_rejects_a_cluster_that_moved_while_the_batch_ran(
+    tmp_path: Path,
+) -> None:
+    """The window this guard exists for. A batch can take 24 hours; if an
+    outlet joined the cluster in that time, the analysis in hand
+    describes a membership that is no longer the story. Re-reading
+    `cluster.version` at collect time stamped the *new* version onto it,
+    which made a partial story pass the validator and publish as
+    current -- exactly what `cluster_version` is there to prevent.
+    """
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    client = _StubClient(
+        _StubBatches("batch_1", [_batch_result(CLUSTER_ID, _model_output())])
+    )
+    submit_batch(data_root, CONFIG, client)
+
+    # An outlet arrives: same cluster, new membership, new version.
+    moved = replace(_cluster(), version=3)
+    _write_cluster(data_root, moved)
+
+    report = collect_batch(data_root, CONFIG, client, "batch_1")
+
+    assert report.written == 0
+    assert [cluster_id for cluster_id, _ in report.failed] == [CLUSTER_ID]
+    assert not analysis_path(data_root, CLUSTER_ID).exists()
+    record = json.loads(rejected_path(data_root, CLUSTER_ID).read_text())
+    assert any("membership changed" in problem for problem in record["problems"])
+    # The output is kept with the reasons, same as every other rejection.
+    assert record["analysis"] is not None
+
+
+def test_collect_batch_refuses_a_batch_it_has_no_submission_record_for(
+    tmp_path: Path,
+) -> None:
+    """Without the record there is no way to know what version was sent,
+    and guessing is the bug. Re-submitting costs half-price tokens;
+    publishing a stale story costs the point of the site."""
+    data_root = DataRoot(tmp_path / "data")
+    _write_cluster(data_root, _cluster())
+    client = _StubClient(
+        _StubBatches("batch_unknown", [_batch_result(CLUSTER_ID, _model_output())])
+    )
+
+    report = collect_batch(data_root, CONFIG, client, "batch_unknown")
+
+    assert report.written == 0
+    assert any(
+        "no submission record" in problem
+        for _, problems in report.failed
+        for problem in problems
+    )

@@ -89,6 +89,12 @@ class DataRoot:
     def items_dir(self) -> Path:
         return self.path / "items"
 
+    def batches_dir(self) -> Path:
+        """`batches/<batch id>.json`: what a `nc analyze --batch`
+        submission sent, so the collect hours later can tell whether the
+        clusters still look the way they did. See `nc.analyze`."""
+        return self.path / "batches"
+
     def item_file_for(self, published: str) -> Path:
         """`items/YYYY/MM/DD.jsonl` for an item whose `published` is
         `published`. `published` is ISO 8601 UTC (`nc.feeds.Item`), so
@@ -204,7 +210,14 @@ def _read_item_file(path: Path) -> list[Item]:
 
 
 def read_items(data_root: DataRoot) -> Iterator[Item]:
-    """Every stored item, in a deterministic (file path, then id) order."""
+    """Every stored *row*, in a deterministic (file path, then id) order.
+
+    Rows, not items: one id can appear in two day files. The store
+    deduplicates within a day file and files by `published`, so an
+    outlet that re-publishes an article under a new date leaves the same
+    id in two places. Callers that need one row per id -- anything
+    keying on the id -- want `latest_by_id`.
+    """
     items_dir = data_root.items_dir()
     if not items_dir.exists():
         return
@@ -235,6 +248,32 @@ def read_items_since(data_root: DataRoot, start_date: str) -> Iterator[Item]:
         yield from _read_item_file(path)
 
 
+def latest_by_id(items: Iterable[Item]) -> list[Item]:
+    """One row per item id, the most recently fetched one.
+
+    The store is append-only and deduplicates only within a day file, so
+    an outlet that re-publishes an article -- same id, new `published`
+    -- leaves two rows in two different files. Found on the live data:
+    BBC's "Why are there concerns AI could threaten humanity" sat in
+    both `2026/09/14.jsonl` and `2026/09/17.jsonl`.
+
+    The freshest row wins because that is what the outlet is currently
+    publishing; ties break on `published` then id so the choice never
+    depends on file order. `nc.cluster` applies the same rule to its
+    four-day window, and this is the one definition both use: a
+    duplicate that two callers resolve differently is two stores.
+    """
+    latest: dict[str, Item] = {}
+    for item in items:
+        current = latest.get(item.id)
+        if current is None or (item.fetched, item.published) >= (
+            current.fetched,
+            current.published,
+        ):
+            latest[item.id] = item
+    return sorted(latest.values(), key=lambda item: (item.published, item.id))
+
+
 _SCHEMA = """
 CREATE TABLE items (
     id TEXT PRIMARY KEY,
@@ -255,6 +294,13 @@ def rebuild_db(data_root: DataRoot, db_path: Path = DEFAULT_DB_PATH) -> int:
 
     Always starts from an empty database: the cache holds no state of
     its own (CLAUDE.md), so "rebuild" means exactly that, not "upsert".
+
+    One row per id, the freshest fetched (`latest_by_id`). `items.id` is
+    the primary key, and the store can hold the same id in two day
+    files, so inserting every row raised `IntegrityError` and failed the
+    one documented way to rebuild the cache. Resolving the duplicate
+    here rather than letting the insert order decide means the cache
+    holds the row `nc cluster` would have used.
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
@@ -264,7 +310,7 @@ def rebuild_db(data_root: DataRoot, db_path: Path = DEFAULT_DB_PATH) -> int:
     try:
         conn.execute(_SCHEMA)
         count = 0
-        for item in read_items(data_root):
+        for item in latest_by_id(read_items(data_root)):
             conn.execute(
                 "INSERT INTO items "
                 "(id, outlet, url, title, lede, author, published, fetched, tags) "
