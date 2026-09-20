@@ -732,3 +732,22 @@ def test_a_second_build_with_nothing_new_writes_and_removes_nothing(
     report = build_site(data_root, out)
 
     assert (report.pages, report.removed) == (0, 0)
+
+
+def test_a_superseded_story_loses_its_page_too(tmp_path: Path) -> None:
+    """The other way a story stops being current. Two clusters merging
+    leaves the loser superseded, and its page was still served."""
+    out = tmp_path / "site"
+    data_root = _prepare(tmp_path)
+    build_site(data_root, out)
+    page = out / "story" / CLUSTER_ID / "index.html"
+    assert page.exists()
+
+    merged = _cluster(status=STATUS_SUPERSEDED, superseded_by="2026-09-16-ffffff")
+    path = data_root.resolve("clusters", merged.date, f"{merged.id}.json")
+    path.write_text(render(merged), encoding="utf-8")
+
+    report = build_site(data_root, out)
+
+    assert report.stories == 0
+    assert not page.exists()
