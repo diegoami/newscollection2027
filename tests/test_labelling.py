@@ -11,6 +11,7 @@ constraint ("nc label is interactive; test it with scripted input").
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -31,7 +32,9 @@ from nc.labelling import (
     TuneReport,
     append_label,
     build_tune_report,
+    format_import_report,
     format_tune_report,
+    import_labels,
     label_from_pair,
     labelling_pool,
     labels_path,
@@ -564,3 +567,221 @@ def test_format_tune_report_includes_current_config_when_given() -> None:
     text = format_tune_report(build_tune_report([_label(0.7, True)]), config=CONFIG)
     assert "tau_low=0.65" in text
     assert "tau_high=0.8" in text
+
+
+# --- nc label --import (the guard on ground truth) ---------------------
+#
+# `labels/pairs.jsonl` decides `tau_high` through `nc tune` and scores
+# the judge model through `nc bench-judge`. The answers in it come off
+# a published page as taps, and something has to carry them back into
+# the file. Every test below is one way that transcription can be
+# wrong while looking right, and the import is allowed to write only
+# when none of them applies.
+
+
+def _import_root(tmp_path: Path) -> tuple[DataRoot, PendingPair]:
+    data_root = DataRoot(tmp_path / "data")
+    pair = _pair("i0", "theverge", "i1", "arstechnica", 0.6789)
+    write_pending_pairs(data_root, [pair])
+    return data_root, pair
+
+
+def _line(pair: PendingPair, **overrides: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "item_id_a": pair.a.item_id,
+        "item_id_b": pair.b.item_id,
+        "outlet_a": pair.a.outlet,
+        "outlet_b": pair.b.outlet,
+        "score": pair.score,
+        "same_story": True,
+        "labeled_at": "2026-09-22T09:00:00Z",
+    }
+    row.update(overrides)
+    return row
+
+
+def _write_import(tmp_path: Path, *rows: object) -> Path:
+    path = tmp_path / "import.jsonl"
+    path.write_text(
+        "\n".join(r if isinstance(r, str) else json.dumps(r) for r in rows) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_import_records_an_answer_for_a_real_pair(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(data_root, _write_import(tmp_path, _line(pair)))
+
+    assert report.ok and report.written
+    recorded = load_labels(data_root)
+    assert [label.pair_id for label in recorded] == [pair.pair_id]
+    assert recorded[0].same_story is True
+    assert recorded[0].labeled_at == "2026-09-22T09:00:00Z"
+
+
+def test_import_refuses_a_pair_that_was_never_scored(tmp_path: Path) -> None:
+    """The one that matters most: an id nothing on disk knows about is
+    an answer to a question no page ever asked."""
+    data_root, pair = _import_root(tmp_path)
+    invented = _line(pair, item_id_a="item-nowhere")
+
+    report = import_labels(data_root, _write_import(tmp_path, invented))
+
+    assert not report.ok
+    assert "no such pair" in report.rejected[0].reason
+    assert load_labels(data_root) == []
+
+
+def test_import_refuses_a_score_the_clusterer_did_not_compute(tmp_path: Path) -> None:
+    """A label at the wrong score reads as ordinary and moves a
+    `nc tune` threshold."""
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(
+        data_root, _write_import(tmp_path, _line(pair, score=0.9123))
+    )
+
+    assert not report.ok
+    assert "nc cluster computed 0.6789" in report.rejected[0].reason
+
+
+def test_import_takes_the_score_from_disk_not_the_file(tmp_path: Path) -> None:
+    """Within the four decimals the page carries the import agrees, and
+    what gets written is still the clusterer's number."""
+    data_root, pair = _import_root(tmp_path)
+
+    import_labels(data_root, _write_import(tmp_path, _line(pair, score=0.67890001)))
+
+    assert load_labels(data_root)[0].score == pair.score
+
+
+def test_import_refuses_outlets_that_are_not_that_pairs(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(
+        data_root, _write_import(tmp_path, _line(pair, outlet_a="wired"))
+    )
+
+    assert not report.ok
+    assert "outlets say wired" in report.rejected[0].reason
+
+
+def test_import_refuses_an_answer_that_is_not_a_yes_or_a_no(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(
+        data_root, _write_import(tmp_path, _line(pair, same_story="yes"))
+    )
+
+    assert not report.ok
+    assert "same_story is not true or false" in report.rejected[0].reason
+
+
+def test_import_refuses_a_bad_timestamp(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(
+        data_root, _write_import(tmp_path, _line(pair, labeled_at="yesterday"))
+    )
+
+    assert not report.ok
+    assert "not a UTC timestamp" in report.rejected[0].reason
+
+
+def test_import_refuses_a_line_that_is_not_json(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(data_root, _write_import(tmp_path, _line(pair), "{oops"))
+
+    assert not report.ok
+    assert report.rejected[0].line == 2
+    assert load_labels(data_root) == []
+
+
+def test_one_bad_line_stops_the_whole_batch(tmp_path: Path) -> None:
+    """A partial import is both incomplete and indistinguishable from a
+    complete one, which is why the good lines go unwritten too."""
+    data_root = DataRoot(tmp_path / "data")
+    good = _pair("g0", "theverge", "g1", "arstechnica", 0.71)
+    other = _pair("h0", "wired", "h1", "zdnet", 0.62)
+    write_pending_pairs(data_root, [good, other])
+    path = _write_import(
+        tmp_path,
+        _line(good),
+        _line(other, score=0.5),
+        _line(other, same_story=False),
+    )
+
+    report = import_labels(data_root, path)
+
+    assert not report.ok
+    assert len(report.accepted) == 2, "the two good lines did pass validation"
+    assert not report.written
+    assert load_labels(data_root) == []
+
+
+def test_importing_the_same_answer_twice_records_it_once(tmp_path: Path) -> None:
+    """Re-importing a page after answering more of it is the normal
+    way this gets used."""
+    data_root, pair = _import_root(tmp_path)
+    path = _write_import(tmp_path, _line(pair))
+    import_labels(data_root, path)
+
+    report = import_labels(data_root, path)
+
+    assert report.ok
+    assert report.accepted == ()
+    assert [label.pair_id for label in report.already] == [pair.pair_id]
+    assert len(load_labels(data_root)) == 1
+
+
+def test_import_refuses_to_overturn_a_recorded_answer(tmp_path: Path) -> None:
+    """`labels/pairs.jsonl` is append-only, and a human changing their
+    mind is a thing to look at rather than overwrite."""
+    data_root, pair = _import_root(tmp_path)
+    import_labels(data_root, _write_import(tmp_path, _line(pair, same_story=True)))
+
+    report = import_labels(
+        data_root, _write_import(tmp_path, _line(pair, same_story=False))
+    )
+
+    assert not report.ok
+    assert "already labelled same story" in report.rejected[0].reason
+    assert [label.same_story for label in load_labels(data_root)] == [True]
+
+
+def test_import_refuses_a_file_that_answers_one_pair_both_ways(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+    path = _write_import(
+        tmp_path, _line(pair, same_story=True), _line(pair, same_story=False)
+    )
+
+    report = import_labels(data_root, path)
+
+    assert not report.ok
+    assert "both ways" in report.rejected[0].reason
+
+
+def test_a_dry_run_reports_without_writing(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+
+    report = import_labels(
+        data_root, _write_import(tmp_path, _line(pair)), dry_run=True
+    )
+
+    assert report.ok and not report.written
+    assert len(report.accepted) == 1
+    assert load_labels(data_root) == []
+    assert "nothing written (dry run)" in format_import_report(report)
+
+
+def test_the_report_names_a_rejection_by_line(tmp_path: Path) -> None:
+    data_root, pair = _import_root(tmp_path)
+    path = _write_import(tmp_path, _line(pair), _line(pair, score=0.1))
+
+    text = format_import_report(import_labels(data_root, path))
+
+    assert "1 line(s) rejected, nothing written:" in text
+    assert "line 2:" in text

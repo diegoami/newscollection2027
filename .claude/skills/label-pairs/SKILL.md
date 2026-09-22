@@ -28,10 +28,11 @@ and `nc tune` reads them to say whether `tau_low` is in the right place.
 A label set the agent wrote would make both meaningless.
 
 **Never write `labels/pairs.jsonl` yourself.** The judge-pairs skill
-says so and this is why. The page emits the lines; the owner commits
-them. If you are asked to transcribe them out of the page's database,
-say the rule exists and let the owner decide — do not decide it for
-them.
+says so and this is why. The page emits the lines; `nc label --import`
+records them. Never append to the file with an editor, a heredoc or a
+shell redirect — not even lines you believe you read out of the page's
+database, because "I read them correctly" is exactly the claim the
+import exists to stop anyone having to take on trust.
 
 ## Refreshing it
 
@@ -75,6 +76,19 @@ thresholds live in `config/labelpage.yaml` where CLAUDE.md says
 thresholds go. A snippet in a markdown file gets retyped; tested code
 does not.
 
+The same day, twice more. The counter (below), and the **order**: the
+page emitted band by band, highest first, so the first fifty pairs the
+owner answered were 77% matches and every negative waited in the last
+fifty. The sample was fine — 48% matches against the pool's 36% — and
+the experience of it was not, which is the form the owner's third
+report took: "almost all of them still seem to be positive". It is also
+a real defect and not just an unpleasant hour, because a session that
+stops early is the normal way one ends, and a session that stopped
+early contributed only the top bands. `interleave` now spreads the
+bands so every prefix of the page carries the mix of the whole, and
+within a band the order is a digest of the pair id so a pair's position
+says nothing about its likely answer.
+
 `nc label-page` also refuses to render a page that has lost its `db`
 capability, or whose progress readout counts `labels` rather than the
 current batch. That second one is the other 2026-09-22 bug: `labels` is
@@ -93,18 +107,40 @@ should say so — reading it off this page gives a confident wrong answer.
 ## Taking the answers back
 
 The page keeps every answer in the artifact's database under
-`labels/<pair_id>` and in the browser's local storage. When the owner
-finishes, it shows the JSONL and a copy button, filtered to the current
-batch. They append it to `<data root>/labels/pairs.jsonl` and run:
+`labels/<pair_id>` and in the browser's local storage, and shows the
+JSONL with a copy button. Either route — the owner's copy button, or
+an agent reading the rows out of the database with `ArtifactData` —
+ends at the same command, which is the only thing permitted to write
+the file:
 
 ```
+nc label --import answers.jsonl --dry-run   # show the owner first
+nc label --import answers.jsonl
 nc tune          # precision and recall per threshold, from the labels
 nc bench-judge   # how the agent's judgments score against them
 nc sync push
 ```
 
-Filtered to the batch matters: `load_labels` does not deduplicate by
-pair id, so a line appended twice is counted twice by `nc tune`.
+**Always the `--dry-run` first, and show the owner its output** before
+recording anything. The import is a guard against a wrong
+transcription, not a licence to skip the owner.
+
+The import checks every line against the pair files `nc cluster` wrote:
+the pair must exist in `pending-pairs/` or `label-sample/`, its score
+must be the score the clusterer computed, and its outlets must be that
+pair's outlets. A pair already labelled the other way is a conflict and
+stops the batch rather than overwriting — the file is append-only and a
+changed mind is a thing to look at. **Nothing is written unless every
+line passes**, because a partial import is both incomplete and
+indistinguishable from a complete one. What gets recorded is built from
+the pair on disk; the only fields taken from the import are the answer
+and its timestamp, the only two things a human actually produced.
+
+So re-importing a page after more of it is answered is safe and normal:
+already-recorded answers are reported and skipped, not duplicated. That
+also removes the old footgun here — `load_labels` does not deduplicate
+by pair id, so a line appended twice by hand was counted twice by `nc
+tune`.
 
 Answers survive a refresh — the page skips any pair it already has an
 answer for — so re-baking an overlapping pool loses nothing.

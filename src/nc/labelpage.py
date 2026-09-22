@@ -24,6 +24,21 @@ So: allocate per band, thinnest band first, and take a stride *across*
 each band rather than its top. `select_for_page` is that, and the tests
 pin both halves against exactly this regression.
 
+The order the page presents them in is the third half of this, and
+the third bug, same day:
+
+    The page emitted band by band, highest first. The sample was
+    48% matches against the pool's 36% -- defensible for a stratified
+    sample -- but the first fifty pairs a human actually saw were 77%
+    matches, and every negative sat in the last fifty. "Almost all of
+    them still seem to be positive" was an accurate report of the page.
+
+That is not only an unpleasant hour. A labelling session that stops
+early -- the normal way one ends -- then contributes only the top
+bands, which is the 0.6079 bug again by a different route. So
+`interleave` spreads the bands evenly, and every prefix of the page
+carries the band mix of the whole page.
+
 **This is a stratified sample, not a representative one.** It is sized
 to estimate a boundary, not the pool's overall match rate. A page built
 this way over-represents the sparse high bands on purpose. Anyone who
@@ -40,6 +55,7 @@ exactly like a working page.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
@@ -139,12 +155,50 @@ def stride(items: Sequence[Any], count: int) -> list[Any]:
     return [items[int(i * step)] for i in range(count)]
 
 
+def _scatter(pair: PendingPair) -> str:
+    """A pair's position within its band on the page: stable, so a page
+    is reproducible from its inputs, and independent of the score, so a
+    pair's position tells a labeller nothing about its answer.
+
+    A digest rather than `pair_id` itself. Real item ids are content
+    digests and would scatter on their own, but that is a property of
+    `nc.store`'s id scheme rather than a promise to this module, and an
+    id scheme that ever became sequential would quietly restore the
+    drift this exists to remove.
+    """
+    return hashlib.blake2b(pair.pair_id.encode("utf-8"), digest_size=8).hexdigest()
+
+
+def interleave(by_band: Mapping[Band, Sequence[Any]]) -> list[Any]:
+    """Every band's pairs spread evenly across one page, so that any
+    prefix holds roughly the band mix of the whole.
+
+    Item `i` of a band of `n` gets position `(i + 0.5) / n` on a unit
+    line and everything is sorted by that; a band of 2 lands at 0.25
+    and 0.75, a band of 46 every 0.022. Deterministic -- no shuffle,
+    because a page has to be reproducible from its inputs to be
+    debuggable -- and it beats a shuffle at the thing that matters
+    here, since a shuffle only gets the mix right on average and this
+    gets it right on every prefix.
+
+    Ties go to the higher band, matching `allocate`.
+    """
+    placed: list[tuple[float, float, Any]] = []
+    for band, items in by_band.items():
+        for index, item in enumerate(items):
+            placed.append(((index + 0.5) / len(items), -band[0], item))
+    placed.sort(key=lambda row: (row[0], row[1]))
+    return [item for _, _, item in placed]
+
+
 def select_for_page(
     labels: Iterable[Label],
     pool: Iterable[PendingPair],
     config: LabelPageConfig,
 ) -> list[PendingPair]:
-    """The pairs one page should carry, given what is already labelled."""
+    """The pairs one page should carry, given what is already labelled,
+    in the order it should ask them -- see `allocate` for which pairs,
+    `stride` for which of a band, and `interleave` for the order."""
     bands = config.bands
     recorded = list(labels)
     have = {
@@ -158,7 +212,14 @@ def select_for_page(
         by_band[band].sort(key=lambda p: p.score)
 
     taken = allocate(have, {b: len(by_band[b]) for b in bands}, config.budget)
-    return [pair for band in bands for pair in stride(by_band[band], taken[band])]
+    # Picked in score order, because `stride` spreads across a sorted
+    # band; presented scattered, because otherwise `interleave` walks
+    # every band low-to-high at once and the page still drifts upward
+    # -- 0.65 mean in its first quarter against 0.69 in its last.
+    chosen = {
+        band: sorted(stride(by_band[band], taken[band]), key=_scatter) for band in bands
+    }
+    return interleave({b: picks for b, picks in chosen.items() if picks})
 
 
 def page_payload(pairs: Sequence[PendingPair]) -> list[dict[str, Any]]:

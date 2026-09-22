@@ -151,16 +151,36 @@ def _cluster(args: argparse.Namespace) -> int:
 
 
 def _label(args: argparse.Namespace) -> int:
-    """T22: show unlabeled pairs, record yes/no to `labels/pairs.jsonl`.
+    """T22: show unlabeled pairs, record yes/no to `labels/pairs.jsonl`,
+    or with `--import` take those answers from a file instead of a
+    terminal prompt.
     Reads `pending-pairs/` (T24's exhaustive judge queue) and
     `label-sample/` (T22's bounded, stratified sample) written by `nc
     cluster` -- no embedding model, see nc/labelling.py's module
     docstring and `labelling_pool`.
     """
     data_root = _data_root(args)
+    if args.import_path is not None:
+        return _label_import(data_root, args.import_path, dry_run=args.dry_run)
     config = cluster.load_cluster_config(args.config)
     labelling.run_label_session(data_root, config, limit=args.limit)
     return 0
+
+
+def _label_import(data_root: store.DataRoot, path: Path, *, dry_run: bool) -> int:
+    """`nc label --import`: record answers collected on the labelling
+    page, checked line by line against the pair files on disk.
+
+    Exits non-zero on any rejection, and writes nothing in that case --
+    see `nc.labelling.import_labels` for why a partial import is the
+    outcome worth most care to avoid. The point of the check is that
+    `labels/pairs.jsonl` is ground truth for `nc tune` and `nc
+    bench-judge`, so "an agent must not write it by hand" stops being
+    an instruction in a skill and becomes something the code enforces.
+    """
+    report = labelling.import_labels(data_root, path, dry_run=dry_run)
+    print(labelling.format_import_report(report))
+    return 0 if report.ok else 1
 
 
 def _label_page(args: argparse.Namespace) -> int:
@@ -645,6 +665,23 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="stop after this many pairs (default: the whole unlabeled pool)",
+    )
+    label_parser.add_argument(
+        "--import",
+        dest="import_path",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help=(
+            "record answers from a JSONL file instead of prompting; every "
+            "line is checked against pending-pairs/ and label-sample/ and "
+            "nothing is written if any line fails"
+        ),
+    )
+    label_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --import, report what would be recorded and write nothing",
     )
     label_parser.set_defaults(func=_label)
 

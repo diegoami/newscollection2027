@@ -19,6 +19,7 @@ from nc.labelpage import (
     LabelPageConfig,
     allocate,
     band_of,
+    interleave,
     load_label_page_config,
     page_payload,
     render_page,
@@ -193,6 +194,54 @@ def test_stride_spreads_rather_than_taking_the_top() -> None:
 
     assert picked == [0, 20, 40, 60, 80]
     assert picked != items[:5]
+
+
+def test_the_page_does_not_front_load_the_matches(tmp_path: Path) -> None:
+    """The third half of the bug: the right pairs, in the wrong order.
+
+    The page used to emit band by band, highest first, so the first
+    fifty pairs a human answered were nearly all matches and every
+    negative waited at the end -- and a session abandoned halfway then
+    contributed only the top bands, which is the original skew again.
+    Every quarter of the page has to look like the whole page.
+    """
+    pool = _real_shaped_pool()
+    bands = CONFIG.bands
+
+    selected = select_for_page([], pool, CONFIG)
+
+    quarter = len(selected) // 4
+    quarters = [selected[i : i + quarter] for i in range(0, quarter * 4, quarter)]
+    means = [sum(p.score for p in q) / len(q) for q in quarters]
+    assert max(means) - min(means) < 0.02, f"front-loaded by score: {means}"
+    for index, part in enumerate(quarters):
+        seen = {band_of(p.score, bands) for p in part}
+        assert len(seen) >= 5, f"quarter {index} draws from only {len(seen)} band(s)"
+
+
+def test_interleave_spreads_a_thin_band_across_a_thick_one() -> None:
+    """Two of one band and forty of another: the two land near a third
+    and two thirds of the way in, not adjacent at either end."""
+    thin, thick = (0.85, 1.01), (0.57, 0.60)
+
+    order = interleave({thin: ["T1", "T2"], thick: [f"k{i}" for i in range(40)]})
+
+    positions = [i for i, item in enumerate(order) if item.startswith("T")]
+    assert positions == [10, 31]
+
+
+def test_interleave_is_deterministic() -> None:
+    """A page has to be reproducible from its inputs to be debuggable,
+    which is why this is an interleave and not a shuffle."""
+    by_band = {(0.7, 0.75): list("abcde"), (0.57, 0.6): list("vwxyz")}
+
+    assert interleave(by_band) == interleave(dict(reversed(by_band.items())))
+
+
+def test_interleave_keeps_every_item() -> None:
+    by_band = {(0.8, 0.85): [1, 2, 3], (0.6, 0.65): [4], (0.57, 0.6): [5, 6]}
+
+    assert sorted(interleave(by_band)) == [1, 2, 3, 4, 5, 6]
 
 
 def test_stride_degenerate_cases() -> None:
