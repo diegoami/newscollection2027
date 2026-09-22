@@ -5,10 +5,10 @@ description: Refresh the "Same Story?" web page with the current unlabelled bord
 
 # The labelling page
 
-`nc label` is the terminal version of this and needs nothing else. This
-skill covers the web page, which exists because a human labelling
-session is two hundred yes/no answers in a row and a phone on a sofa is
-a better place for that than a terminal.
+`nc label` is the terminal version and needs nothing else. This skill
+covers the web page, which exists because a labelling session is two
+hundred yes/no answers in a row and a phone is a better place for that
+than a terminal.
 
 **https://claude.ai/artifact/8enyepuhfxqc5c6hW1iz7v** — "Same Story?"
 
@@ -21,115 +21,81 @@ Labels are **not** judgments, and the two have opposite effects:
 | `nc judge`, the judge-pairs skill | `judgments/` | creates links, makes stories |
 | `nc label`, this page | `labels/pairs.jsonl` | ground truth, creates nothing |
 
-Labelling does not shorten the judge queue and does not publish a
-story. What it does is keep the only independent check on the judge
-step: `nc bench-judge` scores an agent's judgments against these human
-answers, and `nc tune` reads them to say whether `tau_low` is in the
-right place. A label set the agent wrote would make both meaningless.
+Labelling does not shorten the judge queue and does not publish a story.
+What it does is keep the only independent check on the judge step: `nc
+bench-judge` scores an agent's judgments against these human answers,
+and `nc tune` reads them to say whether `tau_low` is in the right place.
+A label set the agent wrote would make both meaningless.
 
 **Never write `labels/pairs.jsonl` yourself.** The judge-pairs skill
 says so and this is why. The page emits the lines; the owner commits
-them. If you are ever asked to transcribe them from the page's
-database, say that the rule exists and let the owner decide — do not
-decide it for them.
+them. If you are asked to transcribe them out of the page's database,
+say the rule exists and let the owner decide — do not decide it for
+them.
 
-## Refreshing the page
+## Refreshing it
 
-The pairs are baked into the page as JSON, so a stale page shows pairs
-that have since been labelled. Regenerate from the pool:
+One command. Do not assemble the selection by hand:
 
-**Do not take the head of `order_for_labelling`.** That ordering is
-built for `nc label`, where the session works down the whole list; it
-round-robins across buckets *and takes the highest score first within
-each one*. Truncating it at 150 therefore returns the top slice of every
-bucket. Tried on 2026-09-22 it produced a page whose lowest pair scored
-0.6079 when 38% of the pool sat below 0.60 -- about 57% likely matches
-against the pool's 25%, and not one new label in the band the `tau_low`
-argument actually rests on. The owner caught it by asking whether the
-page was only sending positives.
-
-Allocate by **where the labels are thinnest**, and spread *across* each
-band rather than taking its top:
-
-```python
-# NC_DATA_ROOT set, after `nc sync pull`
-import random
-
-from nc.labelling import labelling_pool, load_labels
-from nc.store import DataRoot
-
-root = DataRoot.from_env()
-labels = load_labels(root)
-done = {label.pair_id for label in labels}
-todo = [p for p in labelling_pool(root) if p.pair_id not in done]
-
-BANDS = [
-    (0.85, 1.01),
-    (0.80, 0.85),
-    (0.75, 0.80),
-    (0.70, 0.75),
-    (0.65, 0.70),
-    (0.60, 0.65),
-    (0.57, 0.60),
-    (0.0, 0.57),
-]
-have = {b: sum(1 for l in labels if b[0] <= l.score < b[1]) for b in BANDS}
-pool = {
-    b: sorted((p for p in todo if b[0] <= p.score < b[1]), key=lambda p: p.score)
-    for b in BANDS
-}
-
-take = {b: 0 for b in BANDS}  # each pair to the thinnest band
-for _ in range(150):
-    open_bands = [b for b in BANDS if take[b] < len(pool[b])]
-    if not open_bands:
-        break
-    take[min(open_bands, key=lambda b: (have[b] + take[b], -b[0]))] += 1
-
-
-def stride(xs, n):  # n spread across the band, not its top n
-    if n <= 0:
-        return []
-    if n >= len(xs):
-        return list(xs)
-    step = len(xs) / n
-    return [xs[int(i * step)] for i in range(n)]
-
-
-selected = [p for b in BANDS for p in stride(pool[b], take[b])]
-random.Random(0).shuffle(selected)  # so a short session still spans the band
+```
+export NC_DATA_ROOT=…
+nc sync pull
+nc label-page --page <current.html> --out <new.html>
 ```
 
-This is a stratified sample, not a representative one, and that is the
-point: it is sized to estimate a boundary, not the pool's overall match
-rate. Anyone wanting the pool's true yield needs a random sample
-instead, and should say so rather than reading it off this page. 150
-keeps the page near 150KB; take fewer if the pool is small, never the
-whole pool.
+Get `<current.html>` by reading the artifact with the Artifact tool —
+it saves the full HTML to a file and tells you where. Then publish
+`<new.html>` back to **the same url**, omitting `capabilities` so the
+stored `db` declaration carries forward. The command prints a table of
+labels-per-band before and after; read it, because it is the whole point
+of the selection.
 
-**Anything that reads as progress must be scoped to `PAIRS`.** The
-page's `labels` map outlives a batch: it is restored from the artifact's
-database and from local storage, so it holds every answer ever given the
-page, not this batch's. The counter counted its keys against
-`PAIRS.length` and read `222 / 150` the first time the pairs were
-refreshed -- a numerator and denominator measuring different sets. That
-invariant held for free while the page was a snapshot and broke the
-moment it became refreshable. The rail and the JSONL export were already
-scoped with `PAIRS.filter(p => labels[p.id])`; the counter is now too.
+`nc label-page` without `--page` writes just the pair JSON, for
+inspecting the selection without touching the page.
 
-Then swap the JSON inside `<script id="pairs-data" type="application/json">`
-in the artifact's current HTML — read it with the Artifact tool, replace
-that one block, publish back to **the same url**. Change nothing else:
-the page's runtime code, design and `db` capability are already right.
-Omit `capabilities` on the republish so the stored declaration carries
-forward.
+## Why there is a command rather than a recipe here
+
+This skill used to carry the selection as a code block. That is how it
+went wrong. On 2026-09-22 the page was built from the head of
+`nc.labelling.order_for_labelling`, which round-robins across score
+buckets **and takes the highest score first within each one** — right
+for `nc label`, which walks the whole list, and wrong the moment you
+truncate it, because you then get the top slice of every bucket.
+
+The result: a page whose lowest pair scored 0.6079 while 38% of the pool
+sat below 0.60, about 57% likely matches against the pool's 25%, and not
+one new label in `[0.57, 0.60)` — the band with the fewest labels and
+the one carrying the whole argument that `tau_low` is not set too low.
+The owner caught it by asking whether the page was only sending
+positives.
+
+So the selection now lives in `src/nc/labelpage.py` with tests that fail
+against both halves of that mistake (`tests/test_labelpage.py`), and the
+thresholds live in `config/labelpage.yaml` where CLAUDE.md says
+thresholds go. A snippet in a markdown file gets retyped; tested code
+does not.
+
+`nc label-page` also refuses to render a page that has lost its `db`
+capability, or whose progress readout counts `labels` rather than the
+current batch. That second one is the other 2026-09-22 bug: `labels` is
+restored from the artifact's database and holds every answer the page
+has ever taken, so counting its keys against the batch made the counter
+read **222 / 150**. Both invariants only became breakable when the page
+stopped being a one-off snapshot, which is exactly when nobody thinks to
+re-check them.
+
+**It is a stratified sample, not a representative one.** It is sized to
+estimate a boundary, not the pool's overall match rate, and it
+over-represents the sparse high bands on purpose. Anyone who wants to
+know what share of the pool is a real match needs a random sample and
+should say so — reading it off this page gives a confident wrong answer.
 
 ## Taking the answers back
 
-The page keeps every answer twice: in the artifact's database under
-`labels/<pair_id>`, and in the browser's local storage. When the owner
-finishes, the page shows the JSONL and a copy button. They append it to
-`<data root>/labels/pairs.jsonl` and run:
+The page keeps every answer in the artifact's database under
+`labels/<pair_id>` and in the browser's local storage. When the owner
+finishes, it shows the JSONL and a copy button, filtered to the current
+batch. They append it to `<data root>/labels/pairs.jsonl` and run:
 
 ```
 nc tune          # precision and recall per threshold, from the labels
@@ -137,14 +103,16 @@ nc bench-judge   # how the agent's judgments score against them
 nc sync push
 ```
 
-Answers survive a refresh: the page filters out any pair it already has
-an answer for, so re-baking a pool that overlaps an unfinished session
-loses nothing.
+Filtered to the batch matters: `load_labels` does not deduplicate by
+pair id, so a line appended twice is counted twice by `nc tune`.
+
+Answers survive a refresh — the page skips any pair it already has an
+answer for — so re-baking an overlapping pool loses nothing.
 
 ## What the labels are for
 
-As of 2026-09-22, 198 labels give this, and it is the reason `tau_low`
-is 0.57 rather than a guess:
+As of 2026-09-22, 198 labels give this, and it is why `tau_low` is 0.57
+rather than a guess:
 
 | band | labels | same story | yield |
 |---|---|---|---|
@@ -156,8 +124,9 @@ is 0.57 rather than a guess:
 | 0.57-0.60 | 10 | 2 | 20% |
 | below 0.57 | 101 | **0** | 0% |
 
-101 labelled pairs below `tau_low` and not one is a real story; the
-bands above it yield 20% upwards. That is what a threshold argument
-looks like when it is made of evidence, and it is why the bands with
-fewest labels -- 0.75 and up, where `nc tune` still prints the
-fewer-than-five-labels warning -- are worth the next session's answers.
+101 labelled pairs below `tau_low` and not one a real story, against 20%
+yield immediately above it. That is a threshold argument made of
+evidence. The thin rows — `[0.57, 0.60)` at ten labels, and 0.75 and up
+where `nc tune` still prints its fewer-than-five-labels warning — are
+where the next session's answers are worth most, and are what the
+allocation aims at.

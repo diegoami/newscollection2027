@@ -1,0 +1,22 @@
+# The labelling page's sampling (src/nc/labelpage.py, nc label-page).
+#
+# CLAUDE.md: "Model ids and thresholds live in config/, never inline in
+# code." These are thresholds -- they decide which pairs a human is
+# shown, and a page that shows the wrong slice produces a label set that
+# misinforms `nc tune` and `nc bench-judge` without ever looking wrong.
+#
+# Why bands at all, rather than "the top N by score": on 2026-09-22 a
+# page built from the head of `nc.labelling.order_for_labelling` had a
+# lowest pair of 0.6079 while 38% of the pool sat below 0.60, and added
+# no labels at all to [0.57, 0.60) -- the one band the tau_low argument
+# rests on and the one with the fewest labels. Sampling per band and
+# filling the thinnest first is what stops that.
+
+# Pairs baked into one page. ~150 keeps the published page near 150KB.
+budget: 150
+
+# Descending band edges. Each consecutive pair is a band; everything
+# below the last edge is the final band, which is where the evidence
+# that tau_low is not too low lives. The lowest edge is tau_low itself
+# (config/cluster.yaml) -- keep them in step.
+band_edges: [0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.57]
