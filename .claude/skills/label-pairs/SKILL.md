@@ -38,23 +38,74 @@ decide it for them.
 The pairs are baked into the page as JSON, so a stale page shows pairs
 that have since been labelled. Regenerate from the pool:
 
+**Do not take the head of `order_for_labelling`.** That ordering is
+built for `nc label`, where the session works down the whole list; it
+round-robins across buckets *and takes the highest score first within
+each one*. Truncating it at 150 therefore returns the top slice of every
+bucket. Tried on 2026-09-22 it produced a page whose lowest pair scored
+0.6079 when 38% of the pool sat below 0.60 -- about 57% likely matches
+against the pool's 25%, and not one new label in the band the `tau_low`
+argument actually rests on. The owner caught it by asking whether the
+page was only sending positives.
+
+Allocate by **where the labels are thinnest**, and spread *across* each
+band rather than taking its top:
+
 ```python
 # NC_DATA_ROOT set, after `nc sync pull`
-from nc.cluster import load_cluster_config
-from nc.labelling import labelling_pool, load_labels, order_for_labelling
+import random
+
+from nc.labelling import labelling_pool, load_labels
 from nc.store import DataRoot
 
 root = DataRoot.from_env()
-done = {label.pair_id for label in load_labels(root)}
+labels = load_labels(root)
+done = {label.pair_id for label in labels}
 todo = [p for p in labelling_pool(root) if p.pair_id not in done]
-config = load_cluster_config()
-ordered = order_for_labelling(todo, config.tau_low, config.tau_high)[:150]
+
+BANDS = [
+    (0.85, 1.01),
+    (0.80, 0.85),
+    (0.75, 0.80),
+    (0.70, 0.75),
+    (0.65, 0.70),
+    (0.60, 0.65),
+    (0.57, 0.60),
+    (0.0, 0.57),
+]
+have = {b: sum(1 for l in labels if b[0] <= l.score < b[1]) for b in BANDS}
+pool = {
+    b: sorted((p for p in todo if b[0] <= p.score < b[1]), key=lambda p: p.score)
+    for b in BANDS
+}
+
+take = {b: 0 for b in BANDS}  # each pair to the thinnest band
+for _ in range(150):
+    open_bands = [b for b in BANDS if take[b] < len(pool[b])]
+    if not open_bands:
+        break
+    take[min(open_bands, key=lambda b: (have[b] + take[b], -b[0]))] += 1
+
+
+def stride(xs, n):  # n spread across the band, not its top n
+    if n <= 0:
+        return []
+    if n >= len(xs):
+        return list(xs)
+    step = len(xs) / n
+    return [xs[int(i * step)] for i in range(n)]
+
+
+selected = [p for b in BANDS for p in stride(pool[b], take[b])]
+random.Random(0).shuffle(selected)  # so a short session still spans the band
 ```
 
-`order_for_labelling` round-robins across score buckets, so the first
-answers span the whole band and a session that stops early still
-improves every row of `nc tune` rather than one. 150 keeps the page
-around 150KB; take fewer if the pool is small, never the whole pool.
+This is a stratified sample, not a representative one, and that is the
+point: it is sized to estimate a boundary, not the pool's overall match
+rate. Anyone wanting the pool's true yield needs a random sample
+instead, and should say so rather than reading it off this page. 150
+keeps the page near 150KB; take fewer if the pool is small, never the
+whole pool.
 
 **Anything that reads as progress must be scoped to `PAIRS`.** The
 page's `labels` map outlives a batch: it is restored from the artifact's
