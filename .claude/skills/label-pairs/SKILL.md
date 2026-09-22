@@ -56,6 +56,16 @@ answers span the whole band and a session that stops early still
 improves every row of `nc tune` rather than one. 150 keeps the page
 around 150KB; take fewer if the pool is small, never the whole pool.
 
+**Anything that reads as progress must be scoped to `PAIRS`.** The
+page's `labels` map outlives a batch: it is restored from the artifact's
+database and from local storage, so it holds every answer ever given the
+page, not this batch's. The counter counted its keys against
+`PAIRS.length` and read `222 / 150` the first time the pairs were
+refreshed -- a numerator and denominator measuring different sets. That
+invariant held for free while the page was a snapshot and broke the
+moment it became refreshable. The rail and the JSONL export were already
+scoped with `PAIRS.filter(p => labels[p.id])`; the counter is now too.
+
 Then swap the JSON inside `<script id="pairs-data" type="application/json">`
 in the artifact's current HTML — read it with the Artifact tool, replace
 that one block, publish back to **the same url**. Change nothing else:
