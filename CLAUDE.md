@@ -48,4 +48,6 @@ nc nightly --dry-run        every nightly step except the agent step and the pus
   pending cluster into a valid analysis file.
 - `.claude/skills/judge-pairs/SKILL.md`: how an agent answers one
   borderline pair, same story or not. Prompt in `prompts/judge.md`.
+- `.claude/skills/label-pairs/SKILL.md`: the owner's labelling page, and
+  why its answers are never an agent's to write.
 - `.claude/skills/nightly/SKILL.md`: the nightly Routine procedure.
