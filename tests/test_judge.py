@@ -403,6 +403,47 @@ def test_a_judgment_file_missing_a_field_cannot_stop_clustering_either(
     assert accepted_links(data_root) == [(good.a.item_id, good.b.item_id)]
 
 
+def test_a_human_yes_links_a_pair_the_judge_never_saw(tmp_path: Path) -> None:
+    pair = _pair(_item("a", "alpha"), _item("b", "beta"))
+    data_root = _root(tmp_path, [pair])
+    append_label(data_root, _label(pair, True))
+
+    assert accepted_links(data_root) == [(pair.a.item_id, pair.b.item_id)]
+
+
+def test_a_human_answer_outranks_the_judges_either_way(tmp_path: Path) -> None:
+    """The judge said yes and the human no: no link. The judge said no
+    and the human yes: a link. A labelled pair is the human's call."""
+    judge_yes = _pair(_item("a", "alpha"), _item("b", "beta"))
+    judge_no = _pair(_item("c", "gamma"), _item("d", "delta"))
+    data_root = _root(tmp_path, [judge_yes, judge_no])
+    write_judgments(
+        data_root, [_judgment(judge_yes), _judgment(judge_no, same_story=False)]
+    )
+    append_label(data_root, _label(judge_yes, False))
+    append_label(data_root, _label(judge_no, True))
+
+    assert accepted_links(data_root) == [(judge_no.a.item_id, judge_no.b.item_id)]
+
+
+def test_the_last_human_answer_is_the_one_that_links(tmp_path: Path) -> None:
+    pair = _pair(_item("a", "alpha"), _item("b", "beta"))
+    data_root = _root(tmp_path, [pair])
+    append_label(data_root, _label(pair, True))
+    append_label(data_root, _label(pair, False))
+
+    assert accepted_links(data_root) == []
+
+
+def test_a_labelled_pair_leaves_the_judges_queue(tmp_path: Path) -> None:
+    labelled = _pair(_item("a", "alpha"), _item("b", "beta"))
+    open_pair = _pair(_item("c", "gamma"), _item("d", "delta"))
+    data_root = _root(tmp_path, [labelled, open_pair])
+    append_label(data_root, _label(labelled, False))
+
+    assert [pair.pair_id for pair in unjudged_pairs(data_root)] == [open_pair.pair_id]
+
+
 def test_validate_reports_the_file_it_could_not_read(tmp_path: Path) -> None:
     """Skipped, not swallowed. `nc judge --validate` is where a person
     asks what is on disk, and an unreadable file has to show up there or

@@ -140,13 +140,15 @@ def _cluster(args: argparse.Namespace) -> int:
     pair would be. With `tau_high` at 1.00 this is where essentially
     every cross-outlet link now comes from (docs/CLUSTERING.md) --
     `nc cluster` still calls no LLM, it reads files the LLM step wrote.
+    Human labels ride the same seam and outrank a judgment for the pair
+    they answer (nc/judge.py's module docstring).
     """
     data_root = _data_root(args)
     config = cluster.load_cluster_config(args.config)
     links = judge.accepted_links(data_root)
     report = cluster.run_clustering(data_root, config, args.db, extra_links=links)
     print(cluster.format_report(report, config))
-    print(f"cluster: {len(links)} link(s) from accepted judgments")
+    print(f"cluster: {len(links)} link(s) from accepted judgments and labels")
     return 0
 
 

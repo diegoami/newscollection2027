@@ -557,6 +557,14 @@ and reports agreement, precision, recall, and every disagreement with
 the judge's own stated reason — the disagreements are the point, since
 a wrong link is readable rather than merely counted.
 
+A label is also an answer, not only a test question. Since 2026-09-25
+`accepted_links` reads `labels/pairs.jsonl` alongside `judgments/`, and
+where both answer a pair the human wins, in either direction; a labelled
+pair leaves the judge's queue. Judgment files stay the model's alone, so
+this command still scores only the model. The cost is that a pair
+labelled before the judge reached it never gets a model answer, so the
+overlap this command scores on grows only from pairs judged first.
+
 It is backend-agnostic by construction: it reads judgment files, so it
 measures the skill today and will measure the API backend unchanged. It
 needs no model and no network, so unlike `nc bench-embed` it runs in
