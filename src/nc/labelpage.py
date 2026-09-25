@@ -46,6 +46,15 @@ wants to know what share of the pool is a real match needs a random
 sample and must say so -- reading it off this page gives the wrong
 answer, confidently.
 
+**Or the judge's queue, with `--queue`.** Since a label decides its
+pair (nc/judge.py's module docstring), the page is also a way to work
+the judge's backlog by hand. That wants the opposite selection: not a
+spread across bands, but the head of `nc.judge.unjudged_pairs` --
+cross-outlet first, highest score first -- because those are the pairs
+most likely to make a story. `select_from_queue` takes that head and
+nothing else. Only the order changes: it is scattered like a band is,
+so the page still does not front-load its likely matches.
+
 `render_page` handles the other half: swapping the pair data into the
 published HTML, with the invariants that page has to keep. It refuses
 rather than publishes when one breaks, because the page's failures are
@@ -220,6 +229,20 @@ def select_for_page(
         band: sorted(stride(by_band[band], taken[band]), key=_scatter) for band in bands
     }
     return interleave({b: picks for b, picks in chosen.items() if picks})
+
+
+def select_from_queue(queue: Sequence[PendingPair], budget: int) -> list[PendingPair]:
+    """The first `budget` pairs of the judge's queue, in scattered order.
+
+    `queue` is `nc.judge.unjudged_pairs`, already in priority order, so
+    the selection is its head and not a stride: the point of this mode
+    is to answer the pairs the judge would reach first. The order is
+    `_scatter`'s, because the queue's own order is highest score first,
+    and presenting it that way is the front-loading the band sample was
+    fixed for -- the likely matches all first, and a session that stops
+    early having seen only them.
+    """
+    return sorted(queue[: max(budget, 0)], key=_scatter)
 
 
 def page_payload(pairs: Sequence[PendingPair]) -> list[dict[str, Any]]:

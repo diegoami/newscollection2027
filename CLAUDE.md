@@ -36,6 +36,7 @@ nc judge --validate check the judgments on disk before they can link
 nc label            record human yes/no on borderline pairs (ground truth)
 nc label --import   record answers off the labelling page, checked against disk
 nc label-page       rebuild the labelling page's pairs, stratified by band
+nc label-page --queue   the same page, filled from the head of the judge queue
 nc bench-judge      score those judgments against the human labels
 nc validate --new   validate analyses written since the last run
 nc analyze --backend api    fill pending clusters through the SDK backend
