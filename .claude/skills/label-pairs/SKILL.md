@@ -14,18 +14,21 @@ than a terminal.
 
 ## What this is not
 
-Labels are **not** judgments, and the two have opposite effects:
+Labels are **not** judgments, though both decide pairs:
 
 | | writes | effect |
 |---|---|---|
 | `nc judge`, the judge-pairs skill | `judgments/` | creates links, makes stories |
-| `nc label`, this page | `labels/pairs.jsonl` | ground truth, creates nothing |
+| `nc label`, this page | `labels/pairs.jsonl` | ground truth, and outranks a judgment |
 
-Labelling does not shorten the judge queue and does not publish a story.
-What it does is keep the only independent check on the judge step: `nc
-bench-judge` scores an agent's judgments against these human answers,
-and `nc tune` reads them to say whether `tau_low` is in the right place.
-A label set the agent wrote would make both meaningless.
+A labelled pair links if and only if its last label says same story,
+whatever the judgment says, and it leaves the judge's queue
+(`nc.judge.accepted_links`, `nc.judge.unjudged_pairs`). So a label can
+make a story or take one apart. It is also the only independent check
+on the judge step: `nc bench-judge` scores an agent's judgments against
+these human answers, and `nc tune` reads them to say whether `tau_low`
+is in the right place. A label set the agent wrote would make both
+meaningless and would put the agent's guesses above the judge's.
 
 **Never write `labels/pairs.jsonl` yourself.** The judge-pairs skill
 says so and this is why. The page emits the lines; `nc label --import`
