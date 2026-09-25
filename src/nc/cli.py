@@ -31,6 +31,7 @@ from nc import (
     feeds,
     judge,
     labelling,
+    labelpage,
     nightly,
     runlog,
     site,
@@ -150,15 +151,80 @@ def _cluster(args: argparse.Namespace) -> int:
 
 
 def _label(args: argparse.Namespace) -> int:
-    """T22: show unlabeled pairs, record yes/no to `labels/pairs.jsonl`.
+    """T22: show unlabeled pairs, record yes/no to `labels/pairs.jsonl`,
+    or with `--import` take those answers from a file instead of a
+    terminal prompt.
     Reads `pending-pairs/` (T24's exhaustive judge queue) and
     `label-sample/` (T22's bounded, stratified sample) written by `nc
     cluster` -- no embedding model, see nc/labelling.py's module
     docstring and `labelling_pool`.
     """
     data_root = _data_root(args)
+    if args.import_path is not None:
+        return _label_import(data_root, args.import_path, dry_run=args.dry_run)
     config = cluster.load_cluster_config(args.config)
     labelling.run_label_session(data_root, config, limit=args.limit)
+    return 0
+
+
+def _label_import(data_root: store.DataRoot, path: Path, *, dry_run: bool) -> int:
+    """`nc label --import`: record answers collected on the labelling
+    page, checked line by line against the pair files on disk.
+
+    Exits non-zero on any rejection, and writes nothing in that case --
+    see `nc.labelling.import_labels` for why a partial import is the
+    outcome worth most care to avoid. The point of the check is that
+    `labels/pairs.jsonl` is ground truth for `nc tune` and `nc
+    bench-judge`, so "an agent must not write it by hand" stops being
+    an instruction in a skill and becomes something the code enforces.
+    """
+    report = labelling.import_labels(data_root, path, dry_run=dry_run)
+    print(labelling.format_import_report(report))
+    return 0 if report.ok else 1
+
+
+def _label_page(args: argparse.Namespace) -> int:
+    """Rebuild the labelling page's pairs, and optionally the page.
+
+    The selection is `nc.labelpage.select_for_page`, not the head of
+    `nc.labelling.order_for_labelling`: that ordering takes the highest
+    score first within each bucket, so its head is the top slice of
+    every bucket. Doing it by hand on 2026-09-22 produced a page whose
+    lowest pair was 0.6079 while 38% of the pool sat below 0.60. This
+    command exists so nobody assembles that selection by hand again --
+    see `.claude/skills/label-pairs/SKILL.md`.
+    """
+    data_root = _data_root(args)
+    config = labelpage.load_label_page_config(args.config)
+    if args.limit is not None:
+        config = replace(config, budget=args.limit)
+
+    labels = labelling.load_labels(data_root)
+    known = {label.pair_id for label in labels}
+    pool = [p for p in labelling.labelling_pool(data_root) if p.pair_id not in known]
+    selected = labelpage.select_for_page(labels, pool, config)
+    payload = labelpage.page_payload(selected)
+
+    bands = config.bands
+    print(f"label-page: {len(pool)} unlabelled pair(s), {len(selected)} on the page")
+    print(f"{'band':>12} {'labelled':>9} {'pool':>6} {'page':>6} {'after':>6}")
+    for band in bands:
+        have = sum(1 for x in labels if labelpage.band_of(x.score, bands) == band)
+        in_pool = sum(1 for x in pool if labelpage.band_of(x.score, bands) == band)
+        on_page = sum(1 for x in selected if labelpage.band_of(x.score, bands) == band)
+        print(
+            f"{band[0]:>7.2f}-{min(band[1], 1.0):.2f} {have:>9} {in_pool:>6} "
+            f"{on_page:>6} {have + on_page:>6}"
+        )
+
+    if args.page is None:
+        store.write_text(args.out, json.dumps(payload, ensure_ascii=False, indent=2))
+        print(f"label-page: pair data written to {args.out}")
+        return 0
+
+    rendered = labelpage.render_page(args.page.read_text(encoding="utf-8"), payload)
+    store.write_text(args.out, rendered)
+    print(f"label-page: page written to {args.out}; publish it to the same url")
     return 0
 
 
@@ -600,7 +666,54 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="stop after this many pairs (default: the whole unlabeled pool)",
     )
+    label_parser.add_argument(
+        "--import",
+        dest="import_path",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help=(
+            "record answers from a JSONL file instead of prompting; every "
+            "line is checked against pending-pairs/ and label-sample/ and "
+            "nothing is written if any line fails"
+        ),
+    )
+    label_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --import, report what would be recorded and write nothing",
+    )
     label_parser.set_defaults(func=_label)
+
+    label_page_parser = subparsers.add_parser(
+        "label-page",
+        help="rebuild the labelling page's pairs, stratified by score band",
+    )
+    label_page_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    label_page_parser.add_argument(
+        "--config",
+        type=Path,
+        default=labelpage.DEFAULT_CONFIG_PATH,
+        help=f"label page config (default: {labelpage.DEFAULT_CONFIG_PATH})",
+    )
+    label_page_parser.add_argument(
+        "--page",
+        type=Path,
+        default=None,
+        help="the published page's current HTML; omit to emit pair data only",
+    )
+    label_page_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("label-page.json"),
+        help="where to write (default: label-page.json)",
+    )
+    label_page_parser.add_argument(
+        "--limit", type=int, default=None, help="override the configured budget"
+    )
+    label_page_parser.set_defaults(func=_label_page)
 
     tune_parser = subparsers.add_parser(
         "tune",

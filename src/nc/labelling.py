@@ -65,6 +65,7 @@ from collections import deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 
 from nc.cluster import ClusterConfig, PendingPair, load_label_sample, load_pending_pairs
@@ -177,6 +178,208 @@ def append_label(data_root: DataRoot, label: Label) -> None:
     path = labels_path(data_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     append_line(path, json.dumps(label.to_dict(), sort_keys=True, ensure_ascii=True))
+
+
+# --- importing off the labelling page -----------------------------------
+
+
+@dataclass(frozen=True)
+class ImportRejection:
+    """One line of an import file that will not be recorded, and why."""
+
+    line: int
+    pair_id: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class ImportReport:
+    accepted: tuple[Label, ...]
+    already: tuple[Label, ...]
+    rejected: tuple[ImportRejection, ...]
+    written: bool
+
+    @property
+    def ok(self) -> bool:
+        return not self.rejected
+
+
+def read_import_file(path: Path) -> list[tuple[int, dict[str, object] | None]]:
+    """Each non-blank line as `(line number, object or None)`; `None`
+    for a line that is not a JSON object, so the caller can reject it
+    by number rather than dying on the first bad byte."""
+    rows: list[tuple[int, dict[str, object] | None]] = []
+    with path.open("r", encoding="utf-8") as fh:
+        for number, raw in enumerate(fh, start=1):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                rows.append((number, None))
+                continue
+            rows.append((number, parsed if isinstance(parsed, dict) else None))
+    return rows
+
+
+def import_labels(
+    data_root: DataRoot,
+    path: Path,
+    *,
+    dry_run: bool = False,
+) -> ImportReport:
+    """Record answers collected off the labelling page, checking every
+    one against the pair files `nc cluster` wrote.
+
+    Why this is not just `cat >> labels/pairs.jsonl`. `labels/pairs.jsonl`
+    is ground truth: `nc tune` picks `tau_high` from it and
+    `nc bench-judge` scores the judge model against it. It is the one
+    file in the system an agent must not author, and until now that was
+    a rule in a skill -- honoured, unenforced, and worth exactly as
+    much as the care of whoever last transcribed a page full of taps.
+
+    So each line is checked against `labelling_pool`, which is
+    `pending-pairs/` and `label-sample/` on disk:
+
+    * the pair must exist there -- an id for a pair that was never
+      scored cannot have been answered on any page;
+    * the claimed score must be the score `nc cluster` computed, to the
+      four decimals the page carries -- a label at the wrong score
+      moves a `nc tune` threshold while looking entirely normal;
+    * the outlets must be that pair's outlets;
+    * a pair already in `labels/pairs.jsonl` with the other answer is a
+      conflict, not an update: this file is append-only and a human
+      changing their mind is a thing to look at, not to overwrite.
+
+    Nothing is written unless every line passes. A partial import of a
+    page's answers is the worst outcome available -- it is both
+    incomplete and indistinguishable from a complete one -- so a single
+    bad line stops the batch and the report names it by line number.
+
+    What survives validation is built with `label_from_pair` from the
+    pair on disk, so the recorded score and outlets are the ones
+    `nc cluster` computed even where the import agreed with them. The
+    only field taken from the import is the answer itself, plus its
+    timestamp; those are the only two things a human actually produced.
+    """
+    pool = {pair.pair_id: pair for pair in labelling_pool(data_root)}
+    existing = {label.pair_id: label for label in load_labels(data_root)}
+
+    accepted: list[Label] = []
+    already: list[Label] = []
+    rejected: list[ImportRejection] = []
+    seen: dict[str, bool] = {}
+
+    for number, row in read_import_file(path):
+        if row is None:
+            rejected.append(ImportRejection(number, "?", "not a JSON object"))
+            continue
+        pair_id = f"{row.get('item_id_a')}-{row.get('item_id_b')}"
+        reject = partial(ImportRejection, number, pair_id)
+
+        answer = row.get("same_story")
+        if not isinstance(answer, bool):
+            rejected.append(reject("same_story is not true or false"))
+            continue
+        pair = pool.get(pair_id)
+        if pair is None:
+            rejected.append(reject("no such pair in pending-pairs/ or label-sample/"))
+            continue
+        try:
+            claimed = float(str(row.get("score")))
+        except (TypeError, ValueError):
+            rejected.append(reject(f"score {row.get('score')!r} is not a number"))
+            continue
+        if round(claimed, 4) != round(pair.score, 4):
+            rejected.append(
+                reject(
+                    f"score says {claimed:.4f}, nc cluster computed {pair.score:.4f}"
+                )
+            )
+            continue
+        if (row.get("outlet_a"), row.get("outlet_b")) != (pair.a.outlet, pair.b.outlet):
+            rejected.append(
+                reject(
+                    f"outlets say {row.get('outlet_a')}/{row.get('outlet_b')}, "
+                    f"the pair is {pair.a.outlet}/{pair.b.outlet}"
+                )
+            )
+            continue
+        stamp = row.get("labeled_at")
+        if not isinstance(stamp, str) or not _is_timestamp(stamp):
+            rejected.append(reject(f"labeled_at {stamp!r} is not a UTC timestamp"))
+            continue
+
+        if pair_id in seen:
+            if seen[pair_id] != answer:
+                rejected.append(reject("the import answers this pair both ways"))
+            continue
+        seen[pair_id] = answer
+
+        if pair_id in existing:
+            if existing[pair_id].same_story != answer:
+                rejected.append(
+                    reject(
+                        f"already labelled {_yesno(existing[pair_id].same_story)}, "
+                        f"the import says {_yesno(answer)}"
+                    )
+                )
+            else:
+                already.append(existing[pair_id])
+            continue
+
+        accepted.append(label_from_pair(pair, answer, stamp))
+
+    write = bool(accepted) and not rejected and not dry_run
+    if write:
+        for label in accepted:
+            append_label(data_root, label)
+    return ImportReport(
+        accepted=tuple(accepted),
+        already=tuple(already),
+        rejected=tuple(rejected),
+        written=write,
+    )
+
+
+def _yesno(same_story: bool) -> str:
+    return "same story" if same_story else "not the same story"
+
+
+def _is_timestamp(value: str) -> bool:
+    try:
+        datetime.strptime(value, _ISO_FORMAT).replace(tzinfo=UTC)
+    except ValueError:
+        return False
+    return True
+
+
+def format_import_report(report: ImportReport) -> str:
+    """What the owner reads before deciding, and after."""
+    lines: list[str] = []
+    for rejection in report.rejected:
+        lines.append(
+            f"  line {rejection.line}: {rejection.reason}  "
+            f"[{rejection.pair_id[:16]}...]"
+        )
+    if lines:
+        lines.insert(0, f"{len(report.rejected)} line(s) rejected, nothing written:")
+        lines.append("")
+    yes = sum(1 for label in report.accepted if label.same_story)
+    lines.append(
+        f"{len(report.accepted)} new label(s): {yes} same story, "
+        f"{len(report.accepted) - yes} not"
+    )
+    if report.already:
+        lines.append(f"{len(report.already)} already recorded, unchanged")
+    if report.accepted and not report.rejected:
+        lines.append(
+            "written to labels/pairs.jsonl"
+            if report.written
+            else "nothing written (dry run)"
+        )
+    return "\n".join(lines)
 
 
 # --- ordering -----------------------------------------------------------
