@@ -213,7 +213,10 @@ the pipeline that can tell an event from a subject.
 `nc label` and `nc tune` remain, with their purpose changed: the
 labelled pairs are now most useful as an evaluation set for the judge
 rather than as tuning data for the thresholds. `nc bench-judge` is what
-spends them that way.
+spends them that way. They also decide their own pairs: a labelled pair
+links if and only if its last label says same story, whatever the judge
+said, and leaves the judge's queue. So answering pairs in the browser
+changes the site, not just the benchmark.
 
 The judge is a file contract, like the analysis step:
 `pending-pairs/<pair_id>.json` in, `judgments/<pair_id>.json` out,

@@ -56,6 +56,16 @@ only if a judgment says so. `same_story: false` is therefore recorded
 but inert -- kept because it is the evidence for `nc bench-judge`, and
 because re-judging a pair the model already declined would be a waste
 of a call every night forever.
+
+**A human answer outranks the judge's.** `labels/pairs.jsonl` -- what
+`nc label` and the "Same Story?" page write -- is read here too, and a
+labelled pair links if and only if its last label says same story,
+whatever a judgment says. That is the one way a link can be taken
+away, and it is the human's, not the model's. A labelled pair also
+leaves the judge's queue: spending a call on a question a person has
+already answered buys nothing that can change the output. Judgment
+files stay the model's alone, so `nc bench-judge` still scores the
+model and nothing else.
 """
 
 from __future__ import annotations
@@ -300,12 +310,14 @@ def unjudged_pairs(data_root: DataRoot) -> list[PendingPair]:
     the pairs most likely to be real matches.
 
     Self-pairs are dropped outright -- see `_is_self_pair`; there is no
-    case where the answer matters.
+    case where the answer matters. So are pairs a human has labelled
+    (module docstring): the label decides them.
     """
     # Unreadable judgments are ignored rather than raised on, and the
     # pair they were for comes back onto this queue: a judgment nobody
     # can read has decided nothing, so the honest state is unjudged.
     judged = {judgment.pair_id for judgment in _load_judgments(data_root)[0]}
+    judged |= human_answers(data_root).keys()
     pairs = [
         pair
         for pair in load_pending_pairs(data_root)
@@ -317,9 +329,18 @@ def unjudged_pairs(data_root: DataRoot) -> list[PendingPair]:
     )
 
 
+def human_answers(data_root: DataRoot) -> dict[str, Label]:
+    """The last label for each pair, by `pair_id`. `labels/pairs.jsonl`
+    is append-only, so a corrected answer is a later line, not an edit --
+    the same rule `score_judgments` applies."""
+    return {label.pair_id: label for label in load_labels(data_root)}
+
+
 def accepted_links(data_root: DataRoot) -> list[tuple[str, str]]:
     """The `extra_links` for `nc.cluster.cluster_items`: one pair per
-    judgment that says same story *and* passes the validator.
+    judgment that says same story *and* passes the validator, except
+    where a human label answers the pair -- then the label decides
+    (module docstring).
 
     This is the only path from a judgment into clustering. A judgment
     that fails validation *or does not parse at all* is skipped here
@@ -342,7 +363,12 @@ def _accepted_links_with_rejects(
     data_root: DataRoot,
 ) -> tuple[list[tuple[str, str]], list[str]]:
     pairs = {pair.pair_id: pair for pair in load_pending_pairs(data_root)}
-    links: list[tuple[str, str]] = []
+    human = human_answers(data_root)
+    links: list[tuple[str, str]] = [
+        (label.item_id_a, label.item_id_b)
+        for label in human.values()
+        if label.same_story
+    ]
     judgments, unreadable = _load_judgments(data_root)
     rejects: list[str] = list(unreadable)
     for judgment in judgments:
@@ -351,7 +377,7 @@ def _accepted_links_with_rejects(
         except JudgmentRejected as exc:
             rejects.append(str(exc))
             continue
-        if judgment.same_story:
+        if judgment.same_story and judgment.pair_id not in human:
             links.append((judgment.item_id_a, judgment.item_id_b))
     return sorted(links), rejects
 
