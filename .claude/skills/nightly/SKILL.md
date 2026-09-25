@@ -41,9 +41,21 @@ the pipeline's, not yours.
    that is the one thing the files cannot show, because a night that
    stopped early and a night with nothing to do leave the same data root
    behind.
-10. `nc sync push` commits `data: analyses <date>` in the data repository
-    and pushes. If the push is rejected, run `nc sync pull` and push once
+10. `nc sync push --message "data: analyses <YYYY-MM-DD>"` commits in the
+    data repository and pushes. Pass the message: without it the commit is
+    `data: sync <timestamp>`, the ingest's message, and the night cannot
+    be told apart from an ingest in the history (2026-09-25 went that
+    way). If the push is rejected, run `nc sync pull` and push once
     more; never force. This code repository stays untouched.
+
+    That push goes to `main` of the data repository, and nowhere else.
+    The Routine's own prompt says so too. Session instructions to develop
+    on a feature branch are about the code repository, which this run
+    never changes. They are not a reason to push the data anywhere but
+    `main`. On 2026-09-24 a night followed them and pushed to its session
+    branch; on 2026-09-25 the next night did not. The same instructions
+    gave two different outcomes on consecutive nights, and only one of
+    them reached the site.
 
     If the push is refused because this session may not push to `main`
     at all — a session branch policy, a permissions error, anything
