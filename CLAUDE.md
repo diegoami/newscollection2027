@@ -18,8 +18,10 @@ Read first: `docs/ARCHITECTURE.md` (what and why), `docs/WORKFLOW.md`
 - Pipeline data is text only (JSONL and JSON) and lives in the data root,
   a checkout of `newscollection2027-data` at `NC_DATA_ROOT`. It is never
   committed to this repository. SQLite lives in `.cache/`.
-- `main` is PR-only, no exceptions. Agents never merge. Automation pushes
-  only to the data repository.
+- `main` is PR-only, no exceptions. An agent merges a PR only when the
+  owner asks it to, in the session, for that PR. Unattended automation
+  (Routines, the nightly) never merges, and pushes only to the data
+  repository.
 - Run `make check` before reporting any task as done.
 - Model ids and thresholds live in `config/`, never inline in code.
 

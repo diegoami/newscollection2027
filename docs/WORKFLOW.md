@@ -35,8 +35,11 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
 - `main` is protected by a ruleset: PRs only, CI must pass, no force
   pushes, no deletions, required approvals set to zero. Zero, because
   agent sessions open PRs under the owner's GitHub identity and GitHub
-  does not let an author approve their own PR. The owner merges after
-  reading the PR and the reviewer agent's findings. No agent merges.
+  does not let an author approve their own PR. The owner decides every
+  merge after reading the PR and the reviewer agent's findings, and
+  either merges it or tells the agent in the session to merge it. An
+  agent merges only on that instruction, for the PRs it names, and
+  never on its own judgement; unattended automation never merges.
 - Feature branches: `feat/T<nn>-<slug>` (one task per branch), fixes:
   `fix/<slug>`. Branches are short-lived and deleted after merge.
 - One PR per task. The PR body states the task id, what changed, how it
@@ -46,7 +49,8 @@ the fan-out as a Workflow script; otherwise it spawns plain subagents.
   2. Orchestrator runs the reviewer agent and posts its findings as one PR
      comment. Findings are fixed on the same branch or explicitly declined
      with a reason in the thread.
-  3. Owner reads the PR, asks for changes or merges (squash).
+  3. Owner reads the PR, asks for changes, or merges (squash) or tells the
+     agent to.
 - Where data lives was decided in T00 (`docs/DECISIONS.md`): a separate
   repository, `newscollection2027-data`. Nothing writes data into this
   repository, so there is no exception to the PR rule for it -- the
