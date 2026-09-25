@@ -45,6 +45,15 @@ the pipeline's, not yours.
     and pushes. If the push is rejected, run `nc sync pull` and push once
     more; never force. This code repository stays untouched.
 
+    That push goes to `main` of the data repository, and nowhere else.
+    The Routine's own prompt says so too. Session instructions to develop
+    on a feature branch are about the code repository, which this run
+    never changes. They are not a reason to push the data anywhere but
+    `main`. On 2026-09-24 a night followed them and pushed to its session
+    branch; on 2026-09-25 the next night did not. The same instructions
+    gave two different outcomes on consecutive nights, and only one of
+    them reached the site.
+
     If the push is refused because this session may not push to `main`
     at all — a session branch policy, a permissions error, anything
     other than the non-fast-forward case above — the night has failed,

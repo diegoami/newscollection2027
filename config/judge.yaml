@@ -29,7 +29,16 @@ api_model: "claude-sonnet-5"
 # How many pairs one judge run works through. A bound, not a threshold:
 # the queue is ordered highest-score-first (nc.judge.unjudged_pairs), so a
 # run that stops early has judged the pairs most likely to be real
-# matches, and the rest are still there tomorrow. Sized for the nightly
-# Routine -- docs/ARCHITECTURE.md's cost model budgets roughly fifty
-# clusters a night, and the borderline band runs at a similar volume.
-max_pairs_per_run: 60
+# matches, and the rest are still there tomorrow.
+#
+# Sized from the inflow, measured 2026-09-25 over 09-16..09-25: about 150
+# new borderline pairs a day, about 90 of them cross-outlet (44 to 189 on
+# single days). The queue puts cross-outlet pairs first, and only they can
+# make a story on their own. At the old 60 the judge fell behind every
+# night -- 192 unjudged on 09-18, 1080 on 09-25, 493 of them cross-outlet.
+# 150 covers a day's cross-outlet inflow and clears about 60 of that
+# backlog a night, so it is gone in about a week; after that the spare goes
+# to same-outlet pairs. It runs on the subscription, so the cost is the
+# Routine's time, not money. Lower it again once the backlog is gone if
+# the nightly gets slow.
+max_pairs_per_run: 150

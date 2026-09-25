@@ -246,7 +246,9 @@ Static pages, no JavaScript framework, minimal CSS, works on a phone.
 - Ingest, clustering, site build: free (GitHub Actions minutes on a public
   repo).
 - Nightly analysis: Claude Code Routine on the subscription. Roughly fifty
-  clusters a night at around a thousand input tokens each.
+  clusters a night at around a thousand input tokens each, plus up to
+  `max_pairs_per_run` borderline pairs judged (150; `config/judge.yaml`
+  says why).
 - API backend: used for local development, evals and backfills only.
   Claude Sonnet 5 list price is $2 per million input tokens and $10 per
   million output tokens, half that through the Batch API. Fifty clusters a
