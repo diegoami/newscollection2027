@@ -24,6 +24,7 @@ from nc.labelpage import (
     page_payload,
     render_page,
     select_for_page,
+    select_from_queue,
     stride,
 )
 
@@ -276,6 +277,31 @@ _PAGE = (
     "var done = PAIRS.filter(function (p) { return labels[p.id]; }).length;"
     "</script></body></html>"
 )
+
+
+def test_the_queue_page_takes_the_head_of_the_queue() -> None:
+    """Not a stride: the judge would reach these first, and they are the
+    ones most likely to make a story."""
+    queue = [_pair(0.95 - i * 0.001, i) for i in range(300)]
+    picked = select_from_queue(queue, 150)
+    assert {p.pair_id for p in picked} == {p.pair_id for p in queue[:150]}
+
+
+def test_the_queue_page_does_not_front_load_the_high_scores() -> None:
+    queue = [_pair(0.95 - i * 0.001, i) for i in range(150)]
+    picked = select_from_queue(queue, 150)
+    first, last = picked[:50], picked[-50:]
+    assert picked != queue
+    assert (
+        abs(sum(p.score for p in first) / 50 - sum(p.score for p in last) / 50) < 0.03
+    )
+    assert select_from_queue(queue, 150) == picked
+
+
+def test_the_queue_page_copes_with_a_short_queue() -> None:
+    queue = [_pair(0.7, i) for i in range(3)]
+    assert len(select_from_queue(queue, 150)) == 3
+    assert select_from_queue(queue, 0) == []
 
 
 def test_render_page_swaps_the_data_block() -> None:

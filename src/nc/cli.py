@@ -202,13 +202,23 @@ def _label_page(args: argparse.Namespace) -> int:
         config = replace(config, budget=args.limit)
 
     labels = labelling.load_labels(data_root)
-    known = {label.pair_id for label in labels}
-    pool = [p for p in labelling.labelling_pool(data_root) if p.pair_id not in known]
-    selected = labelpage.select_for_page(labels, pool, config)
+    if args.queue:
+        # Already without labelled pairs and self-pairs, in the judge's
+        # priority order (nc.judge.unjudged_pairs).
+        pool = judge.unjudged_pairs(data_root)
+        selected = labelpage.select_from_queue(pool, config.budget)
+        source = "unjudged pair(s) in the judge's queue"
+    else:
+        known = {label.pair_id for label in labels}
+        pool = [
+            p for p in labelling.labelling_pool(data_root) if p.pair_id not in known
+        ]
+        selected = labelpage.select_for_page(labels, pool, config)
+        source = "unlabelled pair(s)"
     payload = labelpage.page_payload(selected)
 
     bands = config.bands
-    print(f"label-page: {len(pool)} unlabelled pair(s), {len(selected)} on the page")
+    print(f"label-page: {len(pool)} {source}, {len(selected)} on the page")
     print(f"{'band':>12} {'labelled':>9} {'pool':>6} {'page':>6} {'after':>6}")
     for band in bands:
         have = sum(1 for x in labels if labelpage.band_of(x.score, bands) == band)
@@ -689,7 +699,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     label_page_parser = subparsers.add_parser(
         "label-page",
-        help="rebuild the labelling page's pairs, stratified by score band",
+        help="rebuild the labelling page's pairs: by score band, or --queue",
     )
     label_page_parser.add_argument(
         "--data-root", type=Path, default=None, help=data_root_help
@@ -714,6 +724,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     label_page_parser.add_argument(
         "--limit", type=int, default=None, help="override the configured budget"
+    )
+    label_page_parser.add_argument(
+        "--queue",
+        action="store_true",
+        help="take the head of the judge's queue instead of a sample by band",
     )
     label_page_parser.set_defaults(func=_label_page)
 

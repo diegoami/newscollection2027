@@ -57,6 +57,17 @@ of the selection.
 `nc label-page` without `--page` writes just the pair JSON, for
 inspecting the selection without touching the page.
 
+**Two selections, one page.** Ask the owner which one they want if they
+have not said:
+
+- the default, a sample by score band, when the point is the benchmark:
+  more labels where `nc tune` and `nc bench-judge` are thinnest,
+  including below `tau_low`, where no answer can link anything.
+- `--queue`, when the point is the backlog: the head of the judge's
+  queue, the pairs most likely to make a story, each answer deciding
+  its pair on the next `nc cluster`. Its band table is lopsided on
+  purpose; that is not the bug described below.
+
 ## Why there is a command rather than a recipe here
 
 This skill used to carry the selection as a code block. That is how it
