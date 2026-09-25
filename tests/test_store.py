@@ -389,6 +389,14 @@ def test_append_items_disables_newline_translation(tmp_path: Path) -> None:
     assert b"\r" not in path.read_bytes()
 
 
+# `store.write_text(path, text)` is the helper itself, reached through
+# its module; `path.write_text(text)` is the thing being banned. The
+# first version of this guard matched both and flagged `nc.cli` for
+# calling the helper correctly -- a guard that cries wolf gets widened
+# by whoever trips over it, so it is narrowed here instead.
+_PATH_WRITE_TEXT = re.compile(r"(?<!\bstore)\.write_text\(")
+
+
 def test_no_module_writes_a_pipeline_file_with_path_write_text() -> None:
     """The regression guard. `Path.write_text` is the easy thing to
     reach for and the one that breaks byte-stability on Windows, and no
@@ -400,7 +408,7 @@ def test_no_module_writes_a_pipeline_file_with_path_write_text() -> None:
         f"{path.name}:{number}"
         for path in sorted(package.glob("*.py"))
         for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
-        if ".write_text(" in line
+        if _PATH_WRITE_TEXT.search(line)
     ]
     assert offenders == [], (
         "use nc.store.write_text (or append_line) instead of Path.write_text: "
@@ -466,3 +474,11 @@ def test_every_writer_opens_in_binary_safe_text_mode() -> None:
     assert offenders == [], 'every write-mode open needs newline="": ' + ", ".join(
         offenders
     )
+
+
+def test_the_path_write_text_guard_still_catches_the_real_thing() -> None:
+    """Narrowing it to exclude the helper must not blind it to the ban."""
+    assert _PATH_WRITE_TEXT.search('path.write_text(text, encoding="utf-8")')
+    assert _PATH_WRITE_TEXT.search("    self._path.write_text(body)")
+    assert not _PATH_WRITE_TEXT.search("store.write_text(path, body)")
+    assert not _PATH_WRITE_TEXT.search("    write_text(path, body)")

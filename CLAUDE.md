@@ -33,6 +33,9 @@ nc cluster          embed, link, emit clusters and pending files
 nc pending          list clusters awaiting analysis
 nc judge            list borderline pairs awaiting a yes/no
 nc judge --validate check the judgments on disk before they can link
+nc label            record human yes/no on borderline pairs (ground truth)
+nc label --import   record answers off the labelling page, checked against disk
+nc label-page       rebuild the labelling page's pairs, stratified by band
 nc bench-judge      score those judgments against the human labels
 nc validate --new   validate analyses written since the last run
 nc analyze --backend api    fill pending clusters through the SDK backend
@@ -48,4 +51,6 @@ nc nightly --dry-run        every nightly step except the agent step and the pus
   pending cluster into a valid analysis file.
 - `.claude/skills/judge-pairs/SKILL.md`: how an agent answers one
   borderline pair, same story or not. Prompt in `prompts/judge.md`.
+- `.claude/skills/label-pairs/SKILL.md`: the owner's labelling page, and
+  why its answers are never an agent's to write.
 - `.claude/skills/nightly/SKILL.md`: the nightly Routine procedure.
