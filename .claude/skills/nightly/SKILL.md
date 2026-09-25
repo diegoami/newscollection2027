@@ -41,8 +41,11 @@ the pipeline's, not yours.
    that is the one thing the files cannot show, because a night that
    stopped early and a night with nothing to do leave the same data root
    behind.
-10. `nc sync push` commits `data: analyses <date>` in the data repository
-    and pushes. If the push is rejected, run `nc sync pull` and push once
+10. `nc sync push --message "data: analyses <YYYY-MM-DD>"` commits in the
+    data repository and pushes. Pass the message: without it the commit is
+    `data: sync <timestamp>`, the ingest's message, and the night cannot
+    be told apart from an ingest in the history (2026-09-25 went that
+    way). If the push is rejected, run `nc sync pull` and push once
     more; never force. This code repository stays untouched.
 
     That push goes to `main` of the data repository, and nowhere else.
