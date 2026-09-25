@@ -44,6 +44,24 @@ the pipeline's, not yours.
 10. `nc sync push` commits `data: analyses <date>` in the data repository
     and pushes. If the push is rejected, run `nc sync pull` and push once
     more; never force. This code repository stays untouched.
+
+    If the push is refused because this session may not push to `main`
+    at all — a session branch policy, a permissions error, anything
+    other than the non-fast-forward case above — the night has failed,
+    whatever `runs/<date>.json` says. Do not look for another way onto
+    `main`, and do not treat a push anywhere else as done. The one thing
+    you may do is park the commit on this session's own branch, so the
+    work does not vanish with the sandbox. Then step 11's report starts
+    with this line, before anything else:
+
+    `NOT PUBLISHED: push to main refused (<the error>). Work parked on <branch> in newscollection2027-data.`
+
+    On 2026-09-24 a night went exactly this way, and the note that said
+    so sat on a branch nobody reads. Recovering it is the owner's call.
+    That time, the branch's judgments and run log were taken onto
+    `main`. Its clusters and analyses were dropped: they were built on
+    a cluster state `main` no longer had, and `nc cluster` and the next
+    nightly rebuilt them.
 11. Report: clusters analysed, rejects left, and anything you stopped on.
 
 ## If something looks wrong before you start
