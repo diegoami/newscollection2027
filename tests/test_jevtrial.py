@@ -266,3 +266,36 @@ def test_the_shipped_config_has_a_jev_section() -> None:
     assert config.model.startswith("jev-")
     assert config.cutoffs == tuple(sorted(config.cutoffs))
     assert 0 < config.prefilter_below < min(config.cutoffs)
+
+
+def test_a_timeout_is_retried_not_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first full run died on one slow response out of 560."""
+    import io
+    import urllib.request
+
+    from nc.jevtrial import http_post
+
+    calls = {"n": 0}
+
+    def fake_urlopen(request: object, timeout: float) -> io.BytesIO:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise TimeoutError("The read operation timed out")
+        return io.BytesIO(json.dumps(_response(0.8)).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr("nc.jevtrial.time.sleep", lambda seconds: None)
+    raw = http_post(CONFIG, "key")({"model": "m"})
+    assert raw["answers"][QUESTION]["noul"] == 0.8
+    assert calls["n"] == 2
+
+
+def test_the_prefilter_counts_only_pairs_that_can_reach_the_queue() -> None:
+    """Labels sampled below tau_low are all no and mostly easy; counting
+    them doubled the first run's apparent pre-filter."""
+    in_band = TrialPair(_pair("a", "b", score=0.65), True)
+    below = TrialPair(_pair("c", "d", score=0.40), False)
+    answers = [_answer(in_band.pair, 0.95), _answer(below.pair, 0.01)]
+    report = build_report([in_band, below], answers, [], CONFIG, queue_floor=0.57)
+    [variant] = report.variants
+    assert (variant.prefilter.dropped, variant.prefilter.total) == (0, 1)

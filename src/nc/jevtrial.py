@@ -57,7 +57,13 @@ from typing import Any
 
 import yaml
 
-from nc.cluster import ClusterItem, PendingPair, load_label_sample, load_pending_pairs
+from nc.cluster import (
+    ClusterItem,
+    PendingPair,
+    load_cluster_config,
+    load_label_sample,
+    load_pending_pairs,
+)
 from nc.judge import (
     DEFAULT_JUDGE_CONFIG_PATH,
     JudgeEval,
@@ -222,9 +228,14 @@ Post = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 def http_post(config: JevConfig, api_key: str) -> Post:
-    """The one function here that touches the network. Retries 429 and
-    5xx with backoff, the SDK's default policy in miniature; anything
-    else is the caller's to see."""
+    """The one function here that touches the network. Retries 429, 5xx
+    and timeouts with backoff, the SDK's default policy in miniature;
+    any other HTTP error is the caller's to see.
+
+    Timeouts are retried because the first full run on 2026-09-26 died
+    on one: a single slow response out of 560 ended the trial at 111.
+    The cache kept those, but a run that needs babysitting is not one
+    anybody will rerun."""
 
     def post(body: dict[str, Any]) -> dict[str, Any]:
         request = urllib.request.Request(
@@ -245,6 +256,9 @@ def http_post(config: JevConfig, api_key: str) -> Post:
                     return parsed
             except urllib.error.HTTPError as exc:
                 if exc.code != 429 and exc.code < 500 or attempt == 3:
+                    raise
+            except (TimeoutError, urllib.error.URLError):
+                if attempt == 3:
                     raise
             time.sleep(0.5 * 2**attempt)
         raise AssertionError("unreachable")
@@ -429,7 +443,14 @@ def build_report(
     judge_judgments: Sequence[Judgment],
     config: JevConfig,
     unrebuildable: int = 0,
+    queue_floor: float = 0.0,
 ) -> TrialReport:
+    """`queue_floor` is `tau_low`: the pre-filter is measured only on
+    pairs that can reach the judge's queue. The labels include pairs
+    sampled below it (all no, most of them easy), and counting those made
+    the first run's pre-filter look twice as effective as it is: 47% of
+    pairs dropped over all labels, 23% over the queue's band."""
+    in_queue = [t for t in pairs if t.pair.score >= queue_floor]
     tuning = [t for t in pairs if in_tuning_half(t.pair.pair_id)]
     held_out = [t for t in pairs if not in_tuning_half(t.pair.pair_id)]
     reports: list[VariantReport] = []
@@ -472,7 +493,7 @@ def build_report(
                 held_out_at_pick=held_out_at_pick,
                 head_to_head=head_to_head,
                 calibration=calibration(pairs, mine),
-                prefilter=prefilter(pairs, mine, config.prefilter_below),
+                prefilter=prefilter(in_queue, mine, config.prefilter_below),
                 cost=sum(a.cost for a in mine),
                 mean_seconds=sum(timed) / len(timed) if timed else None,
             )
@@ -537,7 +558,8 @@ def format_report(report: TrialReport, config: JevConfig) -> str:
             )
         f = v.prefilter
         lines.append(
-            f"  pre-filter below {f.below}: drops {f.dropped}/{f.total} pairs, "
+            f"  pre-filter below {f.below}, queue band only: "
+            f"drops {f.dropped}/{f.total} pairs, "
             f"losing {f.matches_lost}/{f.matches} matches"
         )
         timing = "" if v.mean_seconds is None else f", {v.mean_seconds:.2f} s/call"
@@ -566,5 +588,10 @@ def run_trial(
         post = http_post(config, key)
     answers = ask_all(pairs, load_jev_prompt(prompt_path), config, post, cache_dir)
     return build_report(
-        pairs, answers, load_judgments(data_root), config, unrebuildable
+        pairs,
+        answers,
+        load_judgments(data_root),
+        config,
+        unrebuildable,
+        queue_floor=load_cluster_config().tau_low,
     )
