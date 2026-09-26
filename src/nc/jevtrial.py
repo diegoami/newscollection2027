@@ -51,7 +51,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -199,6 +199,7 @@ class Answer:
     input_tokens: int
     cost: float
     seconds: float
+    cached: bool = False
 
 
 def parse_answer(
@@ -292,7 +293,8 @@ def ask_all(
             if path.exists():
                 cached = json.loads(path.read_text(encoding="utf-8"))
                 if cached.get("prompt_id") == prompt_id:
-                    answers.append(parse_answer(cached["raw"], pid, variant, 0.0))
+                    answer = parse_answer(cached["raw"], pid, variant, 0.0)
+                    answers.append(replace(answer, cached=True))
                     continue
             started = time.monotonic()
             raw = post(request_body(pair, variant, prompt, config.model))
@@ -537,7 +539,7 @@ def build_report(
                     as_judgments([a for a in mine if a.pair_id in ids], picked),
                 ),
             )
-        timed = [a.seconds for a in mine if a.seconds > 0]
+        timed = [a.seconds for a in mine if not a.cached]
         reports.append(
             VariantReport(
                 variant=variant,
@@ -553,7 +555,7 @@ def build_report(
                     config.auto_yes_at,
                     {t.pair.pair_id: t.human for t in in_queue},
                 ),
-                cost=sum(a.cost for a in mine),
+                cost=_spent(mine),
                 mean_seconds=sum(timed) / len(timed) if timed else None,
             )
         )
@@ -564,6 +566,12 @@ def build_report(
         unrebuildable=unrebuildable,
         variants=reports,
     )
+
+
+def _spent(answers: Iterable[Answer]) -> float:
+    """What this run paid: answers read from the cache carry the cost of
+    the call that first fetched them, and cost nothing now."""
+    return sum(a.cost for a in answers if not a.cached)
 
 
 def _pr(result: JudgeEval) -> str:
@@ -673,6 +681,30 @@ class QueueSurvey:
     cross: Triage
     same: Triage
     cost: float
+    answers: tuple[Answer, ...] = ()
+    cross_ids: frozenset[str] = frozenset()
+
+
+LANES = ("no", "middle", "yes")
+
+
+def lane_ids(survey: QueueSurvey, lane: str, low: float, high: float) -> list[str]:
+    """The cross-outlet pair ids in one lane of the three-way split, for
+    `nc label-page --ids`: the way a human checks a lane on the real
+    queue rather than trusting the labelled estimate. Cross-outlet only,
+    because those are the pairs the judge takes first and the only ones
+    that make a story on their own."""
+    if lane not in LANES:
+        raise ValueError(f"lane must be one of {LANES}, got {lane!r}")
+
+    def lane_of(p: float) -> str:
+        return "no" if p < low else "yes" if p >= high else "middle"
+
+    return sorted(
+        a.pair_id
+        for a in survey.answers
+        if a.pair_id in survey.cross_ids and lane_of(a.p) == lane
+    )
 
 
 def survey_queue(
@@ -706,7 +738,9 @@ def survey_queue(
         variant=variant,
         cross=triage([a for a in answers if a.pair_id in cross_ids], low, high),
         same=triage([a for a in answers if a.pair_id not in cross_ids], low, high),
-        cost=sum(a.cost for a in answers),
+        cost=_spent(answers),
+        answers=tuple(answers),
+        cross_ids=frozenset(cross_ids),
     )
 
 

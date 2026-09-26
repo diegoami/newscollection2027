@@ -203,7 +203,25 @@ def _label_page(args: argparse.Namespace) -> int:
         config = replace(config, budget=args.limit)
 
     labels = labelling.load_labels(data_root)
-    if args.queue:
+    if args.ids is not None:
+        # An explicit list, e.g. `nc bench-jev --queue --write-lane yes`:
+        # exactly those pairs, minus any already labelled, in the same
+        # scattered order as --queue so position says nothing.
+        wanted = {
+            line.strip()
+            for line in args.ids.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+        known = {label.pair_id for label in labels}
+        pool = [
+            p
+            for p in labelling.labelling_pool(data_root)
+            if p.pair_id in wanted and p.pair_id not in known
+        ]
+        missing = len(wanted) - len(pool)
+        selected = labelpage.select_from_queue(pool, config.budget)
+        source = f"listed pair(s) ({missing} labelled or not on disk)"
+    elif args.queue:
         # Already without labelled pairs and self-pairs, in the judge's
         # priority order (nc.judge.unjudged_pairs).
         pool = judge.unjudged_pairs(data_root)
@@ -455,8 +473,18 @@ def _bench_jev(args: argparse.Namespace) -> int:
     data_root = _data_root(args)
     config = jevtrial.load_jev_config(args.config)
     if args.queue:
-        print(jevtrial.format_survey(jevtrial.survey_queue(data_root, config)))
+        survey = jevtrial.survey_queue(data_root, config)
+        print(jevtrial.format_survey(survey))
+        if args.write_lane:
+            ids = jevtrial.lane_ids(
+                survey, args.write_lane, config.prefilter_below, config.auto_yes_at
+            )
+            out = args.out or Path(f"jev-lane-{args.write_lane}.txt")
+            store.write_text(out, "".join(f"{pid}\n" for pid in ids))
+            print(f"bench-jev: {len(ids)} cross-outlet pair id(s) written to {out}")
         return 0
+    if args.write_lane:
+        raise SystemExit("bench-jev: --write-lane needs --queue")
     report = jevtrial.run_trial(data_root, config, limit=args.limit)
     print(jevtrial.format_report(report, config))
     return 0
@@ -746,6 +774,13 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="take the head of the judge's queue instead of a sample by band",
     )
+    label_page_parser.add_argument(
+        "--ids",
+        type=Path,
+        default=None,
+        help="fill the page with the pair ids in this file, one per line",
+    )
+
     label_page_parser.set_defaults(func=_label_page)
 
     tune_parser = subparsers.add_parser(
@@ -983,6 +1018,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--queue",
         action="store_true",
         help="survey the live judge queue instead of the labels (read-only)",
+    )
+    bench_jev_parser.add_argument(
+        "--write-lane",
+        choices=jevtrial.LANES,
+        default=None,
+        help="with --queue, write that lane's cross-outlet pair ids to --out",
+    )
+    bench_jev_parser.add_argument(
+        "--out", type=Path, default=None, help="default: jev-lane-<lane>.txt"
     )
     bench_jev_parser.set_defaults(func=_bench_jev)
 
