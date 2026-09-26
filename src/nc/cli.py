@@ -29,6 +29,7 @@ from nc import (
     embed,
     evals,
     feeds,
+    jevjudge,
     jevtrial,
     judge,
     labelling,
@@ -287,15 +288,24 @@ def _judge(args: argparse.Namespace) -> int:
     score first, in the form a backend answers -- the same role `nc
     pending` plays for the analysis step. With `--validate` it reports
     what is on disk instead: how many judgments, how many would link,
-    and every one the validator refuses and why. It never writes a
-    judgment itself; that is the backend's job, and this command is the
-    gate (CLAUDE.md: "Never bypass the validator").
+    and every one the validator refuses and why. Bare or with
+    `--validate` it never writes a judgment; that is a backend's job,
+    and this command is the gate (CLAUDE.md: "Never bypass the
+    validator"). `--backend jev` runs one such backend, the way `nc
+    analyze --backend api` does for analyses.
     """
     data_root = _data_root(args)
     if args.validate:
         report = judge.validate_all(data_root)
         print(judge.format_judge_report(report))
         return 1 if report.rejected else 0
+    if args.backend == judge.BACKEND_JEV:
+        # A backend run, like `nc analyze --backend api`: it writes
+        # judgment files, and `--validate` above stays the gate.
+        jev_config = jevtrial.load_jev_config(args.config)
+        jev_report = jevjudge.judge_with_jev(data_root, jev_config)
+        print(jevjudge.format_jev_judge_report(jev_report))
+        return 0
 
     config = judge.load_judge_config(args.config)
     pending = judge.unjudged_pairs(data_root)
@@ -461,7 +471,7 @@ def _bench_judge(args: argparse.Namespace) -> int:
     `make check` and in this sandbox, unlike `nc bench-embed`.
     """
     data_root = _data_root(args)
-    print(judge.format_judge_eval(judge.run_bench_judge(data_root)))
+    print(judge.format_judge_eval(judge.run_bench_judge(data_root, args.backend)))
     return 0
 
 
@@ -823,6 +833,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="report what is on disk and what the validator refuses, and exit "
         "non-zero if anything is refused",
     )
+    judge_parser.add_argument(
+        "--backend",
+        choices=[judge.BACKEND_JEV],
+        default=None,
+        help="jev: let Jev answer the confident ends of the queue and write "
+        "those judgments; a no-op without its API key",
+    )
     judge_parser.set_defaults(func=_judge)
 
     analyze_parser = subparsers.add_parser(
@@ -995,6 +1012,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bench_judge_parser.add_argument(
         "--data-root", type=Path, default=None, help=data_root_help
+    )
+    bench_judge_parser.add_argument(
+        "--backend",
+        default=None,
+        help="score only this backend's judgments (claude_code, api, jev)",
     )
     bench_judge_parser.set_defaults(func=_bench_judge)
 

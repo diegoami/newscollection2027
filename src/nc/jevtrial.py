@@ -65,6 +65,7 @@ from nc.cluster import (
     load_pending_pairs,
 )
 from nc.judge import (
+    BACKEND_JEV,
     DEFAULT_JUDGE_CONFIG_PATH,
     JudgeEval,
     Judgment,
@@ -80,7 +81,6 @@ DEFAULT_CACHE_DIR = Path(".cache/jev-trial")
 # The SDK's own path (typesafe_sdk/_core/constants.py, SYSTEM_ONE_PATH).
 SYSTEM_ONE_PATH = "/v1/systemone"
 QUESTION = "same_event"
-BACKEND_JEV = "jev"
 
 VARIANT_DATES = "with-dates"
 VARIANT_NO_DATES = "no-dates"
