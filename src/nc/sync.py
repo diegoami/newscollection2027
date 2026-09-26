@@ -79,6 +79,7 @@ def pull(data_root: DataRoot, config: SyncConfig) -> None:
     path = data_root.path
     if _is_git_checkout(path):
         _run(["git", "-C", str(path), "fetch", "origin", config.branch])
+        _onto_branch(path, config.branch)
         _run(["git", "-C", str(path), "merge", "--ff-only", f"origin/{config.branch}"])
         return
 
@@ -116,6 +117,38 @@ def pull(data_root: DataRoot, config: SyncConfig) -> None:
         _run(["git", "-C", str(path), "checkout", "-B", config.branch])
 
 
+def _onto_branch(path: Path, branch: str) -> None:
+    """Put an existing checkout on `branch` before fast-forwarding it.
+
+    A cloud session checks the data repo out on a branch of its own
+    (`claude/...`), not on `main`. Fast-forwarding that branch and then
+    pushing `main` published nothing: the commit sat on the session
+    branch, `git push origin main` sent the untouched local `main`, git
+    said "Everything up-to-date", and the night's work stayed in the
+    sandbox. So the checkout moves to `branch` first -- but only when
+    that loses nothing, i.e. when everything on the current branch is
+    already on the remote one. Anything else is a checkout with work of
+    its own, and that is a person's call, not this function's.
+    """
+    current = _run(
+        ["git", "-C", str(path), "symbolic-ref", "--short", "-q", "HEAD"], check=False
+    ).stdout.strip()
+    if current == branch:
+        return
+    upstream = f"origin/{branch}"
+    contained = _run(
+        ["git", "-C", str(path), "merge-base", "--is-ancestor", "HEAD", upstream],
+        check=False,
+    )
+    if contained.returncode != 0:
+        raise RuntimeError(
+            f"{path} is on {current or 'a detached HEAD'} with commits that are "
+            f"not on {upstream}; refusing to switch to {branch} and leave them "
+            "behind"
+        )
+    _run(["git", "-C", str(path), "checkout", "-B", branch, upstream])
+
+
 def push(data_root: DataRoot, config: SyncConfig, message: str) -> bool:
     """Commit and push the data root, only if something changed.
 
@@ -132,5 +165,9 @@ def push(data_root: DataRoot, config: SyncConfig, message: str) -> bool:
 
     _set_local_identity(path)
     _run(["git", "-C", str(path), "commit", "-m", message])
-    _run(["git", "-C", str(path), "push", "origin", config.branch])
+    # HEAD, not the local branch of that name: whatever was just
+    # committed is what goes to the remote branch, whichever local
+    # branch it sits on. A remote that has moved on rejects this as a
+    # non-fast-forward, which is loud, and the caller pulls and retries.
+    _run(["git", "-C", str(path), "push", "origin", f"HEAD:refs/heads/{config.branch}"])
     return True

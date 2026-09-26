@@ -138,3 +138,74 @@ def test_message_already_prefixed_data_is_not_prefixed_twice(
     push(root, config, "data: already prefixed")
 
     assert _log(root.path) == ["data: already prefixed"]
+
+
+def _session_checkout(tmp_path: Path, bare_repo: Path, name: str) -> DataRoot:
+    """A checkout the way a cloud session leaves it: cloned, then put on
+    a branch of the session's own rather than `main`."""
+    root = DataRoot(tmp_path / name)
+    _git("clone", str(bare_repo), str(root.path))
+    _git("checkout", "-b", "claude/session-abc123", cwd=root.path)
+    return root
+
+
+def _seed(tmp_path: Path, bare_repo: Path, config: SyncConfig) -> None:
+    seed = DataRoot(tmp_path / "seed")
+    pull(seed, config)
+    (seed.path / "a.txt").write_text("first\n")
+    push(seed, config, "first")
+
+
+def test_a_night_on_a_session_branch_still_publishes_to_main(
+    tmp_path: Path, bare_repo: Path
+) -> None:
+    """2026-09-26: the nightly's data checkout was on `claude/...`, and
+    `push` sent the untouched local `main` -- "Everything up-to-date",
+    nothing published."""
+    config = SyncConfig(repo_url=str(bare_repo), branch="main")
+    _seed(tmp_path, bare_repo, config)
+    night = _session_checkout(tmp_path, bare_repo, "night")
+
+    pull(night, config)
+    (night.path / "b.txt").write_text("tonight\n")
+    assert push(night, config, "analyses")
+
+    check = DataRoot(tmp_path / "check")
+    pull(check, config)
+    assert (check.path / "b.txt").read_text() == "tonight\n"
+    assert _log(check.path)[0] == "data: analyses"
+
+
+def test_pull_moves_a_session_branch_checkout_onto_main(
+    tmp_path: Path, bare_repo: Path
+) -> None:
+    config = SyncConfig(repo_url=str(bare_repo), branch="main")
+    _seed(tmp_path, bare_repo, config)
+    night = _session_checkout(tmp_path, bare_repo, "night")
+
+    pull(night, config)
+    branch = _git("symbolic-ref", "--short", "HEAD", cwd=night.path).stdout.strip()
+    assert branch == "main"
+
+
+def test_pull_refuses_to_leave_unpushed_work_behind(
+    tmp_path: Path, bare_repo: Path
+) -> None:
+    config = SyncConfig(repo_url=str(bare_repo), branch="main")
+    _seed(tmp_path, bare_repo, config)
+    night = _session_checkout(tmp_path, bare_repo, "night")
+    (night.path / "c.txt").write_text("unpushed\n")
+    _git("add", "-A", cwd=night.path)
+    _git(
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-m",
+        "wip",
+        cwd=night.path,
+    )
+
+    with pytest.raises(RuntimeError, match="refusing to switch"):
+        pull(night, config)
