@@ -42,3 +42,30 @@ api_model: "claude-sonnet-5"
 # Routine's time, not money. Lower it again once the backlog is gone if
 # the nightly gets slow.
 max_pairs_per_run: 150
+
+# The Jev trial (src/nc/jevtrial.py, `nc bench-jev`): does TypeSafe's Jev,
+# a model that returns a probability instead of text, answer "same event?"
+# as well as the judge does? An eval only -- nothing here writes to the
+# data repository or reaches clustering.
+jev:
+  # Pinned, not jev-latest: two trial runs are only comparable if they
+  # asked the same model.
+  model: "jev-1.13"
+  # OpenRouter, because TypeSafe's own signups are paused (2026-09-26).
+  # The TypeSafe SDK's wire format, POST <base_url>/v1/systemone, works
+  # unchanged against both; switching to TypeSafe direct is these two
+  # lines: "https://api.typesafe.ai" and TYPESAFE_API_KEY.
+  base_url: "https://openrouter.ai/api"
+  api_key_env: "OPENROUTER_API_KEY"
+  timeout_seconds: 30
+  # Jev answers p(same event). A cutoff turns that into yes/no; the trial
+  # reports every one of these and picks among them on half the labels.
+  cutoffs: [0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+  # The precision a cutoff must reach on the tuning half to be picked.
+  # The judge scored 0.924 against the labels on 2026-09-25; a wrong yes
+  # merges two unrelated stories, so Jev has to at least match it.
+  target_precision: 0.92
+  # The pre-filter question: pairs Jev scores below this would leave the
+  # judge queue unasked. Worth it only if almost no labelled match falls
+  # below it.
+  prefilter_below: 0.1
