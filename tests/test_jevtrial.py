@@ -28,6 +28,7 @@ from nc.jevtrial import (
     format_report,
     format_survey,
     in_tuning_half,
+    lane_ids,
     load_jev_config,
     load_jev_prompt,
     parse_answer,
@@ -336,3 +337,63 @@ def test_the_queue_survey_is_read_only_and_splits_by_outlet(tmp_path: Path) -> N
     assert (survey.cross.yes, survey.same.no) == (1, 1)
     assert sorted(p.name for p in (tmp_path / "data").rglob("*")) == before
     assert "cross-outlet (1)" in format_survey(survey)
+
+
+def test_a_lane_lists_only_its_cross_outlet_pairs(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    sure = _pair("a", "b")
+    unsure = _pair("c", "d")
+    same = PendingPair(
+        a=sure.a, b=ClusterItem.from_item(_item("e", "alpha")), score=0.7
+    )
+    write_pending_pairs(data_root, [sure, unsure, same])
+
+    def post(body: dict[str, Any]) -> dict[str, Any]:
+        text = json.dumps(body)
+        return _response(0.5 if "c headline" in text else 0.95)
+
+    survey = survey_queue(data_root, CONFIG, post=post, cache_dir=tmp_path / "c")
+    assert lane_ids(survey, "yes", 0.1, 0.9) == [sure.pair_id]
+    assert lane_ids(survey, "middle", 0.1, 0.9) == [unsure.pair_id]
+    with pytest.raises(ValueError):
+        lane_ids(survey, "maybe", 0.1, 0.9)
+
+
+def test_the_label_page_takes_exactly_the_listed_pairs(tmp_path: Path) -> None:
+    from nc.cli import main
+
+    data_root = tmp_path / "data"
+    listed, other, labelled = _pair("a", "b"), _pair("c", "d"), _pair("e", "f")
+    write_pending_pairs(DataRoot(data_root), [listed, other, labelled])
+    append_label(DataRoot(data_root), _label(labelled, True))
+    ids = tmp_path / "ids.txt"
+    ids.write_text(f"{listed.pair_id}\n{labelled.pair_id}\n", encoding="utf-8")
+    out = tmp_path / "page.json"
+
+    assert (
+        main(
+            [
+                "label-page",
+                "--data-root",
+                str(data_root),
+                "--ids",
+                str(ids),
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
+    assert [p["id"] for p in json.loads(out.read_text())] == [listed.pair_id]
+
+
+def test_a_rerun_from_the_cache_reports_no_spend(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    write_pending_pairs(data_root, [_pair("a", "b")])
+
+    def post(body: dict[str, Any]) -> dict[str, Any]:
+        return _response(0.95)
+
+    first = survey_queue(data_root, CONFIG, post=post, cache_dir=tmp_path / "c")
+    again = survey_queue(data_root, CONFIG, post=post, cache_dir=tmp_path / "c")
+    assert first.cost > 0 and again.cost == 0
