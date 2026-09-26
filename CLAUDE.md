@@ -40,6 +40,7 @@ nc label --import   record answers off the labelling page, checked against disk
 nc label-page       rebuild the labelling page's pairs, stratified by band
 nc label-page --queue   the same page, filled from the head of the judge queue
 nc bench-judge      score those judgments against the human labels
+nc bench-jev        ask Jev every labelled pair, score it like the judge (paid)
 nc validate --new   validate analyses written since the last run
 nc analyze --backend api    fill pending clusters through the SDK backend
 nc build            write the static site to site/

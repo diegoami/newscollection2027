@@ -29,6 +29,7 @@ from nc import (
     embed,
     evals,
     feeds,
+    jevtrial,
     judge,
     labelling,
     labelpage,
@@ -443,6 +444,21 @@ def _bench_judge(args: argparse.Namespace) -> int:
     """
     data_root = _data_root(args)
     print(judge.format_judge_eval(judge.run_bench_judge(data_root)))
+    return 0
+
+
+def _bench_jev(args: argparse.Namespace) -> int:
+    """Ask Jev every labelled pair and score it like the judge
+    (nc/jevtrial.py). Calls a paid API -- about a cent for the whole
+    label set -- so, like `nc bench-embed`, it is never part of
+    `make check`. Answers are cached under `.cache/jev-trial/`."""
+    data_root = _data_root(args)
+    config = jevtrial.load_jev_config(args.config)
+    if args.queue:
+        print(jevtrial.format_survey(jevtrial.survey_queue(data_root, config)))
+        return 0
+    report = jevtrial.run_trial(data_root, config, limit=args.limit)
+    print(jevtrial.format_report(report, config))
     return 0
 
 
@@ -946,6 +962,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "--data-root", type=Path, default=None, help=data_root_help
     )
     bench_judge_parser.set_defaults(func=_bench_judge)
+
+    bench_jev_parser = subparsers.add_parser(
+        "bench-jev",
+        help="ask Jev every labelled pair and score it like the judge -- paid API",
+    )
+    bench_jev_parser.add_argument(
+        "--data-root", type=Path, default=None, help=data_root_help
+    )
+    bench_jev_parser.add_argument(
+        "--config",
+        type=Path,
+        default=judge.DEFAULT_JUDGE_CONFIG_PATH,
+        help=f"config with a jev section (default: {judge.DEFAULT_JUDGE_CONFIG_PATH})",
+    )
+    bench_jev_parser.add_argument(
+        "--limit", type=int, default=None, help="ask only the first N labelled pairs"
+    )
+    bench_jev_parser.add_argument(
+        "--queue",
+        action="store_true",
+        help="survey the live judge queue instead of the labels (read-only)",
+    )
+    bench_jev_parser.set_defaults(func=_bench_jev)
 
     bench_parser = subparsers.add_parser(
         "bench-embed",
