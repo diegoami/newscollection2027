@@ -69,3 +69,7 @@ jev:
   # judge queue unasked. Worth it only if almost no labelled match falls
   # below it.
   prefilter_below: 0.1
+  # The other end of the three-way split: at or above this, Jev's yes
+  # would stand without the judge. 0.964-1.000 precision held out on
+  # 2026-09-26; the judge decides everything between the two.
+  auto_yes_at: 0.9

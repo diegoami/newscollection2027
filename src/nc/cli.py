@@ -454,6 +454,9 @@ def _bench_jev(args: argparse.Namespace) -> int:
     `make check`. Answers are cached under `.cache/jev-trial/`."""
     data_root = _data_root(args)
     config = jevtrial.load_jev_config(args.config)
+    if args.queue:
+        print(jevtrial.format_survey(jevtrial.survey_queue(data_root, config)))
+        return 0
     report = jevtrial.run_trial(data_root, config, limit=args.limit)
     print(jevtrial.format_report(report, config))
     return 0
@@ -975,6 +978,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bench_jev_parser.add_argument(
         "--limit", type=int, default=None, help="ask only the first N labelled pairs"
+    )
+    bench_jev_parser.add_argument(
+        "--queue",
+        action="store_true",
+        help="survey the live judge queue instead of the labels (read-only)",
     )
     bench_jev_parser.set_defaults(func=_bench_jev)
 

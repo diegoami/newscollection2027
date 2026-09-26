@@ -26,6 +26,7 @@ from nc.jevtrial import (
     build_report,
     calibration,
     format_report,
+    format_survey,
     in_tuning_half,
     load_jev_config,
     load_jev_prompt,
@@ -34,6 +35,8 @@ from nc.jevtrial import (
     prefilter,
     request_body,
     run_trial,
+    survey_queue,
+    triage,
     trial_pairs,
 )
 from nc.labelling import Label, append_label
@@ -47,6 +50,7 @@ CONFIG = JevConfig(
     cutoffs=(0.5, 0.7, 0.9),
     target_precision=0.9,
     prefilter_below=0.1,
+    auto_yes_at=0.9,
 )
 
 
@@ -170,7 +174,7 @@ def test_a_bad_response_raises_rather_than_counting_as_no(raw: dict[str, Any]) -
 
 
 def test_answers_are_cached_per_model_and_prompt(tmp_path: Path) -> None:
-    pairs = [TrialPair(_pair("a", "b"), True)]
+    pairs = [_pair("a", "b")]
     calls: list[dict[str, Any]] = []
 
     def post(body: dict[str, Any]) -> dict[str, Any]:
@@ -299,3 +303,36 @@ def test_the_prefilter_counts_only_pairs_that_can_reach_the_queue() -> None:
     report = build_report([in_band, below], answers, [], CONFIG, queue_floor=0.57)
     [variant] = report.variants
     assert (variant.prefilter.dropped, variant.prefilter.total) == (0, 1)
+
+
+def test_triage_splits_into_three_lanes_and_counts_each_lanes_mistakes() -> None:
+    pairs = {c: _pair(c, c.upper()) for c in "abcd"}
+    answers = [
+        _answer(pairs["a"], 0.95),  # yes lane, right
+        _answer(pairs["b"], 0.92),  # yes lane, wrong
+        _answer(pairs["c"], 0.50),  # middle
+        _answer(pairs["d"], 0.05),  # no lane, a lost match
+    ]
+    truth = {pairs["a"].pair_id: True, pairs["b"].pair_id: False}
+    truth |= {pairs["c"].pair_id: True, pairs["d"].pair_id: True}
+    result = triage(answers, 0.1, 0.9, truth)
+    assert (result.no, result.middle, result.yes) == (1, 1, 2)
+    assert (result.no_lost, result.yes_wrong) == (1, 1)
+
+
+def test_the_queue_survey_is_read_only_and_splits_by_outlet(tmp_path: Path) -> None:
+    data_root = DataRoot(tmp_path / "data")
+    cross = _pair("a", "b")
+    same = PendingPair(
+        a=cross.a, b=ClusterItem.from_item(_item("c", "alpha")), score=0.7
+    )
+    write_pending_pairs(data_root, [cross, same])
+    before = sorted(p.name for p in (tmp_path / "data").rglob("*"))
+
+    def post(body: dict[str, Any]) -> dict[str, Any]:
+        return _response(0.95 if "b headline" in json.dumps(body) else 0.02)
+
+    survey = survey_queue(data_root, CONFIG, post=post, cache_dir=tmp_path / "cache")
+    assert (survey.cross.yes, survey.same.no) == (1, 1)
+    assert sorted(p.name for p in (tmp_path / "data").rglob("*")) == before
+    assert "cross-outlet (1)" in format_survey(survey)

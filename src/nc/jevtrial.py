@@ -100,6 +100,7 @@ class JevConfig:
     cutoffs: tuple[float, ...]
     target_precision: float
     prefilter_below: float
+    auto_yes_at: float
 
 
 def load_jev_config(path: Path = DEFAULT_JUDGE_CONFIG_PATH) -> JevConfig:
@@ -118,6 +119,7 @@ def load_jev_config(path: Path = DEFAULT_JUDGE_CONFIG_PATH) -> JevConfig:
         cutoffs=cutoffs,
         target_precision=float(jev["target_precision"]),
         prefilter_below=float(jev["prefilter_below"]),
+        auto_yes_at=float(jev["auto_yes_at"]),
     )
 
 
@@ -271,7 +273,7 @@ def _cache_path(cache_dir: Path, model: str, variant: str, pair_id: str) -> Path
 
 
 def ask_all(
-    pairs: Sequence[TrialPair],
+    pairs: Sequence[PendingPair],
     prompt: str,
     config: JevConfig,
     post: Post,
@@ -284,8 +286,8 @@ def ask_all(
     prompt_id = hashlib.blake2b(prompt.encode("utf-8"), digest_size=6).hexdigest()
     answers: list[Answer] = []
     for variant in variants:
-        for trial in pairs:
-            pid = trial.pair.pair_id
+        for pair in pairs:
+            pid = pair.pair_id
             path = _cache_path(cache_dir, config.model, variant, pid)
             if path.exists():
                 cached = json.loads(path.read_text(encoding="utf-8"))
@@ -293,7 +295,7 @@ def ask_all(
                     answers.append(parse_answer(cached["raw"], pid, variant, 0.0))
                     continue
             started = time.monotonic()
-            raw = post(request_body(trial.pair, variant, prompt, config.model))
+            raw = post(request_body(pair, variant, prompt, config.model))
             answer = parse_answer(raw, pid, variant, time.monotonic() - started)
             path.parent.mkdir(parents=True, exist_ok=True)
             write_text(path, json.dumps({"prompt_id": prompt_id, "raw": raw}) + "\n")
@@ -416,6 +418,55 @@ def prefilter(
 
 
 @dataclass(frozen=True)
+class Triage:
+    """The three-way split: Jev says yes at or above `high`, no below
+    `low`, and the judge decides the middle. Against labels, each lane
+    also carries its mistakes; against the live queue there are none to
+    count, only how the queue would divide."""
+
+    low: float
+    high: float
+    no: int
+    middle: int
+    yes: int
+    no_lost: int | None = None  # labelled matches Jev would have said no to
+    yes_wrong: int | None = None  # labelled non-matches Jev would have linked
+
+
+def triage(
+    answers: Sequence[Answer],
+    low: float,
+    high: float,
+    truth: Mapping[str, bool] | None = None,
+) -> Triage:
+    no = [a for a in answers if a.p < low]
+    yes = [a for a in answers if a.p >= high]
+    lost = wrong = None
+    if truth is not None:
+        lost = sum(truth[a.pair_id] for a in no if a.pair_id in truth)
+        wrong = sum(not truth[a.pair_id] for a in yes if a.pair_id in truth)
+    return Triage(
+        low=low,
+        high=high,
+        no=len(no),
+        middle=len(answers) - len(no) - len(yes),
+        yes=len(yes),
+        no_lost=lost,
+        yes_wrong=wrong,
+    )
+
+
+def format_triage(t: Triage) -> str:
+    line = (
+        f"no below {t.low}: {t.no} | judge decides: {t.middle} | "
+        f"yes at {t.high}+: {t.yes}"
+    )
+    if t.no_lost is not None and t.yes_wrong is not None:
+        line += f"  (matches lost {t.no_lost}, wrong links {t.yes_wrong})"
+    return line
+
+
+@dataclass(frozen=True)
 class VariantReport:
     variant: str
     per_cutoff: list[tuple[float, JudgeEval, JudgeEval]]  # cutoff, tuning, held out
@@ -424,6 +475,7 @@ class VariantReport:
     head_to_head: tuple[JudgeEval, JudgeEval] | None  # judge, jev on shared pairs
     calibration: list[CalibrationBin]
     prefilter: Prefilter
+    triage: Triage
     cost: float
     mean_seconds: float | None
 
@@ -451,6 +503,7 @@ def build_report(
     the first run's pre-filter look twice as effective as it is: 47% of
     pairs dropped over all labels, 23% over the queue's band."""
     in_queue = [t for t in pairs if t.pair.score >= queue_floor]
+    queue_ids = {t.pair.pair_id for t in in_queue}
     tuning = [t for t in pairs if in_tuning_half(t.pair.pair_id)]
     held_out = [t for t in pairs if not in_tuning_half(t.pair.pair_id)]
     reports: list[VariantReport] = []
@@ -494,6 +547,12 @@ def build_report(
                 head_to_head=head_to_head,
                 calibration=calibration(pairs, mine),
                 prefilter=prefilter(in_queue, mine, config.prefilter_below),
+                triage=triage(
+                    [a for a in mine if a.pair_id in queue_ids],
+                    config.prefilter_below,
+                    config.auto_yes_at,
+                    {t.pair.pair_id: t.human for t in in_queue},
+                ),
                 cost=sum(a.cost for a in mine),
                 mean_seconds=sum(timed) / len(timed) if timed else None,
             )
@@ -562,9 +621,17 @@ def format_report(report: TrialReport, config: JevConfig) -> str:
             f"drops {f.dropped}/{f.total} pairs, "
             f"losing {f.matches_lost}/{f.matches} matches"
         )
+        lines.append("  three-way, queue band only: " + format_triage(v.triage))
         timing = "" if v.mean_seconds is None else f", {v.mean_seconds:.2f} s/call"
         lines.append(f"  cost ${v.cost:.4f}{timing}")
     return "\n".join(lines)
+
+
+def _api_key(config: JevConfig) -> str:
+    key = os.environ.get(config.api_key_env, "")
+    if not key:
+        raise SystemExit(f"bench-jev: {config.api_key_env} is not set")
+    return key
 
 
 def run_trial(
@@ -582,11 +649,10 @@ def run_trial(
     if limit is not None:
         pairs = pairs[:limit]
     if post is None:
-        key = os.environ.get(config.api_key_env, "")
-        if not key:
-            raise SystemExit(f"bench-jev: {config.api_key_env} is not set")
-        post = http_post(config, key)
-    answers = ask_all(pairs, load_jev_prompt(prompt_path), config, post, cache_dir)
+        post = http_post(config, _api_key(config))
+    answers = ask_all(
+        [t.pair for t in pairs], load_jev_prompt(prompt_path), config, post, cache_dir
+    )
     return build_report(
         pairs,
         answers,
@@ -594,4 +660,65 @@ def run_trial(
         config,
         unrebuildable,
         queue_floor=load_cluster_config().tau_low,
+    )
+
+
+# --- the live queue -------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class QueueSurvey:
+    model: str
+    variant: str
+    cross: Triage
+    same: Triage
+    cost: float
+
+
+def survey_queue(
+    data_root: DataRoot,
+    config: JevConfig,
+    post: Post | None = None,
+    cache_dir: Path = DEFAULT_CACHE_DIR,
+    prompt_path: Path = DEFAULT_JEV_PROMPT_PATH,
+    variant: str = VARIANT_DATES,
+) -> QueueSurvey:
+    """`nc bench-jev --queue`: ask Jev every pair in the judge's queue and
+    report how the three-way split would divide it. Read-only like the
+    rest: answers go to the cache, the queue and the judgments are
+    untouched. With dates, because the labelled run found they help.
+
+    Cross-outlet and same-outlet pairs are counted apart: the judge takes
+    cross-outlet pairs first (`nc.judge.unjudged_pairs`), so they are the
+    ones whose share of the middle lane decides the judge's workload."""
+    from nc.judge import unjudged_pairs
+
+    queue = unjudged_pairs(data_root)
+    if post is None:
+        post = http_post(config, _api_key(config))
+    answers = ask_all(
+        queue, load_jev_prompt(prompt_path), config, post, cache_dir, [variant]
+    )
+    cross_ids = {p.pair_id for p in queue if p.a.outlet != p.b.outlet}
+    low, high = config.prefilter_below, config.auto_yes_at
+    return QueueSurvey(
+        model=config.model,
+        variant=variant,
+        cross=triage([a for a in answers if a.pair_id in cross_ids], low, high),
+        same=triage([a for a in answers if a.pair_id not in cross_ids], low, high),
+        cost=sum(a.cost for a in answers),
+    )
+
+
+def format_survey(survey: QueueSurvey) -> str:
+    total = survey.cross.no + survey.cross.middle + survey.cross.yes
+    same = survey.same.no + survey.same.middle + survey.same.yes
+    return "\n".join(
+        [
+            f"bench-jev --queue: {survey.model}, {survey.variant}, "
+            f"{total + same} unjudged pair(s)",
+            f"  cross-outlet ({total}): " + format_triage(survey.cross),
+            f"  same-outlet ({same}): " + format_triage(survey.same),
+            f"  cost ${survey.cost:.4f} (cached answers cost nothing)",
+        ]
     )
