@@ -21,7 +21,11 @@ the pipeline's, not yours.
    do not have to time or report anything.
 3. `nc sync pull` brings the data repository to the data root
    (`NC_DATA_ROOT`). Never write pipeline data into this code repository.
-4. `nc judge`. If it lists any pair, follow
+4. `nc judge --backend jev` first. Jev answers the pairs it is sure of,
+   yes at the top and no at the bottom, and writes those judgments
+   (src/nc/jevjudge.py). Without its API key it prints "skipped" and
+   does nothing; that is fine, carry on. If it prints "stopped early",
+   say so in step 11 and carry on. Then `nc judge`. If it lists any pair, follow
    `.claude/skills/judge-pairs/SKILL.md`, then `nc judge --validate` and
    `nc cluster`, so tonight's accepted links are in the clusters before
    anything is analysed. Judging after clustering would hold every link

@@ -35,6 +35,7 @@ nc cluster          embed, link, emit clusters and pending files
 nc pending          list clusters awaiting analysis
 nc judge            list borderline pairs awaiting a yes/no
 nc judge --validate check the judgments on disk before they can link
+nc judge --backend jev  Jev answers the confident ends of the queue (needs its key)
 nc label            record human yes/no on borderline pairs (ground truth)
 nc label --import   record answers off the labelling page, checked against disk
 nc label-page       rebuild the labelling page's pairs, stratified by band

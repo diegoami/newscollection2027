@@ -29,7 +29,7 @@ the same shape the analysis step uses for clusters:
           clustering; `accepted_links` is the only way a judgment
           reaches `cluster_items`
 
-Two backends write the same files and this module cannot tell them
+Three backends write the same files and this module cannot tell them
 apart, exactly as docs/ARCHITECTURE.md intends ("The rest of the system
 never knows which backend ran"):
 
@@ -39,6 +39,9 @@ never knows which backend ran"):
   Claude Code subscription and reserves the API backend for "local
   development, evals and backfills only".
 - `api` -- the Anthropic SDK, for `nc bench-judge` and backfills.
+- `jev` -- TypeSafe's Jev, for the confident ends of the queue only, run
+  before the Claude judge each night (nc/jevjudge.py). It answers what
+  it is sure of and leaves the middle to the judge.
 
 **Why judgments are files and not a database.** They are evidence, not
 state. A judgment is written once and never rewritten, so a run that
@@ -91,7 +94,9 @@ DEFAULT_JUDGE_PROMPT_PATH = Path("prompts/judge.md")
 
 BACKEND_CLAUDE_CODE = "claude_code"
 BACKEND_API = "api"
-_BACKENDS = frozenset({BACKEND_CLAUDE_CODE, BACKEND_API})
+# TypeSafe's Jev, for the confident ends of the queue only (nc/jevjudge.py).
+BACKEND_JEV = "jev"
+_BACKENDS = frozenset({BACKEND_CLAUDE_CODE, BACKEND_API, BACKEND_JEV})
 
 # A reason is for a human reading the data repo later, and for spotting
 # a backend that has started returning boilerplate. Long enough for one
@@ -574,7 +579,7 @@ def score_judgments(labels: list[Label], judgments: list[Judgment]) -> JudgeEval
     )
 
 
-def run_bench_judge(data_root: DataRoot) -> JudgeEval:
+def run_bench_judge(data_root: DataRoot, backend: str | None = None) -> JudgeEval:
     """`nc bench-judge`: score whatever judgments are on disk against
     `labels/pairs.jsonl`.
 
@@ -583,8 +588,16 @@ def run_bench_judge(data_root: DataRoot) -> JudgeEval:
     backend that exists today and will measure T31's `api` backend
     unchanged -- there is nothing here that knows how a judgment was
     produced, only what it says.
+
+    `backend` narrows it to one backend's files. Since Jev answers the
+    confident ends of the queue (nc/jevjudge.py), the unfiltered number
+    is the pipeline's, not any one model's -- and Jev's share is the easy
+    pairs, so an unfiltered score would flatter the judge.
     """
-    return score_judgments(load_labels(data_root), load_judgments(data_root))
+    judgments = load_judgments(data_root)
+    if backend is not None:
+        judgments = [j for j in judgments if j.backend == backend]
+    return score_judgments(load_labels(data_root), judgments)
 
 
 def format_judge_eval(result: JudgeEval) -> str:
