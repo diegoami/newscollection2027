@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PHP patches two critical flaws as hackers exploit them early, CISA confirms attacks &middot; newscollection2027</title>
+<title>Critical PHP2Shell flaws disclosed, exploited before patching, trigger shutdowns and new warnings &middot; newscollection2027</title>
 <link rel="stylesheet" href="/newscollection2027/style.css">
 </head>
 <body>
@@ -17,49 +17,20 @@
 </header>
 <main>
 <article>
-<h1>PHP patches two critical flaws as hackers exploit them early, CISA confirms attacks</h1>
+<h1>Critical PHP2Shell flaws disclosed, exploited before patching, trigger shutdowns and new warnings</h1>
 <p class="meta">
   <time datetime="2026-10-20">2026-10-20</time>
   &middot; 11 outlets
   &middot; <span class="agreement partial">partial</span>
 </p>
-<p class="lede">PHP&#39;s maintainers issued emergency patches for two critical vulnerabilities, dubbed PHP2Shell, prompting website operators and some governments to take sites offline as a precaution. Reports say AI tools helped researchers find the flaws, and that attackers began probing them roughly four days before patches shipped. The US cybersecurity agency CISA later added the flaws to its exploited-vulnerabilities catalog and ordered federal agencies to patch, as a separate, lower-priority third bug was also reported.</p>
+<p class="lede">Two critical PHP vulnerabilities known as PHP2Shell forced emergency patches and precautionary website shutdowns across Europe and Canada. Amazon and other researchers found hackers exploiting the flaws roughly four days before patches shipped, and AI tools reportedly helped uncover the bugs. CISA later added PHP2Shell to its exploited-vulnerabilities catalog, warned of a chained Linux kernel flaw, and a separate report found risks to network appliances; a third bug will not get an emergency fix.</p>
 
 <h2>Claims</h2>
 <table class="claims">
 <thead><tr><th>Claim</th><th>arstechnica</th><th>bbc-technology</th><th>bleepingcomputer</th><th>engadget</th><th>techcrunch</th><th>theguardian</th><th>theregister</th><th>theverge</th><th>tomshardware</th><th>wired</th><th>zdnet</th></tr></thead>
 <tbody>
 <tr>
-  <th scope="row">PHP&#39;s maintainers found two critical vulnerabilities, later named PHP2Shell, affecting widely used PHP-based websites.</th>
-  <td>
-  </td>
-  <td>
-    <blockquote cite="https://www.bbc.co.uk/news/articles/cmly0lg3w5x2o"><a href="https://www.bbc.co.uk/news/articles/cmly0lg3w5x2o" rel="noopener nofollow">Two critical vulnerabilities have been identified with PHP, a programming language which is widely used across the internet.</a></blockquote>
-  </td>
-  <td>
-    <blockquote cite="https://www.bleepingcomputer.com/news/security/php-warns-admins-of-two-critical-flaws-emergency-patches-coming-tomorrow/"><a href="https://www.bleepingcomputer.com/news/security/php-warns-admins-of-two-critical-flaws-emergency-patches-coming-tomorrow/" rel="noopener nofollow">two critical vulnerabilities, as information about the flaws has reportedly leaked ahead of their scheduled disclosure. [...]</a></blockquote>
-  </td>
-  <td>
-  </td>
-  <td>
-    <blockquote cite="https://techcrunch.com/2026/10/24/php-ocalypse-how-two-critical-web-bugs-almost-broke-the-internet/"><a href="https://techcrunch.com/2026/10/24/php-ocalypse-how-two-critical-web-bugs-almost-broke-the-internet/" rel="noopener nofollow">Two critical bugs in the PHP web programming language, used by the majority of the internet, threatened to upend the internet — and it&#39;s unlikely to be the last major software scare.</a></blockquote>
-  </td>
-  <td>
-  </td>
-  <td>
-  </td>
-  <td>
-  </td>
-  <td>
-  </td>
-  <td>
-    <blockquote cite="https://www.wired.com/story/this-is-not-a-drill-2-php-vulnerabilities-are-setting-the-internet-on-fire/"><a href="https://www.wired.com/story/this-is-not-a-drill-2-php-vulnerabilities-are-setting-the-internet-on-fire/" rel="noopener nofollow">two serious vulnerabilities that could impact millions of websites. Security experts warn that failure to quickly patch the flaws could have dire consequences.</a></blockquote>
-  </td>
-  <td>
-  </td>
-</tr>
-<tr>
-  <th scope="row">PHP&#39;s security team released emergency patches for the two vulnerabilities, collectively named PHP2Shell.</th>
+  <th scope="row">The PHP security team disclosed two critical PHP2Shell vulnerabilities and shipped emergency patches for them.</th>
   <td>
   </td>
   <td>
@@ -74,9 +45,9 @@
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.theregister.com/security/2026/10/21/php-devs-publish-critical-bug-fix-as-site-owners-warned-pull-em-offline-if-youre-unpatched/5304519"><a href="https://www.theregister.com/security/2026/10/21/php-devs-publish-critical-bug-fix-as-site-owners-warned-pull-em-offline-if-youre-unpatched/5304519" rel="noopener nofollow">PHP devs publish critical bug fix as site owners warned: Pull &#39;em offline if you&#39;re unpatched</a></blockquote>
   </td>
   <td>
+    <blockquote cite="https://www.theverge.com/tech/1015257/php-vulnerability-patch-website-security-wordpress"><a href="https://www.theverge.com/tech/1015257/php-vulnerability-patch-website-security-wordpress" rel="noopener nofollow">A critical PHP vulnerability may take websites down today</a></blockquote>
   </td>
   <td>
   </td>
@@ -86,11 +57,10 @@
   </td>
 </tr>
 <tr>
-  <th scope="row">A number of organizations and governments took websites offline as a precaution while patches were applied.</th>
+  <th scope="row">Governments and companies in Europe and Canada took websites offline as a precaution before and after the patches shipped.</th>
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.bbc.co.uk/news/articles/cmly0lg3w5x2o"><a href="https://www.bbc.co.uk/news/articles/cmly0lg3w5x2o" rel="noopener nofollow">Websites taken down across Europe ahead of critical cyber-security update</a></blockquote>
   </td>
   <td>
   </td>
@@ -100,10 +70,9 @@
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.theguardian.com/technology/2026/oct/21/flaw-in-php-computer-language-leads-to-shutdown-of-websites-around-world"><a href="https://www.theguardian.com/technology/2026/oct/21/flaw-in-php-computer-language-leads-to-shutdown-of-websites-around-world" rel="noopener nofollow">Websites around the globe have gone dark after a serious vulnerability was found in a computer language used to build much of the world wide web. Belgian, Dutch, Finnish, French and German sites were among those that governments took down temporarily as</a></blockquote>
+    <blockquote cite="https://www.theguardian.com/technology/2026/oct/21/flaw-in-php-computer-language-leads-to-shutdown-of-websites-around-world"><a href="https://www.theguardian.com/technology/2026/oct/21/flaw-in-php-computer-language-leads-to-shutdown-of-websites-around-world" rel="noopener nofollow">Belgian, Dutch, Finnish, French and German sites were among those that governments took down temporarily</a></blockquote>
   </td>
   <td>
-    <blockquote cite="https://www.theregister.com/security/2026/10/21/php-devs-publish-critical-bug-fix-as-site-owners-warned-pull-em-offline-if-youre-unpatched/5304519"><a href="https://www.theregister.com/security/2026/10/21/php-devs-publish-critical-bug-fix-as-site-owners-warned-pull-em-offline-if-youre-unpatched/5304519" rel="noopener nofollow">Websites down as precaution as exploits have already been published</a></blockquote>
   </td>
   <td>
   </td>
@@ -115,7 +84,7 @@
   </td>
 </tr>
 <tr>
-  <th scope="row">Security researchers reported that attackers began probing or exploiting the flaws about four days before patches were released.</th>
+  <th scope="row">Amazon and other researchers found hackers had been exploiting the flaws for about four days before the patches were released.</th>
   <td>
     <blockquote cite="https://arstechnica.com/security/2026/10/hackers-got-a-four-day-head-start-on-epic-php2shell-vulnerability/"><a href="https://arstechnica.com/security/2026/10/hackers-got-a-four-day-head-start-on-epic-php2shell-vulnerability/" rel="noopener nofollow">Hackers got a four-day head start on epic PHP2Shell vulnerability</a></blockquote>
   </td>
@@ -131,60 +100,57 @@
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.theregister.com/cyber-crime/2026/10/22/hackers-pile-on-php2shell-as-aws-reveals-attacks-began-before-disclosure/5304749"><a href="https://www.theregister.com/cyber-crime/2026/10/22/hackers-pile-on-php2shell-as-aws-reveals-attacks-began-before-disclosure/5304749" rel="noopener nofollow">Amazon spotted attackers trying their luck four days before patches landed</a></blockquote>
   </td>
   <td>
   </td>
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.wired.com/story/hackers-exploited-the-php-vulnerabilities-days-before-they-were-patched/"><a href="https://www.wired.com/story/hackers-exploited-the-php-vulnerabilities-days-before-they-were-patched/" rel="noopener nofollow">Amazon Web Services logged attempts to leverage the internet-melting PHP2Shell bugs four days ago. They&#39;re now being “broadly exploited” across the internet.</a></blockquote>
-  </td>
-  <td>
-  </td>
-</tr>
-<tr>
-  <th scope="row">Reports said AI tools were used by security researchers to help uncover the PHP vulnerabilities.</th>
-  <td>
-  </td>
-  <td>
-    <blockquote cite="https://www.bbc.co.uk/news/articles/c3qjnwye0ep5o"><a href="https://www.bbc.co.uk/news/articles/c3qjnwye0ep5o" rel="noopener nofollow">AI uncovered long-hidden programming flaws, triggering a rare global cyber-security response.</a></blockquote>
-  </td>
-  <td>
-  </td>
-  <td>
-  </td>
-  <td>
-    <blockquote cite="https://techcrunch.com/2026/10/21/php-armageddon-openai-googles-wiz-find-ancient-holes-panicking-the-internet/"><a href="https://techcrunch.com/2026/10/21/php-armageddon-openai-googles-wiz-find-ancient-holes-panicking-the-internet/" rel="noopener nofollow">OpenAI, Google’s Wiz find ancient holes</a></blockquote>
-  </td>
-  <td>
-  </td>
-  <td>
-  </td>
-  <td>
-  </td>
-  <td>
-    <blockquote cite="https://www.tomshardware.com/tech-industry/cyber-security/openai-says-gpt-5-6-sol-helped-uncover-critical-php-flaws-that-could-affect-70-percent-of-websites-ai-assisted-researchers-turned-two-year-old-bug-that-stumped-human-developers-into-working-exploits-in-two-weeks"><a href="https://www.tomshardware.com/tech-industry/cyber-security/openai-says-gpt-5-6-sol-helped-uncover-critical-php-flaws-that-could-affect-70-percent-of-websites-ai-assisted-researchers-turned-two-year-old-bug-that-stumped-human-developers-into-working-exploits-in-two-weeks" rel="noopener nofollow">researchers using GPT-5.6 Sol uncovered two critical PHP vulnerabilities with severity scores of 9.2 and demonstrated working exploits, after which the company coordinated fixes.</a></blockquote>
-  </td>
-  <td>
-    <blockquote cite="https://www.wired.com/story/kernel-panic-the-php-meltdown-shows-how-ai-makes-bugs-more-exploitable/"><a href="https://www.wired.com/story/kernel-panic-the-php-meltdown-shows-how-ai-makes-bugs-more-exploitable/" rel="noopener nofollow">Security researchers used AI tools to help uncover years-old vulnerabilities in the PHP web scripting language. Then the AI-assisted attacks began.</a></blockquote>
+    <blockquote cite="https://www.wired.com/story/hackers-exploited-the-php-vulnerabilities-days-before-they-were-patched/"><a href="https://www.wired.com/story/hackers-exploited-the-php-vulnerabilities-days-before-they-were-patched/" rel="noopener nofollow">Hackers Exploited the PHP Vulnerabilities Days Before They Were Patched</a></blockquote>
   </td>
   <td>
   </td>
 </tr>
 <tr>
-  <th scope="row">The US Cybersecurity and Infrastructure Security Agency added the PHP2Shell vulnerabilities to its known-exploited-vulnerabilities catalog and ordered federal agencies to patch them.</th>
+  <th scope="row">AI tools were used by researchers to help discover the PHP vulnerabilities.</th>
   <td>
   </td>
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.bleepingcomputer.com/news/security/cisa-confirms-php2shell-vulnerabilities-now-exploited-in-attacks/"><a href="https://www.bleepingcomputer.com/news/security/cisa-confirms-php2shell-vulnerabilities-now-exploited-in-attacks/" rel="noopener nofollow">has added the PHP2Shell vulnerabilities to its catalog of actively exploited security flaws and ordered federal agencies to patch their systems by Thursday. [...]</a></blockquote>
   </td>
   <td>
   </td>
   <td>
-    <blockquote cite="https://techcrunch.com/2026/10/27/us-government-says-hackers-are-now-exploiting-critical-php-web-bugs/"><a href="https://techcrunch.com/2026/10/27/us-government-says-hackers-are-now-exploiting-critical-php-web-bugs/" rel="noopener nofollow">US government says hackers are now exploiting critical PHP web bugs</a></blockquote>
+    <blockquote cite="https://techcrunch.com/2026/10/21/php-armageddon-openai-googles-wiz-find-ancient-holes-panicking-the-internet/"><a href="https://techcrunch.com/2026/10/21/php-armageddon-openai-googles-wiz-find-ancient-holes-panicking-the-internet/" rel="noopener nofollow">PHP armageddon: OpenAI, Google’s Wiz find ancient holes, panicking the internet</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.tomshardware.com/tech-industry/cyber-security/openai-says-gpt-5-6-sol-helped-uncover-critical-php-flaws-that-could-affect-70-percent-of-websites-ai-assisted-researchers-turned-two-year-old-bug-that-stumped-human-developers-into-working-exploits-in-two-weeks"><a href="https://www.tomshardware.com/tech-industry/cyber-security/openai-says-gpt-5-6-sol-helped-uncover-critical-php-flaws-that-could-affect-70-percent-of-websites-ai-assisted-researchers-turned-two-year-old-bug-that-stumped-human-developers-into-working-exploits-in-two-weeks" rel="noopener nofollow">OpenAI says ChatGPT Sol helped uncover critical PHP flaws that could affect 70% of websites</a></blockquote>
+  </td>
+  <td>
+    <blockquote cite="https://www.wired.com/story/kernel-panic-the-php-meltdown-shows-how-ai-makes-bugs-more-exploitable/"><a href="https://www.wired.com/story/kernel-panic-the-php-meltdown-shows-how-ai-makes-bugs-more-exploitable/" rel="noopener nofollow">Security researchers used AI tools to help uncover years-old vulnerabilities in the PHP web scripting language.</a></blockquote>
+  </td>
+  <td>
+  </td>
+</tr>
+<tr>
+  <th scope="row">CISA added PHP2Shell to its catalog of actively exploited vulnerabilities and ordered federal agencies to patch.</th>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/cisa-confirms-php2shell-vulnerabilities-now-exploited-in-attacks/"><a href="https://www.bleepingcomputer.com/news/security/cisa-confirms-php2shell-vulnerabilities-now-exploited-in-attacks/" rel="noopener nofollow">has added the PHP2Shell vulnerabilities to its catalog of actively exploited security flaws and ordered federal agencies to patch their systems by Thursday.</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
   </td>
   <td>
   </td>
@@ -201,7 +167,7 @@
   </td>
 </tr>
 <tr>
-  <th scope="row">The Register reported that a third PHP2Shell-related bug was discovered but would not receive an emergency fix.</th>
+  <th scope="row">A third, related PHP2Shell bug was found that will not get an emergency fix.</th>
   <td>
   </td>
   <td>
@@ -226,50 +192,101 @@
   <td>
   </td>
 </tr>
+<tr>
+  <th scope="row">The PHP team later shared mitigation steps for a separate, unpatched remote-code-execution flaw affecting non-default configurations.</th>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/php-shares-mitigation-for-new-and-unpatched-rce-vulnerability/"><a href="https://www.bleepingcomputer.com/news/security/php-shares-mitigation-for-new-and-unpatched-rce-vulnerability/" rel="noopener nofollow">PHP shares mitigation for new RCE vulnerability with no patch</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.zdnet.com/tech/php2shell-php-patch-mitigation-critical-exploit/"><a href="https://www.zdnet.com/tech/php2shell-php-patch-mitigation-critical-exploit/" rel="noopener nofollow">PHP2Shell: Haven’t patched yet? Take these steps now to mitigate</a></blockquote>
+  </td>
+</tr>
+<tr>
+  <th scope="row">CISA later warned that attackers are chaining a separate Linux kernel privilege-escalation flaw with the PHP2Shell bugs.</th>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/cisa-warns-of-fragnesia-linux-flaw-chained-in-php2shell-attacks/"><a href="https://www.bleepingcomputer.com/news/security/cisa-warns-of-fragnesia-linux-flaw-chained-in-php2shell-attacks/" rel="noopener nofollow">warned federal agencies to patch a high-severity Linux kernel privilege escalation bug that attackers are chaining with the PHP2Shell flaws in the wild.</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+</tr>
+<tr>
+  <th scope="row">A separate report found the PHP2Shell flaws also put network-infrastructure appliances such as firewalls and VPNs at risk.</th>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/infratrust-report-warns-of-exploited-flaws-in-critical-network-infrastructure/"><a href="https://www.bleepingcomputer.com/news/security/infratrust-report-warns-of-exploited-flaws-in-critical-network-infrastructure/" rel="noopener nofollow">PHP flaws known as &#34;PHP2Shell&#34; put the web management interfaces of firewalls, VPNs, application delivery controllers, and other appliances at risk.</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+</tr>
 </tbody>
 </table>
 
 <h2>Where they differ</h2>
 <section class="discrepancy sev-low">
   <h3>attribution <span class="sev">low</span></h3>
-  <p>Outlets differ on who is credited with surfacing the flaws: one ties the discovery to OpenAI and Google&#39;s Wiz, another to OpenAI&#39;s GPT-5.6 Sol model specifically.</p>
+  <p>TechCrunch credits both OpenAI and Google&#39;s Wiz with finding the flaws, while Tom&#39;s Hardware attributes the discovery to OpenAI&#39;s own model alone.</p>
   <dl>
     <dt>
 <a href="https://techcrunch.com/2026/10/21/php-armageddon-openai-googles-wiz-find-ancient-holes-panicking-the-internet/" rel="noopener nofollow">techcrunch</a>
     </dt>
-    <dd><blockquote>OpenAI, Google’s Wiz find ancient holes</blockquote></dd>
+    <dd><blockquote>PHP armageddon: OpenAI, Google’s Wiz find ancient holes, panicking the internet</blockquote></dd>
     <dt>
 <a href="https://www.tomshardware.com/tech-industry/cyber-security/openai-says-gpt-5-6-sol-helped-uncover-critical-php-flaws-that-could-affect-70-percent-of-websites-ai-assisted-researchers-turned-two-year-old-bug-that-stumped-human-developers-into-working-exploits-in-two-weeks" rel="noopener nofollow">tomshardware</a>
     </dt>
-    <dd><blockquote>researchers using GPT-5.6 Sol uncovered two critical PHP vulnerabilities with severity scores of 9.2 and demonstrated working exploits, after which the company coordinated fixes.</blockquote></dd>
-  </dl>
-</section>
-<section class="discrepancy sev-low">
-  <h3>omission <span class="sev">low</span></h3>
-  <p>Wired&#39;s account of early exploitation attributes detection only to Amazon, while The Register&#39;s also credits Cloudflare with logging millions of attempts.</p>
-  <dl>
-    <dt>
-<a href="https://www.wired.com/story/hackers-exploited-the-php-vulnerabilities-days-before-they-were-patched/" rel="noopener nofollow">wired</a>
-    </dt>
-    <dd><blockquote>Amazon Web Services logged attempts to leverage the internet-melting PHP2Shell bugs four days ago. They&#39;re now being “broadly exploited” across the internet.</blockquote></dd>
-    <dt>
-<a href="https://www.theregister.com/cyber-crime/2026/10/22/hackers-pile-on-php2shell-as-aws-reveals-attacks-began-before-disclosure/5304749" rel="noopener nofollow">theregister</a>
-    </dt>
-    <dd><blockquote>Amazon spotted attackers trying their luck four days before patches landed</blockquote></dd>
-  </dl>
-</section>
-<section class="discrepancy sev-low">
-  <h3>framing <span class="sev">low</span></h3>
-  <p>Ars Technica initially described the exploit report as unconfirmed, while Wired&#39;s framing treated the threat as already certain and severe.</p>
-  <dl>
-    <dt>
-<a href="https://arstechnica.com/security/2026/10/php-maintainers-tell-web-devs-to-prepare-themselves-for-critical-security-patches/" rel="noopener nofollow">arstechnica</a>
-    </dt>
-    <dd><blockquote>Unconfirmed report claims PHP2Shell exploit remotely executes code on PHP sites.</blockquote></dd>
-    <dt>
-<a href="https://www.wired.com/story/this-is-not-a-drill-2-php-vulnerabilities-are-setting-the-internet-on-fire/" rel="noopener nofollow">wired</a>
-    </dt>
-    <dd><blockquote>Critical PHP Vulnerabilities Are Setting the Internet on Fire</blockquote></dd>
+    <dd><blockquote>OpenAI says ChatGPT Sol helped uncover critical PHP flaws that could affect 70% of websites</blockquote></dd>
   </dl>
 </section>
 
@@ -442,8 +459,18 @@
   </li>
   <li>
     <strong>bleepingcomputer</strong> &middot;
+    <time datetime="2026-10-28T13:50:59Z">2026-10-28T13:50:59Z</time><br>
+    <a href="https://www.bleepingcomputer.com/news/security/even-after-php2shell-blast-radius-matters-more-than-a-cvss-score/" rel="noopener nofollow">Even after PHP2Shell, blast radius matters more than a CVSS score</a>
+  </li>
+  <li>
+    <strong>bleepingcomputer</strong> &middot;
     <time datetime="2026-10-28T14:00:00Z">2026-10-28T14:00:00Z</time><br>
     <a href="https://www.bleepingcomputer.com/news/security/infratrust-report-warns-of-exploited-flaws-in-critical-network-infrastructure/" rel="noopener nofollow">InfraTrust report warns of exploited flaws in critical network infrastructure</a>
+  </li>
+  <li>
+    <strong>bleepingcomputer</strong> &middot;
+    <time datetime="2026-10-29T13:59:48Z">2026-10-29T13:59:48Z</time><br>
+    <a href="https://www.bleepingcomputer.com/news/security/cisa-warns-of-fragnesia-linux-flaw-chained-in-php2shell-attacks/" rel="noopener nofollow">CISA warns of Fragnesia Linux flaw chained in PHP2Shell attacks</a>
   </li>
 </ul>
 <p class="caveat">Headlines and opening sentences are quoted for comparison;
