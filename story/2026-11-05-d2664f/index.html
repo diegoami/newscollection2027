@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New OpenSSH and musl flaw lets attackers bypass Linux passwords &middot; newscollection2027</title>
+<link rel="stylesheet" href="/newscollection2027/style.css">
+</head>
+<body>
+<header>
+  <a class="wordmark" href="/newscollection2027/">newscollection<span>2027</span></a>
+  <nav>
+    <a href="/newscollection2027/">Today</a>
+    <a href="/newscollection2027/method/">Method</a>
+    <a href="/newscollection2027/status/">Status</a>
+  </nav>
+</header>
+<main>
+<article>
+<h1>New OpenSSH and musl flaw lets attackers bypass Linux passwords</h1>
+<p class="meta">
+  <time datetime="2026-11-05">2026-11-05</time>
+  &middot; 4 outlets
+  &middot; <span class="agreement full">full</span>
+</p>
+<p class="lede">A newly disclosed vulnerability nicknamed sshole combines flaws in OpenSSH and musl-libc, letting attackers bypass password authentication on Alpine Linux and possibly other musl-based distros by entering an overly long password, over 256 characters per Tom&#39;s Hardware. The Register calls the underlying OpenSSH bug decade-old and now fixed.</p>
+
+<h2>Claims</h2>
+<table class="claims">
+<thead><tr><th>Claim</th><th>arstechnica</th><th>bleepingcomputer</th><th>theregister</th><th>tomshardware</th></tr></thead>
+<tbody>
+<tr>
+  <th scope="row">A vulnerability nicknamed sshole combines OpenSSH and musl-libc flaws to bypass password authentication on Alpine Linux and possibly other distros.</th>
+  <td>
+    <blockquote cite="https://arstechnica.com/security/2026/11/vulnerability-allows-attackers-to-log-into-some-linux-devices-sans-password/"><a href="https://arstechnica.com/security/2026/11/vulnerability-allows-attackers-to-log-into-some-linux-devices-sans-password/" rel="noopener nofollow">Meet *sshole, the vulnerability that lets hackers SSH into Linux devices</a></blockquote>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/"><a href="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/" rel="noopener nofollow">OpenSSH flaw lets attackers log into password-disabled Linux accounts</a></blockquote>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/"><a href="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/" rel="noopener nofollow">*sshole</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+</tr>
+<tr>
+  <th scope="row">The exploit works by entering an overly long password, over 256 characters per Tom&#39;s Hardware.</th>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/"><a href="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/" rel="noopener nofollow">simply by entering an oversized password</a></blockquote>
+  </td>
+  <td>
+    <blockquote cite="https://www.theregister.com/security/2026/11/05/get-root-on-a-musl-linux-system-by-slamming-it-with-an-overly-long-password/5307910"><a href="https://www.theregister.com/security/2026/11/05/get-root-on-a-musl-linux-system-by-slamming-it-with-an-overly-long-password/5307910" rel="noopener nofollow">by slamming it with an overly long password</a></blockquote>
+  </td>
+  <td>
+    <blockquote cite="https://www.tomshardware.com/tech-industry/cyber-security/combined-flaws-let-anyone-into-alpine-linux-and-other-distros-by-typing-anything-over-256-characters-as-a-password-emergency-fixes-for-openssh-and-musl-libc-issued-for-millions-of-systems-patch-immediately"><a href="https://www.tomshardware.com/tech-industry/cyber-security/combined-flaws-let-anyone-into-alpine-linux-and-other-distros-by-typing-anything-over-256-characters-as-a-password-emergency-fixes-for-openssh-and-musl-libc-issued-for-millions-of-systems-patch-immediately" rel="noopener nofollow">by typing anything over 256 characters as a password</a></blockquote>
+  </td>
+</tr>
+<tr>
+  <th scope="row">The Register describes the underlying OpenSSH vulnerability as decade-old and now fixed.</th>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.theregister.com/security/2026/11/05/get-root-on-a-musl-linux-system-by-slamming-it-with-an-overly-long-password/5307910"><a href="https://www.theregister.com/security/2026/11/05/get-root-on-a-musl-linux-system-by-slamming-it-with-an-overly-long-password/5307910" rel="noopener nofollow">Decade-old vulnerability in OpenSSH is now fixed, so get a-patchin&#39;</a></blockquote>
+  </td>
+  <td>
+  </td>
+</tr>
+<tr>
+  <th scope="row">Other distros beyond Alpine may also be affected.</th>
+  <td>
+    <blockquote cite="https://arstechnica.com/security/2026/11/vulnerability-allows-attackers-to-log-into-some-linux-devices-sans-password/"><a href="https://arstechnica.com/security/2026/11/vulnerability-allows-attackers-to-log-into-some-linux-devices-sans-password/" rel="noopener nofollow">Certain configurations of Alpine are affected. Other distros may be as well.</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+</tr>
+</tbody>
+</table>
+
+<h2>Where they differ</h2>
+<p class="empty">Nowhere the given text shows. The outlets agree on everything
+their headlines and ledes state.</p>
+
+<h2>Sources</h2>
+<ul class="sources">
+  <li>
+    <strong>bleepingcomputer</strong> &middot;
+    <time datetime="2026-11-05T17:45:29Z">2026-11-05T17:45:29Z</time><br>
+    <a href="https://www.bleepingcomputer.com/news/security/openssh-flaw-lets-attackers-log-into-password-disabled-linux-accounts/" rel="noopener nofollow">OpenSSH flaw lets attackers log into password-disabled Linux accounts</a>
+  </li>
+  <li>
+    <strong>tomshardware</strong> &middot;
+    <time datetime="2026-11-05T18:14:56Z">2026-11-05T18:14:56Z</time><br>
+    <a href="https://www.tomshardware.com/tech-industry/cyber-security/combined-flaws-let-anyone-into-alpine-linux-and-other-distros-by-typing-anything-over-256-characters-as-a-password-emergency-fixes-for-openssh-and-musl-libc-issued-for-millions-of-systems-patch-immediately" rel="noopener nofollow">Combined OpenSSH and musl-libc flaws let anyone into Alpine Linux and other distros by typing anything over 256 characters as a password</a>
+  </li>
+  <li>
+    <strong>theregister</strong> &middot;
+    <time datetime="2026-11-05T18:29:00Z">2026-11-05T18:29:00Z</time><br>
+    <a href="https://www.theregister.com/security/2026/11/05/get-root-on-a-musl-linux-system-by-slamming-it-with-an-overly-long-password/5307910" rel="noopener nofollow">Get root on a musl Linux system by slamming it with an overly long password</a>
+  </li>
+  <li>
+    <strong>arstechnica</strong> &middot;
+    <time datetime="2026-11-05T23:09:36Z">2026-11-05T23:09:36Z</time><br>
+    <a href="https://arstechnica.com/security/2026/11/vulnerability-allows-attackers-to-log-into-some-linux-devices-sans-password/" rel="noopener nofollow">Meet *sshole, the vulnerability that lets hackers SSH into Linux devices</a>
+  </li>
+</ul>
+<p class="caveat">Headlines and opening sentences are quoted for comparison;
+the articles themselves belong to the outlets above and are linked, not
+reproduced.</p>
+<p class="caveat">Analysed by <code>claude_code</code> using
+<code>claude-sonnet-5</code> from headlines and opening sentences only.</p>
+</article>
+</main>
+<footer>
+  <p>Every claim below is quoted verbatim from an outlet's own headline or
+  opening sentence. This site never has the article bodies, and it does not
+  decide who is right.</p>
+</footer>
+</body>
+</html>
