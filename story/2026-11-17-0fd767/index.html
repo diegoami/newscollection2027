@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Critical Java4Shell flaw enables remote code execution in Java apps &middot; newscollection2027</title>
+<title>Critical Java4Shell flaw enables remote code execution across Java apps &middot; newscollection2027</title>
 <link rel="stylesheet" href="/newscollection2027/style.css">
 </head>
 <body>
@@ -17,57 +17,110 @@
 </header>
 <main>
 <article>
-<h1>Critical Java4Shell flaw enables remote code execution in Java apps</h1>
+<h1>Critical Java4Shell flaw enables remote code execution across Java apps</h1>
 <p class="meta">
   <time datetime="2026-11-17">2026-11-17</time>
-  &middot; 2 outlets
-  &middot; <span class="agreement full">full</span>
+  &middot; 4 outlets
+  &middot; <span class="agreement partial">partial</span>
 </p>
-<p class="lede">A critical OpenJDK vulnerability called Java4Shell, disclosed by Oracle, lets unauthenticated attackers remotely execute code or crash the JVM on major Java applications including Jenkins, Atlassian Jira, Confluence, and Keycloak.</p>
+<p class="lede">A critical vulnerability called Java4Shell in OpenJDK can let unauthenticated attackers remotely execute code on major applications such as Jenkins, Jira, Confluence, and Keycloak, and can be triggered simply by inputting repeated text. Oracle has disclosed the bug as urgent, though one report attributes its discovery to an AI-driven startup that had previously found a PHP flaw. Millions of sites and services are described as at risk.</p>
 
 <h2>Claims</h2>
 <table class="claims">
-<thead><tr><th>Claim</th><th>bleepingcomputer</th><th>theregister</th></tr></thead>
+<thead><tr><th>Claim</th><th>bbc-technology</th><th>bleepingcomputer</th><th>theregister</th><th>tomshardware</th></tr></thead>
 <tbody>
 <tr>
-  <th scope="row">A critical OpenJDK vulnerability called Java4Shell allows unauthenticated attackers to remotely execute code on major Java applications.</th>
+  <th scope="row">A critical Java4Shell vulnerability in OpenJDK can let unauthenticated attackers remotely execute code or crash affected systems.</th>
   <td>
-    <blockquote cite="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/"><a href="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/" rel="noopener nofollow">Critical Java4Shell flaw allows RCE attacks on major Java applications</a></blockquote>
+  </td>
+  <td>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/"><a href="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/" rel="noopener nofollow">A critical vulnerability dubbed Java4Shell in OpenJDK</a></blockquote>
   </td>
   <td>
     <blockquote cite="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661"><a href="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661" rel="noopener nofollow">Attackers can crash the JVM or achieve unauthenticated RCE</a></blockquote>
   </td>
-</tr>
-<tr>
-  <th scope="row">Affected applications include Jenkins, Atlassian Jira, Confluence, and Keycloak.</th>
   <td>
-    <blockquote cite="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/"><a href="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/" rel="noopener nofollow">including Jenkins, Atlassian Jira, Confluence, and Keycloak.</a></blockquote>
-  </td>
-  <td>
+    <blockquote cite="https://www.tomshardware.com/tech-industry/cyber-security/critical-java-vulnerability-puts-millions-of-sites-services-and-devices-at-risk-of-remote-code-execution-triggers-with-64-as-and-an-sign-openjdk-optimization-bug-lets-an-attacker-trigger-it-just-by-inputting-repeated-text"><a href="https://www.tomshardware.com/tech-industry/cyber-security/critical-java-vulnerability-puts-millions-of-sites-services-and-devices-at-risk-of-remote-code-execution-triggers-with-64-as-and-an-sign-openjdk-optimization-bug-lets-an-attacker-trigger-it-just-by-inputting-repeated-text" rel="noopener nofollow">Critical Java vulnerability puts millions of sites, services, and devices at risk of remote code execution</a></blockquote>
   </td>
 </tr>
 <tr>
-  <th scope="row">Attackers can also crash the JVM, not only achieve RCE.</th>
+  <th scope="row">The flaw affects popular enterprise applications, including Jenkins, Atlassian Jira, Confluence, and Keycloak.</th>
   <td>
   </td>
   <td>
-    <blockquote cite="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661"><a href="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661" rel="noopener nofollow">Attackers can crash the JVM or achieve unauthenticated RCE</a></blockquote>
+    <blockquote cite="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/"><a href="https://www.bleepingcomputer.com/news/security/critical-java4shell-flaw-allows-rce-attacks-on-major-java-applications/" rel="noopener nofollow">including Jenkins, Atlassian Jira, Confluence, and Keycloak</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
   </td>
 </tr>
 <tr>
-  <th scope="row">Oracle disclosed the bug.</th>
+  <th scope="row">Oracle has revealed the bug, describing it as needing to be fixed urgently.</th>
+  <td>
+  </td>
   <td>
   </td>
   <td>
     <blockquote cite="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661"><a href="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661" rel="noopener nofollow">Oracle reveals fix-this-ASAP-grade Java4Shell bug that allows attacks on many third-party apps</a></blockquote>
+  </td>
+  <td>
+  </td>
+</tr>
+<tr>
+  <th scope="row">One report says the bug was discovered by a tech start-up using AI, the same start-up that previously found a PHP flaw.</th>
+  <td>
+    <blockquote cite="https://www.bbc.co.uk/news/articles/cke89jevqm1vo"><a href="https://www.bbc.co.uk/news/articles/cke89jevqm1vo" rel="noopener nofollow">The same tech start-up that discovered a PHP flaw used AI to uncover a critical software bug</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+</tr>
+<tr>
+  <th scope="row">Attackers can trigger the bug simply by inputting repeated text.</th>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
+    <blockquote cite="https://www.tomshardware.com/tech-industry/cyber-security/critical-java-vulnerability-puts-millions-of-sites-services-and-devices-at-risk-of-remote-code-execution-triggers-with-64-as-and-an-sign-openjdk-optimization-bug-lets-an-attacker-trigger-it-just-by-inputting-repeated-text"><a href="https://www.tomshardware.com/tech-industry/cyber-security/critical-java-vulnerability-puts-millions-of-sites-services-and-devices-at-risk-of-remote-code-execution-triggers-with-64-as-and-an-sign-openjdk-optimization-bug-lets-an-attacker-trigger-it-just-by-inputting-repeated-text" rel="noopener nofollow">Attackers can trigger the bug by just inputting repeated text</a></blockquote>
+  </td>
+</tr>
+<tr>
+  <th scope="row">Java is described as the world&#39;s third-largest programming language.</th>
+  <td>
+    <blockquote cite="https://www.bbc.co.uk/news/articles/cke89jevqm1vo"><a href="https://www.bbc.co.uk/news/articles/cke89jevqm1vo" rel="noopener nofollow">world&#39;s third-largest programming language</a></blockquote>
+  </td>
+  <td>
+  </td>
+  <td>
+  </td>
+  <td>
   </td>
 </tr>
 </tbody>
 </table>
 
 <h2>Where they differ</h2>
-<p class="empty">Nowhere the given text shows. The outlets agree on everything
-their headlines and ledes state.</p>
+<section class="discrepancy sev-medium">
+  <h3>attribution <span class="sev">medium</span></h3>
+  <p>Outlets differ on who is credited with finding the flaw: one says Oracle revealed it, another says an AI-driven start-up discovered it.</p>
+  <dl>
+    <dt>
+<a href="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661" rel="noopener nofollow">theregister</a>
+    </dt>
+    <dd><blockquote>Oracle reveals fix-this-ASAP-grade Java4Shell bug that allows attacks on many third-party apps</blockquote></dd>
+    <dt>
+<a href="https://www.bbc.co.uk/news/articles/cke89jevqm1vo" rel="noopener nofollow">bbc-technology</a>
+    </dt>
+    <dd><blockquote>The same tech start-up that discovered a PHP flaw used AI to uncover a critical software bug</blockquote></dd>
+  </dl>
+</section>
 
 <h2>Sources</h2>
 <ul class="sources">
@@ -80,6 +133,16 @@ their headlines and ledes state.</p>
     <strong>theregister</strong> &middot;
     <time datetime="2026-11-18T04:33:05Z">2026-11-18T04:33:05Z</time><br>
     <a href="https://www.theregister.com/security/2026/11/18/oracle-reveals-fix-this-asap-grade-java4shell-bug-that-allows-attacks-on-many-third-party-apps/5310661" rel="noopener nofollow">Oracle reveals fix-this-ASAP-grade Java4Shell bug that allows attacks on many third-party apps</a>
+  </li>
+  <li>
+    <strong>bbc-technology</strong> &middot;
+    <time datetime="2026-11-18T08:47:06Z">2026-11-18T08:47:06Z</time><br>
+    <a href="https://www.bbc.co.uk/news/articles/cke89jevqm1vo" rel="noopener nofollow">Security flaw found in Java, world&#39;s third-largest programming language</a>
+  </li>
+  <li>
+    <strong>tomshardware</strong> &middot;
+    <time datetime="2026-11-19T10:30:00Z">2026-11-19T10:30:00Z</time><br>
+    <a href="https://www.tomshardware.com/tech-industry/cyber-security/critical-java-vulnerability-puts-millions-of-sites-services-and-devices-at-risk-of-remote-code-execution-triggers-with-64-as-and-an-sign-openjdk-optimization-bug-lets-an-attacker-trigger-it-just-by-inputting-repeated-text" rel="noopener nofollow">Critical Java vulnerability puts millions of sites, services, and devices at risk of remote code execution</a>
   </li>
 </ul>
 <p class="caveat">Headlines and opening sentences are quoted for comparison;
